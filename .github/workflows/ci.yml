@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version diff and tagging
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -36,3 +38,147 @@ jobs:
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # --- Version auto-increment & tagging (push to main only) ---
+      - name: Check if version was bumped in this commit
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: version_check
+        run: |
+          # Get current versionName from build.gradle.kts
+          CURRENT_VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          # Check if versionName was changed in this push
+          if git diff HEAD~1 -- app/build.gradle.kts | grep -q 'versionName'; then
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Check if a tag already exists for this version
+          if git tag -l "v$CURRENT_VERSION" | grep -q .; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auto-increment patch version
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.version_check.outputs.version_changed == 'false'
+        id: bump
+        run: |
+          CURRENT="${{ steps.version_check.outputs.current_version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+
+          # Also increment versionCode
+          CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
+          NEW_CODE=$((CURRENT_CODE + 1))
+
+          sed -i "s/versionName = \"$CURRENT\"/versionName = \"$NEW_VERSION\"/" app/build.gradle.kts
+          sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" app/build.gradle.kts
+
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped version: $CURRENT -> $NEW_VERSION (code $CURRENT_CODE -> $NEW_CODE)"
+
+      - name: Commit version bump
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.version_check.outputs.version_changed == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
+          git push
+
+      - name: Tag new version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: tagging
+        run: |
+          # Determine which version to tag
+          if [ "${{ steps.version_check.outputs.version_changed }}" == "true" ]; then
+            VERSION="${{ steps.version_check.outputs.current_version }}"
+          else
+            VERSION="${{ steps.bump.outputs.new_version }}"
+          fi
+
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # Only create tag if it doesn't already exist
+          if ! git tag -l "$TAG" | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $VERSION"
+            git push origin "$TAG"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+            echo "Created and pushed tag $TAG"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG already exists, skipping"
+          fi
+
+      - name: Build release APK
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.tagging.outputs.created == 'true'
+        run: ./gradlew assembleRelease
+
+      - name: Generate release notes
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.tagging.outputs.created == 'true'
+        id: release_notes
+        run: |
+          TAG="${{ steps.tagging.outputs.tag }}"
+          VERSION="${{ steps.tagging.outputs.version }}"
+
+          # Get the previous tag for changelog
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^$TAG$" | head -n 1)
+
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s" --no-merges | grep -v '\[skip ci\]')
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | grep -v '\[skip ci\]')
+          fi
+
+          # Write to file to preserve newlines
+          cat > /tmp/release_notes.md << NOTES_EOF
+          ## What's Changed
+
+          $CHANGELOG
+
+          ---
+          **Full Changelog**: ${PREV_TAG:+\`$PREV_TAG\`...\`$TAG\`}${PREV_TAG:-Initial release}
+          NOTES_EOF
+
+      - name: Create GitHub Release
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.tagging.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tagging.outputs.tag }}"
+          VERSION="${{ steps.tagging.outputs.version }}"
+
+          # Collect APKs to attach
+          ASSETS=""
+          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -1)
+
+          if [ -n "$DEBUG_APK" ]; then
+            ASSETS="$ASSETS $DEBUG_APK"
+          fi
+          if [ -n "$RELEASE_APK" ]; then
+            ASSETS="$ASSETS $RELEASE_APK"
+          fi
+
+          gh release create "$TAG" \
+            --title "RallyTrax $VERSION" \
+            --notes-file /tmp/release_notes.md \
+            $ASSETS
