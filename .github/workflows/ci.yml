@@ -30,36 +30,18 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-
-      # --- Version auto-increment & tagging (push to main only) ---
+      # --- Version auto-increment (push to main only, before any APK builds) ---
       - name: Check if version was bumped in this commit
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: version_check
         run: |
-          # Get current versionName from build.gradle.kts
           CURRENT_VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
-          # Check if versionName was changed in this push
           if git diff HEAD~1 -- app/build.gradle.kts | grep -q 'versionName'; then
             echo "version_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "version_changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          # Check if a tag already exists for this version
-          if git tag -l "v$CURRENT_VERSION" | grep -q .; then
-            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Auto-increment patch version
@@ -73,7 +55,6 @@ jobs:
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
 
-          # Also increment versionCode
           CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
           NEW_CODE=$((CURRENT_CODE + 1))
 
@@ -94,26 +75,27 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
           git push
 
+      - name: Determine release version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: release_version
+        run: |
+          # After any bump, read the actual version from build.gradle.kts
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION ($TAG)"
+
       - name: Tag new version
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: tagging
         run: |
-          # Determine which version to tag
-          if [ "${{ steps.version_check.outputs.version_changed }}" == "true" ]; then
-            VERSION="${{ steps.version_check.outputs.current_version }}"
-          else
-            VERSION="${{ steps.bump.outputs.new_version }}"
-          fi
+          TAG="${{ steps.release_version.outputs.tag }}"
 
-          TAG="v$VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-          # Only create tag if it doesn't already exist
           if ! git tag -l "$TAG" | grep -q .; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $VERSION"
+            git tag -a "$TAG" -m "Release ${{ steps.release_version.outputs.version }}"
             git push origin "$TAG"
             echo "created=true" >> "$GITHUB_OUTPUT"
             echo "Created and pushed tag $TAG"
@@ -122,11 +104,29 @@ jobs:
             echo "Tag $TAG already exists, skipping"
           fi
 
+      # --- Build APKs AFTER version bump so versions match the tag ---
+      - name: Build debug APK
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.tagging.outputs.created == 'true'
+        run: ./gradlew assembleDebug
+
       - name: Build release APK
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
           && steps.tagging.outputs.created == 'true'
         run: ./gradlew assembleRelease
+
+      # --- For PRs, just build the debug APK ---
+      - name: Build debug APK (PR)
+        if: github.event_name == 'pull_request'
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
 
       - name: Generate release notes
         if: >
@@ -134,10 +134,8 @@ jobs:
           && steps.tagging.outputs.created == 'true'
         id: release_notes
         run: |
-          TAG="${{ steps.tagging.outputs.tag }}"
-          VERSION="${{ steps.tagging.outputs.version }}"
+          TAG="${{ steps.release_version.outputs.tag }}"
 
-          # Get the previous tag for changelog
           PREV_TAG=$(git tag --sort=-v:refname | grep -v "^$TAG$" | head -n 1)
 
           if [ -n "$PREV_TAG" ]; then
@@ -146,7 +144,6 @@ jobs:
             CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | grep -v '\[skip ci\]')
           fi
 
-          # Write to file to preserve newlines
           cat > /tmp/release_notes.md << NOTES_EOF
           ## What's Changed
 
@@ -163,10 +160,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ steps.tagging.outputs.tag }}"
-          VERSION="${{ steps.tagging.outputs.version }}"
+          TAG="${{ steps.release_version.outputs.tag }}"
+          VERSION="${{ steps.release_version.outputs.version }}"
 
-          # Collect APKs to attach
           ASSETS=""
           DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
           RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -1)
