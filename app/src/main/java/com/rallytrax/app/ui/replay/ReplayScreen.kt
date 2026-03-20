@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -81,6 +82,7 @@ fun ReplayScreen(
                 items(tracks) { track ->
                     ReplayTrackItem(
                         track = track,
+                        unitSystem = preferences.unitSystem,
                         onClick = { onTrackSelected(track.id) },
                     )
                 }
@@ -92,6 +94,7 @@ fun ReplayScreen(
 @Composable
 private fun ReplayTrackItem(
     track: TrackEntity,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     onClick: () -> Unit,
 ) {
     Card(
@@ -119,7 +122,7 @@ private fun ReplayTrackItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = formatDistance(track.distanceMeters, preferences.unitSystem),
+                        text = formatDistance(track.distanceMeters, unitSystem),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
