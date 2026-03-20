@@ -8,6 +8,13 @@ plugins {
     alias(libs.plugins.room)
 }
 
+val localProperties = java.util.Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        load(localPropsFile.inputStream())
+    }
+}
+
 android {
     namespace = "com.rallytrax.app"
     compileSdk = 35
@@ -20,6 +27,13 @@ android {
         versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Maps API key: local.properties → env var → empty fallback
+        val mapsApiKey = localProperties.getProperty("MAPS_API_KEY")
+            ?: System.getenv("MAPS_API_KEY")
+            ?: ""
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     buildTypes {

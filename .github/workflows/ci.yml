@@ -25,9 +25,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run lint
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew lint
 
       - name: Run unit tests
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew test
 
       # --- Version auto-increment (push to main only, before any APK builds) ---
@@ -109,17 +113,23 @@ jobs:
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
           && steps.tagging.outputs.created == 'true'
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew assembleDebug
 
       - name: Build release APK
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
           && steps.tagging.outputs.created == 'true'
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew assembleRelease
 
       # --- For PRs, just build the debug APK ---
       - name: Build debug APK (PR)
         if: github.event_name == 'pull_request'
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew assembleDebug
 
       - name: Upload debug APK
