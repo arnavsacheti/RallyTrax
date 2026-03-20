@@ -21,6 +21,29 @@ android {
     namespace = "com.rallytrax.app"
     compileSdk = 35
 
+    signingConfigs {
+        create("release") {
+            // CI: keystore decoded from base64 secret into a temp file
+            // Local: keystore file lives at app/release.jks
+            val ciKeystorePath = System.getenv("KEYSTORE_FILE")
+            val keystoreFile = if (!ciKeystorePath.isNullOrBlank()) {
+                file(ciKeystorePath)
+            } else {
+                file("release.jks")
+            }
+
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                    ?: localProperties.getProperty("KEYSTORE_PASSWORD", "rallytrax2024")
+                keyAlias = System.getenv("KEY_ALIAS")
+                    ?: localProperties.getProperty("KEY_ALIAS", "rallytrax")
+                keyPassword = System.getenv("KEY_PASSWORD")
+                    ?: localProperties.getProperty("KEY_PASSWORD", "rallytrax2024")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.rallytrax.app"
         minSdk = 29
@@ -46,6 +69,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"

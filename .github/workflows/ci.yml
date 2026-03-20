@@ -117,12 +117,23 @@ jobs:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew assembleDebug
 
+      - name: Decode release keystore
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.tagging.outputs.created == 'true'
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/app/ci-release.jks
+
       - name: Build release APK
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
           && steps.tagging.outputs.created == 'true'
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          KEYSTORE_FILE: ${{ github.workspace }}/app/ci-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
       # --- For PRs, just build the debug APK ---
