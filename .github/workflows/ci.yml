@@ -15,28 +15,65 @@ jobs:
         with:
           fetch-depth: 0  # Full history for version diff and tagging
 
+      - name: Check for app changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="HEAD~1"
+          fi
+
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(app/|gradle/|build\.gradle|settings\.gradle|gradlew)'; then
+            echo "app_changed=true" >> "$GITHUB_OUTPUT"
+            echo "App-related files changed, running full pipeline"
+          else
+            echo "app_changed=false" >> "$GITHUB_OUTPUT"
+            echo "No app changes detected, skipping lint/build/release"
+          fi
+
       - name: Set up JDK 17
+        if: steps.changes.outputs.app_changed == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Gradle
+        if: steps.changes.outputs.app_changed == 'true'
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run lint
+        if: steps.changes.outputs.app_changed == 'true'
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew lint
 
       - name: Run unit tests
+        if: steps.changes.outputs.app_changed == 'true'
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew test
 
-      # --- Version auto-increment (push to main only, before any APK builds) ---
+      # --- For PRs, just build the debug APK ---
+      - name: Build debug APK (PR)
+        if: github.event_name == 'pull_request' && steps.changes.outputs.app_changed == 'true'
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK (PR)
+        if: github.event_name == 'pull_request' && steps.changes.outputs.app_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+      # --- Main branch: version bump locally, build, then commit/tag/release ---
       - name: Check if version was bumped in this commit
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
         id: version_check
         run: |
           CURRENT_VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
@@ -51,6 +88,7 @@ jobs:
       - name: Auto-increment patch version
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
           && steps.version_check.outputs.version_changed == 'false'
         id: bump
         run: |
@@ -68,9 +106,39 @@ jobs:
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "Bumped version: $CURRENT -> $NEW_VERSION (code $CURRENT_CODE -> $NEW_CODE)"
 
+      # --- Build APKs with bumped version (uncommitted) ---
+      - name: Build debug APK
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: ./gradlew assembleDebug
+
+      - name: Decode release keystore
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/app/ci-release.jks
+
+      - name: Build release APK
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          KEYSTORE_FILE: ${{ github.workspace }}/app/ci-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      # --- Build succeeded: now commit version bump, tag, and release ---
       - name: Commit version bump
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
           && steps.version_check.outputs.version_changed == 'false'
         run: |
           git config user.name "github-actions[bot]"
@@ -80,10 +148,11 @@ jobs:
           git push
 
       - name: Determine release version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
         id: release_version
         run: |
-          # After any bump, read the actual version from build.gradle.kts
           VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
           TAG="v$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -91,7 +160,9 @@ jobs:
           echo "Release version: $VERSION ($TAG)"
 
       - name: Tag new version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
         id: tagging
         run: |
           TAG="${{ steps.release_version.outputs.tag }}"
@@ -108,42 +179,10 @@ jobs:
             echo "Tag $TAG already exists, skipping"
           fi
 
-      # --- Build APKs AFTER version bump so versions match the tag ---
-      - name: Build debug APK
-        if: >
-          github.event_name == 'push' && github.ref == 'refs/heads/main'
-          && steps.tagging.outputs.created == 'true'
-        env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
-        run: ./gradlew assembleDebug
-
-      - name: Decode release keystore
-        if: >
-          github.event_name == 'push' && github.ref == 'refs/heads/main'
-          && steps.tagging.outputs.created == 'true'
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/app/ci-release.jks
-
-      - name: Build release APK
-        if: >
-          github.event_name == 'push' && github.ref == 'refs/heads/main'
-          && steps.tagging.outputs.created == 'true'
-        env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
-          KEYSTORE_FILE: ${{ github.workspace }}/app/ci-release.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
-
-      # --- For PRs, just build the debug APK ---
-      - name: Build debug APK (PR)
-        if: github.event_name == 'pull_request'
-        env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
-        run: ./gradlew assembleDebug
-
       - name: Upload debug APK
+        if: >
+          github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
@@ -152,6 +191,7 @@ jobs:
       - name: Generate release notes
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
           && steps.tagging.outputs.created == 'true'
         id: release_notes
         run: |
@@ -177,6 +217,7 @@ jobs:
       - name: Create GitHub Release
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && steps.changes.outputs.app_changed == 'true'
           && steps.tagging.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
