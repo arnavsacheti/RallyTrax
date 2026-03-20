@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RallyTrax — Drive. Record. Replay. Co-Drive.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+/* ============================================
+   RallyTrax Landing Page — Flighty-inspired
+   Dark-mode-first, Inter font, Pixel 10 mockups
+   ============================================ */
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #08080f;
+  --bg-surface: #0e0e1a;
+  --bg-card: #141425;
+  --bg-card-hover: #1a1a32;
+  --text: #f0f0f5;
+  --text-secondary: #8888a0;
+  --accent: #1A73E8;
+  --accent-glow: rgba(26, 115, 232, 0.15);
+  --accent-dim: #1259b5;
+  --orange: #FF6B35;
+  --red: #E63946;
+  --green: #2EC486;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --max-width: 1200px;
+  --phone-width: 280px;
+  --phone-height: 600px;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---- Navigation ---- */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(8, 8, 15, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.nav-links a {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.nav-links a:hover {
+  color: var(--text);
+}
+
+.nav-cta {
+  background: var(--accent);
+  color: white !important;
+  padding: 8px 20px;
+  border-radius: 100px;
+  font-weight: 600 !important;
+  transition: background 0.2s, transform 0.2s !important;
+}
+
+.nav-cta:hover {
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+}
+
+/* ---- Buttons ---- */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: white;
+  padding: 14px 32px;
+  border-radius: 100px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--accent-dim);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(26, 115, 232, 0.3);
+}
+
+.btn-primary.large {
+  padding: 18px 40px;
+  font-size: 18px;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  padding: 14px 24px;
+  border-radius: 100px;
+  font-weight: 500;
+  font-size: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ---- Hero Section ---- */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 24px 80px;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  gap: 60px;
+}
+
+.hero-bg-glow {
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 600px;
+  background: radial-gradient(ellipse, rgba(26, 115, 232, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-content {
+  flex: 1;
+  max-width: 540px;
+  z-index: 1;
+}
+
+.hero-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  background: var(--accent-glow);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 24px;
+  letter-spacing: 0.02em;
+}
+
+.hero h1 {
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: 20px;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent) 0%, #5DADE2 50%, var(--accent) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 4s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+.hero-sub {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  max-width: 460px;
+}
+
+.hero-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.hero-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.hero-phone-wrapper {
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+/* ---- Pixel 10 Phone Mockup ---- */
+.pixel-phone {
+  width: var(--phone-width);
+  height: var(--phone-height);
+  background: #1a1a1a;
+  border-radius: 36px;
+  padding: 8px;
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 80px rgba(26, 115, 232, 0.08);
+}
+
+.pixel-phone::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 20px;
+  background: #0a0a0a;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+.pixel-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+/* ---- Mock App Screens ---- */
+.mock-app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  position: relative;
+}
+
+.mock-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 16px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mock-statusbar.dark {
+  color: white;
+}
+
+.mock-statusbar-icons {
+  display: flex;
+  gap: 4px;
+  font-size: 8px;
+}
+
+/* -- Home Screen -- */
+.mock-home {
+  background: var(--bg-surface);
+}
+
+.mock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px 12px;
+}
+
+.mock-greeting {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.mock-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mock-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #5DADE2);
+}
+
+.mock-stats-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.mock-stat-card {
+  flex: 1;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mock-stat-label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.mock-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+}
+
+.mock-stat-value span {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.mock-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px 6px;
+  color: var(--text-secondary);
+}
+
+.mock-track-card {
+  display: flex;
+  gap: 10px;
+  padding: 8px 16px;
+  align-items: center;
+}
+
+.mock-track-map {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(135deg, #1a2540, #0d1a30);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mock-track-map::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(15deg);
+}
+
+.mock-track-map.map2::after {
+  border-color: var(--green);
+  border-right-color: transparent;
+  border-top-color: transparent;
+  transform: rotate(-10deg);
+}
+
+.mock-track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-track-name {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.mock-track-meta {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.mock-fab {
+  position: absolute;
+  bottom: 64px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(26, 115, 232, 0.4);
+}
+
+.mock-bottomnav {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0 12px;
+  background: var(--bg-surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mock-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+
+.mock-nav-item.active {
+  color: var(--accent);
+}
+
+.mock-nav-item svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* -- Recording Screen -- */
+.mock-recording {
+  background: #0a0a14;
+}
+
+.mock-map-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.mock-map-bg {
+  width: 100%;
+  height: 100%;
+}
+
+.mock-recording-hud {
+  background: rgba(10, 10, 20, 0.95);
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mock-rec-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--red);
+  margin-bottom: 10px;
+}
+
+.rec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: rec-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.mock-rec-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.mock-rec-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: white;
+}
+
+.mock-rec-stat-value small {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.mock-rec-stat-label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mock-rec-controls {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.mock-rec-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.mock-rec-btn.pause {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mock-rec-btn.stop {
+  background: var(--red);
+}
+
+/* -- Library Screen -- */
+.mock-library {
+  background: var(--bg-surface);
+}
+
+.mock-lib-header {
+  padding: 4px 16px 8px;
+}
+
+.mock-lib-header .mock-title {
+  margin-bottom: 10px;
+}
+
+.mock-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mock-filter-row {
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.mock-chip {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mock-chip.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.mock-lib-list {
+  flex: 1;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.mock-lib-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+}
+
+.mock-lib-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(135deg, #1a2540, #0d1a30);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.mock-lib-thumb::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(20deg);
+}
+
+.mock-lib-thumb.t2::after {
+  border-color: var(--green);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(-15deg);
+}
+
+.mock-lib-thumb.t3::after {
+  border-color: var(--orange);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  transform: rotate(35deg);
+}
+
+.mock-lib-thumb.t4::after {
+  border-color: #9B59B6;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  transform: rotate(-25deg);
+}
+
+.mock-lib-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-lib-name {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.mock-lib-meta {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.mock-lib-tags {
+  display: flex;
+  gap: 4px;
+}
+
+.mock-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 500;
+  background: rgba(26, 115, 232, 0.15);
+  color: var(--accent);
+}
+
+.mock-lib-date {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* -- Pace Notes Screen -- */
+.mock-pacenotes {
+  background: var(--bg-surface);
+}
+
+.mock-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.mock-detail-map {
+  height: 120px;
+  overflow: hidden;
+}
+
+.mock-detail-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 16px;
+}
+
+.mock-detail-tab {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  position: relative;
+}
+
+.mock-detail-tab.active {
+  color: var(--accent);
+}
+
+.mock-detail-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.mock-notes-list {
+  flex: 1;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.mock-note-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+}
+
+.mock-note-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mock-note-icon.left-turn { background: var(--accent); }
+.mock-note-icon.right-turn { background: var(--orange); }
+.mock-note-icon.hairpin-icon { background: var(--red); }
+.mock-note-icon.straight-icon { background: var(--green); }
+
+.mock-note-content {
+  flex: 1;
+}
+
+.mock-note-call {
+  font-weight: 600;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mock-note-dist {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.mock-note-severity {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mock-note-severity.s1 { background: rgba(46, 196, 134, 0.15); color: var(--green); }
+.mock-note-severity.s2 { background: rgba(26, 115, 232, 0.15); color: var(--accent); }
+.mock-note-severity.s3 { background: rgba(255, 107, 53, 0.15); color: var(--orange); }
+.mock-note-severity.s4 { background: rgba(255, 107, 53, 0.2); color: var(--orange); }
+.mock-note-severity.s6 { background: rgba(230, 57, 70, 0.15); color: var(--red); }
+
+/* -- Replay Screen -- */
+.mock-replay {
+  background: #0a0a14;
+}
+
+.mock-replay-note-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 12px;
+  padding: 10px 14px;
+  background: rgba(255, 107, 53, 0.12);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  border-radius: var(--radius-sm);
+  z-index: 2;
+}
+
+.mock-replay-note-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--orange);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mock-replay-note-call {
+  font-weight: 700;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mock-replay-note-dist {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.mock-replay-map {
+  flex: 1;
+  overflow: hidden;
+}
+
+.mock-replay-speed {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.mock-replay-speed-value {
+  font-size: 40px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.03em;
+}
+
+.mock-replay-speed-unit {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.mock-replay-progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0 12px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mock-replay-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.mock-replay-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px 12px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.mock-replay-mute {
+  opacity: 0.6;
+}
+
+/* ---- Feature Sections ---- */
+.feature-section {
+  padding: 80px 24px;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 80px;
+}
+
+.feature-row.reverse {
+  flex-direction: row-reverse;
+}
+
+.feature-text {
+  flex: 1;
+  max-width: 480px;
+}
+
+.feature-label {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+
+.feature-text h2 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  margin-bottom: 16px;
+}
+
+.feature-text p {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.feature-phone-wrapper {
+  flex-shrink: 0;
+}
+
+.feature-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feature-detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.feature-detail-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* -- Pace Note Examples -- */
+.pace-note-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pace-note-example {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.pace-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pace-icon.left { background: var(--accent); }
+.pace-icon.right { background: var(--orange); }
+.pace-icon.hairpin { background: var(--red); }
+
+.pace-call {
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 2px;
+}
+
+.pace-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ---- Steps Section ---- */
+.steps-section {
+  padding: 100px 24px;
+  background: var(--bg-surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.steps-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.section-header h2 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.step-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+  transition: border-color 0.3s, transform 0.3s;
+  animation-delay: var(--delay, 0s);
+}
+
+.step-card:hover {
+  border-color: rgba(26, 115, 232, 0.2);
+  transform: translateY(-4px);
+}
+
+.step-number {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  font-size: 48px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.04);
+  line-height: 1;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.step-icon {
+  margin-bottom: 20px;
+}
+
+.step-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+
+.step-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* ---- Specs Section ---- */
+.specs-section {
+  padding: 80px 24px;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.specs-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 24px;
+  text-align: center;
+}
+
+.spec-item {
+  padding: 24px 16px;
+}
+
+.spec-value {
+  font-size: 32px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, var(--text) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.spec-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ---- CTA Section ---- */
+.cta-section {
+  padding: 120px 24px;
+  text-align: center;
+  position: relative;
+}
+
+.cta-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(26, 115, 232, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.cta-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  position: relative;
+}
+
+.cta-content h2 {
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+
+.cta-content p {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+.cta-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  margin-top: 16px !important;
+}
+
+/* ---- Footer ---- */
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 48px 24px;
+}
+
+.footer-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.footer-tagline {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.footer-links {
+  display: flex;
+  gap: 24px;
+}
+
+.footer-links a {
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: var(--text);
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  width: 100%;
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* ---- Scroll Animations ---- */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll[data-animation="fade-right"] {
+  transform: translateX(-40px);
+}
+
+.animate-on-scroll[data-animation="fade-left"] {
+  transform: translateX(40px);
+}
+
+.animate-on-scroll[data-animation="fade-up"] {
+  transform: translateY(30px);
+}
+
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.step-card.visible {
+  transition-delay: var(--delay, 0s);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .hero {
+    flex-direction: column;
+    text-align: center;
+    padding-top: 100px;
+    gap: 40px;
+  }
+
+  .hero-content {
+    max-width: 100%;
+  }
+
+  .hero-sub {
+    max-width: 100%;
+  }
+
+  .hero-cta-row {
+    justify-content: center;
+  }
+
+  .feature-row,
+  .feature-row.reverse {
+    flex-direction: column;
+    gap: 40px;
+    text-align: center;
+  }
+
+  .feature-text {
+    max-width: 100%;
+  }
+
+  .feature-details {
+    align-items: center;
+  }
+
+  .pace-note-examples {
+    align-items: stretch;
+  }
+
+  .steps-grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .specs-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .nav-links a:not(.nav-cta) {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --phone-width: 240px;
+    --phone-height: 510px;
+  }
+
+  .pixel-phone {
+    border-radius: 30px;
+  }
+
+  .pixel-screen {
+    border-radius: 24px;
+  }
+
+  .specs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .hero-cta-row {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="6" fill="#1A73E8"/>
+          <path d="M7 20L14 8L21 20H17L14 14L11 20H7Z" fill="white"/>
+        </svg>
+        <span>RallyTrax</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#replay">Replay</a>
+        <a href="#download" class="nav-cta">Get the App</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg-glow"></div>
+    <div class="hero-content">
+      <div class="hero-badge">Android App</div>
+      <h1>Turn any road into<br>a <span class="gradient-text">rally stage.</span></h1>
+      <p class="hero-sub">Record your favourite drives, then replay them with a synthetic co-driver calling out every turn, crest, and hazard — just like a professional rally navigator.</p>
+      <div class="hero-cta-row">
+        <a href="#download" class="btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 2L6.477 2C5.76 2 5.2 2.632 5.336 3.336L6.96 12H4L12 22L20 12H17.04L18.664 3.336C18.8 2.632 18.24 2 17.523 2ZM12 18.3L6.8 12H9.04L7.6 4H16.4L14.96 12H17.2L12 18.3Z"/></svg>
+          Download for Android
+        </a>
+        <a href="#how-it-works" class="btn-ghost">See how it works</a>
+      </div>
+      <p class="hero-note">Free on Google Play &middot; Android 10+</p>
+    </div>
+    <div class="hero-phone-wrapper">
+      <div class="pixel-phone hero-phone animate-on-scroll" data-animation="fade-up">
+        <div class="pixel-screen">
+          <!-- Mock Home Screen -->
+          <div class="mock-app mock-home">
+            <div class="mock-statusbar">
+              <span>9:41</span>
+              <div class="mock-statusbar-icons">
+                <span>&#9679;&#9679;&#9679;&#9679;</span>
+                <span>&#9632;</span>
+              </div>
+            </div>
+            <div class="mock-header">
+              <div>
+                <div class="mock-greeting">Good morning</div>
+                <div class="mock-title">Dashboard</div>
+              </div>
+              <div class="mock-avatar"></div>
+            </div>
+            <div class="mock-stats-row">
+              <div class="mock-stat-card">
+                <div class="mock-stat-label">This Week</div>
+                <div class="mock-stat-value">247 <span>km</span></div>
+              </div>
+              <div class="mock-stat-card">
+                <div class="mock-stat-label">Tracks</div>
+                <div class="mock-stat-value">12</div>
+              </div>
+            </div>
+            <div class="mock-section-label">Recent Drives</div>
+            <div class="mock-track-card">
+              <div class="mock-track-map"></div>
+              <div class="mock-track-info">
+                <div class="mock-track-name">Angeles Crest Hwy</div>
+                <div class="mock-track-meta">34.2 km &middot; 28 min &middot; Today</div>
+              </div>
+            </div>
+            <div class="mock-track-card">
+              <div class="mock-track-map map2"></div>
+              <div class="mock-track-info">
+                <div class="mock-track-name">Mulholland Drive</div>
+                <div class="mock-track-meta">18.7 km &middot; 22 min &middot; Yesterday</div>
+              </div>
+            </div>
+            <div class="mock-fab">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="4" fill="none" stroke="white" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="mock-bottomnav">
+              <div class="mock-nav-item active">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1a1 1 0 00.7-1.7l-9-9a1 1 0 00-1.4 0l-9 9A1 1 0 003 13z"/></svg>
+                <span>Home</span>
+              </div>
+              <div class="mock-nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                <span>Library</span>
+              </div>
+              <div class="mock-nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <span>Replay</span>
+              </div>
+              <div class="mock-nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
+                <span>Settings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature: Record -->
+  <section class="feature-section" id="features">
+    <div class="feature-row">
+      <div class="feature-text animate-on-scroll" data-animation="fade-right">
+        <div class="feature-label">Record</div>
+        <h2>Every road tells a story.<br>Capture yours.</h2>
+        <p>Tap record and drive. RallyTrax uses high-accuracy GPS to trace your route in real-time, capturing every twist, elevation change, and speed variation. Pause mid-drive, resume later — your track stays intact.</p>
+        <div class="feature-details">
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#1A73E8"><circle cx="12" cy="12" r="4" fill="none" stroke="#1A73E8" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="#1A73E8" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <span>1-second GPS precision</span>
+          </div>
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <span>Battery-efficient foreground service</span>
+          </div>
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><path d="M3 17l6-6 4 4 8-8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <span>Speed, elevation &amp; distance tracked</span>
+          </div>
+        </div>
+      </div>
+      <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-left">
+        <div class="pixel-phone">
+          <div class="pixel-screen">
+            <!-- Mock Recording Screen -->
+            <div class="mock-app mock-recording">
+              <div class="mock-statusbar dark">
+                <span>9:41</span>
+                <div class="mock-statusbar-icons"><span>REC</span></div>
+              </div>
+              <div class="mock-map-area">
+                <div class="mock-map-bg">
+                  <svg viewBox="0 0 300 400" width="100%" height="100%">
+                    <rect fill="#1a1a2e" width="300" height="400"/>
+                    <!-- Road grid -->
+                    <line x1="0" y1="100" x2="300" y2="100" stroke="#2a2a4a" stroke-width="0.5"/>
+                    <line x1="0" y1="200" x2="300" y2="200" stroke="#2a2a4a" stroke-width="0.5"/>
+                    <line x1="0" y1="300" x2="300" y2="300" stroke="#2a2a4a" stroke-width="0.5"/>
+                    <line x1="75" y1="0" x2="75" y2="400" stroke="#2a2a4a" stroke-width="0.5"/>
+                    <line x1="150" y1="0" x2="150" y2="400" stroke="#2a2a4a" stroke-width="0.5"/>
+                    <line x1="225" y1="0" x2="225" y2="400" stroke="#2a2a4a" stroke-width="0.5"/>
+                    <!-- Track polyline -->
+                    <polyline points="50,350 60,320 80,280 120,240 150,210 170,180 160,150 140,120 130,90 140,60 170,40 200,50 220,80 210,120 190,160 200,200 230,230 250,250" fill="none" stroke="#1A73E8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Current position pulse -->
+                    <circle cx="250" cy="250" r="12" fill="#1A73E8" opacity="0.2">
+                      <animate attributeName="r" values="8;16;8" dur="2s" repeatCount="indefinite"/>
+                      <animate attributeName="opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="250" cy="250" r="6" fill="#1A73E8"/>
+                    <circle cx="250" cy="250" r="3" fill="white"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="mock-recording-hud">
+                <div class="mock-rec-indicator">
+                  <span class="rec-dot"></span> Recording
+                </div>
+                <div class="mock-rec-stats">
+                  <div class="mock-rec-stat">
+                    <div class="mock-rec-stat-value">12:34</div>
+                    <div class="mock-rec-stat-label">Duration</div>
+                  </div>
+                  <div class="mock-rec-stat">
+                    <div class="mock-rec-stat-value">8.4 <small>km</small></div>
+                    <div class="mock-rec-stat-label">Distance</div>
+                  </div>
+                  <div class="mock-rec-stat">
+                    <div class="mock-rec-stat-value">67 <small>km/h</small></div>
+                    <div class="mock-rec-stat-label">Speed</div>
+                  </div>
+                </div>
+                <div class="mock-rec-controls">
+                  <button class="mock-rec-btn pause">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  </button>
+                  <button class="mock-rec-btn stop">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature: Library -->
+  <section class="feature-section">
+    <div class="feature-row reverse">
+      <div class="feature-text animate-on-scroll" data-animation="fade-left">
+        <div class="feature-label">Library</div>
+        <h2>Your personal<br>road atlas.</h2>
+        <p>Every drive you record lives in your Library — searchable, sortable, and tagged the way you want. See the route on a map, browse elevation profiles, and export to GPX to share with friends.</p>
+        <div class="feature-details">
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <span>Search, filter &amp; tag tracks</span>
+          </div>
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <span>GPX import &amp; export</span>
+          </div>
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+            </div>
+            <span>Elevation charts &amp; stats</span>
+          </div>
+        </div>
+      </div>
+      <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-right">
+        <div class="pixel-phone">
+          <div class="pixel-screen">
+            <!-- Mock Library Screen -->
+            <div class="mock-app mock-library">
+              <div class="mock-statusbar">
+                <span>9:41</span>
+                <div class="mock-statusbar-icons">
+                  <span>&#9679;&#9679;&#9679;&#9679;</span>
+                  <span>&#9632;</span>
+                </div>
+              </div>
+              <div class="mock-lib-header">
+                <div class="mock-title">Library</div>
+                <div class="mock-search-bar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <span>Search tracks...</span>
+                </div>
+                <div class="mock-filter-row">
+                  <span class="mock-chip active">All</span>
+                  <span class="mock-chip">Canyon</span>
+                  <span class="mock-chip">Highway</span>
+                  <span class="mock-chip">Mountain</span>
+                </div>
+              </div>
+              <div class="mock-lib-list">
+                <div class="mock-lib-item">
+                  <div class="mock-lib-thumb"></div>
+                  <div class="mock-lib-info">
+                    <div class="mock-lib-name">Angeles Crest Hwy</div>
+                    <div class="mock-lib-meta">34.2 km &middot; 28 min</div>
+                    <div class="mock-lib-tags">
+                      <span class="mock-tag">Canyon</span>
+                      <span class="mock-tag">Favourite</span>
+                    </div>
+                  </div>
+                  <div class="mock-lib-date">Today</div>
+                </div>
+                <div class="mock-lib-item">
+                  <div class="mock-lib-thumb t2"></div>
+                  <div class="mock-lib-info">
+                    <div class="mock-lib-name">Mulholland Drive</div>
+                    <div class="mock-lib-meta">18.7 km &middot; 22 min</div>
+                    <div class="mock-lib-tags">
+                      <span class="mock-tag">Mountain</span>
+                    </div>
+                  </div>
+                  <div class="mock-lib-date">Yesterday</div>
+                </div>
+                <div class="mock-lib-item">
+                  <div class="mock-lib-thumb t3"></div>
+                  <div class="mock-lib-info">
+                    <div class="mock-lib-name">Pacific Coast Hwy</div>
+                    <div class="mock-lib-meta">62.1 km &middot; 48 min</div>
+                    <div class="mock-lib-tags">
+                      <span class="mock-tag">Highway</span>
+                      <span class="mock-tag">Scenic</span>
+                    </div>
+                  </div>
+                  <div class="mock-lib-date">Mar 15</div>
+                </div>
+                <div class="mock-lib-item">
+                  <div class="mock-lib-thumb t4"></div>
+                  <div class="mock-lib-info">
+                    <div class="mock-lib-name">Ortega Highway</div>
+                    <div class="mock-lib-meta">42.8 km &middot; 35 min</div>
+                    <div class="mock-lib-tags">
+                      <span class="mock-tag">Canyon</span>
+                    </div>
+                  </div>
+                  <div class="mock-lib-date">Mar 12</div>
+                </div>
+              </div>
+              <div class="mock-bottomnav">
+                <div class="mock-nav-item">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1a1 1 0 00.7-1.7l-9-9a1 1 0 00-1.4 0l-9 9A1 1 0 003 13z"/></svg>
+                  <span>Home</span>
+                </div>
+                <div class="mock-nav-item active">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                  <span>Library</span>
+                </div>
+                <div class="mock-nav-item">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  <span>Replay</span>
+                </div>
+                <div class="mock-nav-item">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
+                  <span>Settings</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature: Pace Notes -->
+  <section class="feature-section" id="how-it-works">
+    <div class="feature-row">
+      <div class="feature-text animate-on-scroll" data-animation="fade-right">
+        <div class="feature-label">Pace Notes</div>
+        <h2>AI-generated<br>co-driver calls.</h2>
+        <p>After recording, RallyTrax analyses your track's geometry — every bend radius, elevation change, and straight — to generate authentic rally-style pace notes, graded 1 to 6 just like the pros use.</p>
+        <div class="pace-note-examples">
+          <div class="pace-note-example">
+            <div class="pace-icon left">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            </div>
+            <div>
+              <div class="pace-call">"Left 3, tightens"</div>
+              <div class="pace-desc">Medium bend, radius decreasing</div>
+            </div>
+          </div>
+          <div class="pace-note-example">
+            <div class="pace-icon right">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </div>
+            <div>
+              <div class="pace-call">"Right 4, over crest, 120"</div>
+              <div class="pace-desc">Firm corner with elevation, 120m to next</div>
+            </div>
+          </div>
+          <div class="pace-note-example">
+            <div class="pace-icon hairpin">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M18.56 5.44l-4.94 4.94 1.41 1.41 2.12-2.12c1.95 1.95 1.95 5.12 0 7.07-1.95 1.95-5.12 1.95-7.07 0-1.95-1.95-1.95-5.12 0-7.07l3.54-3.54-1.41-1.41-3.54 3.54a6.003 6.003 0 000 8.49 6.003 6.003 0 008.49 0 6.003 6.003 0 000-8.49l2.12-2.12 1.41 1.41L22 2h-5.56l2.12 3.44z"/></svg>
+            </div>
+            <div>
+              <div class="pace-call">"Hairpin right"</div>
+              <div class="pace-desc">Grade 6 — extreme, 150&deg;+ deflection</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-left">
+        <div class="pixel-phone">
+          <div class="pixel-screen">
+            <!-- Mock Track Detail / Pace Notes Screen -->
+            <div class="mock-app mock-pacenotes">
+              <div class="mock-statusbar">
+                <span>9:41</span>
+                <div class="mock-statusbar-icons">
+                  <span>&#9679;&#9679;&#9679;&#9679;</span>
+                  <span>&#9632;</span>
+                </div>
+              </div>
+              <div class="mock-detail-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                <span>Angeles Crest Hwy</span>
+              </div>
+              <div class="mock-detail-map">
+                <svg viewBox="0 0 300 140" width="100%" height="100%">
+                  <rect fill="#1a1a2e" width="300" height="140"/>
+                  <polyline points="20,120 40,110 70,90 100,70 130,60 150,55 160,50 140,40 120,35 130,25 160,20 190,25 210,40 200,60 180,80 190,100 220,110 260,115 280,120" fill="none" stroke="#1A73E8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <!-- Pace note markers -->
+                  <circle cx="100" cy="70" r="5" fill="#FF6B35" stroke="#1a1a2e" stroke-width="1.5"/>
+                  <circle cx="160" cy="50" r="5" fill="#FF6B35" stroke="#1a1a2e" stroke-width="1.5"/>
+                  <circle cx="120" cy="35" r="5" fill="#E63946" stroke="#1a1a2e" stroke-width="1.5"/>
+                  <circle cx="200" cy="60" r="5" fill="#FF6B35" stroke="#1a1a2e" stroke-width="1.5"/>
+                </svg>
+              </div>
+              <div class="mock-detail-tabs">
+                <span class="mock-detail-tab">Overview</span>
+                <span class="mock-detail-tab active">Pace Notes</span>
+                <span class="mock-detail-tab">Elevation</span>
+              </div>
+              <div class="mock-notes-list">
+                <div class="mock-note-item">
+                  <div class="mock-note-icon left-turn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                  </div>
+                  <div class="mock-note-content">
+                    <div class="mock-note-call">Left 3, tightens</div>
+                    <div class="mock-note-dist">at 2.4 km</div>
+                  </div>
+                  <div class="mock-note-severity s3">3</div>
+                </div>
+                <div class="mock-note-item">
+                  <div class="mock-note-icon right-turn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+                  </div>
+                  <div class="mock-note-content">
+                    <div class="mock-note-call">Right 4, over crest</div>
+                    <div class="mock-note-dist">at 3.1 km</div>
+                  </div>
+                  <div class="mock-note-severity s4">4</div>
+                </div>
+                <div class="mock-note-item">
+                  <div class="mock-note-icon hairpin-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M18.56 5.44l-4.94 4.94 1.41 1.41 2.12-2.12c1.95 1.95 1.95 5.12 0 7.07-1.95 1.95-5.12 1.95-7.07 0-1.95-1.95-1.95-5.12 0-7.07l3.54-3.54-1.41-1.41-3.54 3.54a6 6 0 000 8.49 6 6 0 008.49 0 6 6 0 000-8.49l2.12-2.12 1.41 1.41L22 2h-5.56l2.12 3.44z"/></svg>
+                  </div>
+                  <div class="mock-note-content">
+                    <div class="mock-note-call">Hairpin right</div>
+                    <div class="mock-note-dist">at 4.7 km</div>
+                  </div>
+                  <div class="mock-note-severity s6">6</div>
+                </div>
+                <div class="mock-note-item">
+                  <div class="mock-note-icon straight-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z"/></svg>
+                  </div>
+                  <div class="mock-note-content">
+                    <div class="mock-note-call">Straight, 320</div>
+                    <div class="mock-note-dist">at 5.2 km</div>
+                  </div>
+                  <div class="mock-note-severity s1">1</div>
+                </div>
+                <div class="mock-note-item">
+                  <div class="mock-note-icon left-turn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                  </div>
+                  <div class="mock-note-content">
+                    <div class="mock-note-call">Left 2, long</div>
+                    <div class="mock-note-dist">at 5.5 km</div>
+                  </div>
+                  <div class="mock-note-severity s2">2</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature: Replay -->
+  <section class="feature-section" id="replay">
+    <div class="feature-row reverse">
+      <div class="feature-text animate-on-scroll" data-animation="fade-left">
+        <div class="feature-label">Replay</div>
+        <h2>Your co-driver<br>rides shotgun.</h2>
+        <p>Select any saved track and hit replay. As you drive, RallyTrax matches your GPS position to the route and reads out pace notes through your speakers — timed to your speed, with a chime before each call.</p>
+        <div class="feature-details">
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+            <span>Rally-style TTS voice</span>
+          </div>
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span>Speed-proportional call timing</span>
+          </div>
+          <div class="feature-detail">
+            <div class="feature-detail-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <span>Glanceable dark HUD</span>
+          </div>
+        </div>
+      </div>
+      <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-right">
+        <div class="pixel-phone">
+          <div class="pixel-screen">
+            <!-- Mock Replay HUD -->
+            <div class="mock-app mock-replay">
+              <div class="mock-statusbar dark">
+                <span>9:41</span>
+                <div class="mock-statusbar-icons"><span>&#9679;&#9679;&#9679;&#9679;</span></div>
+              </div>
+              <!-- Next note card -->
+              <div class="mock-replay-note-card">
+                <div class="mock-replay-note-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                </div>
+                <div class="mock-replay-note-text">
+                  <div class="mock-replay-note-call">Left 3, tightens</div>
+                  <div class="mock-replay-note-dist">in 80 m</div>
+                </div>
+              </div>
+              <!-- Map area -->
+              <div class="mock-replay-map">
+                <svg viewBox="0 0 300 360" width="100%" height="100%">
+                  <rect fill="#0d0d1a" width="300" height="360"/>
+                  <!-- Dark map roads -->
+                  <line x1="0" y1="80" x2="300" y2="80" stroke="#1a1a30" stroke-width="1"/>
+                  <line x1="0" y1="160" x2="300" y2="160" stroke="#1a1a30" stroke-width="1"/>
+                  <line x1="0" y1="240" x2="300" y2="240" stroke="#1a1a30" stroke-width="1"/>
+                  <line x1="60" y1="0" x2="60" y2="360" stroke="#1a1a30" stroke-width="1"/>
+                  <line x1="150" y1="0" x2="150" y2="360" stroke="#1a1a30" stroke-width="1"/>
+                  <line x1="240" y1="0" x2="240" y2="360" stroke="#1a1a30" stroke-width="1"/>
+                  <!-- Recorded track -->
+                  <polyline points="30,340 50,310 80,270 120,230 150,200 170,170 160,140 140,110 130,80 140,50 170,30 200,40 220,70 210,110 190,150 200,190 230,220 260,240 280,260" fill="none" stroke="#3d5a80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+                  <!-- Driven portion -->
+                  <polyline points="30,340 50,310 80,270 120,230 150,200" fill="none" stroke="#1A73E8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  <!-- Upcoming turn marker -->
+                  <circle cx="170" cy="170" r="10" fill="#FF6B35" opacity="0.3"/>
+                  <circle cx="170" cy="170" r="5" fill="#FF6B35"/>
+                  <!-- Position -->
+                  <circle cx="150" cy="200" r="14" fill="#1A73E8" opacity="0.15">
+                    <animate attributeName="r" values="10;18;10" dur="2s" repeatCount="indefinite"/>
+                  </circle>
+                  <circle cx="150" cy="200" r="7" fill="#1A73E8"/>
+                  <circle cx="150" cy="200" r="3" fill="white"/>
+                  <!-- Direction indicator -->
+                  <polygon points="150,186 145,196 155,196" fill="white" opacity="0.9"/>
+                </svg>
+              </div>
+              <!-- Speed display -->
+              <div class="mock-replay-speed">
+                <div class="mock-replay-speed-value">67</div>
+                <div class="mock-replay-speed-unit">km/h</div>
+              </div>
+              <!-- Progress bar -->
+              <div class="mock-replay-progress">
+                <div class="mock-replay-progress-fill" style="width: 38%"></div>
+              </div>
+              <div class="mock-replay-progress-label">
+                <span>38% complete</span>
+                <span class="mock-replay-mute">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0014 8.5v7a4.47 4.47 0 002.5-3.5zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="steps-section">
+    <div class="steps-inner">
+      <div class="section-header animate-on-scroll" data-animation="fade-up">
+        <div class="feature-label">How It Works</div>
+        <h2>Three steps to your<br>personal rally stage.</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card animate-on-scroll" data-animation="fade-up" style="--delay: 0s">
+          <div class="step-number">1</div>
+          <div class="step-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-linecap="round"/></svg>
+          </div>
+          <h3>Record your drive</h3>
+          <p>Tap the record button and drive your favourite road. The app captures GPS coordinates, speed, and elevation every second.</p>
+        </div>
+        <div class="step-card animate-on-scroll" data-animation="fade-up" style="--delay: 0.15s">
+          <div class="step-number">2</div>
+          <div class="step-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg>
+          </div>
+          <h3>Notes are generated</h3>
+          <p>RallyTrax analyses the track geometry and produces rally-style pace notes — turns, crests, straights — graded on the 1-to-6 severity scale.</p>
+        </div>
+        <div class="step-card animate-on-scroll" data-animation="fade-up" style="--delay: 0.3s">
+          <div class="step-number">3</div>
+          <div class="step-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <h3>Replay with co-driver</h3>
+          <p>Drive the route again while your phone calls out every turn ahead of time — timed to your speed, just like a real rally co-driver.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech specs banner -->
+  <section class="specs-section">
+    <div class="specs-inner animate-on-scroll" data-animation="fade-up">
+      <div class="specs-grid">
+        <div class="spec-item">
+          <div class="spec-value">1s</div>
+          <div class="spec-label">GPS interval</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-value">6</div>
+          <div class="spec-label">Severity grades</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-value">GPX</div>
+          <div class="spec-label">Import &amp; Export</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-value">&lt;5%</div>
+          <div class="spec-label">Battery per 30 min</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-value">M3</div>
+          <div class="spec-label">Material You</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section" id="download">
+    <div class="cta-inner">
+      <div class="cta-content animate-on-scroll" data-animation="fade-up">
+        <h2>Ready to turn your<br>commute into a stage?</h2>
+        <p>Download RallyTrax free on Google Play. Record your first drive today.</p>
+        <a href="#" class="btn-primary large">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.4l2.834 1.638a1 1 0 010 1.73l-2.834 1.639-2.532-2.532 2.532-2.475zM5.864 2.658L16.8 9.292l-2.302 2.302-8.634-8.936z"/></svg>
+          Get it on Google Play
+        </a>
+        <p class="cta-note">Android 10+ &middot; Free &middot; No account required</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a href="#" class="nav-logo">
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="6" fill="#1A73E8"/>
+            <path d="M7 20L14 8L21 20H17L14 14L11 20H7Z" fill="white"/>
+          </svg>
+          <span>RallyTrax</span>
+        </a>
+        <p class="footer-tagline">Drive. Record. Replay. Co-Drive.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Support</a>
+      </div>
+      <div class="footer-copy">
+        &copy; 2026 RallyTrax. Built with Kotlin &amp; Jetpack Compose.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+// Scroll-triggered animations
+document.addEventListener('DOMContentLoaded', () => {
+  const elements = document.querySelectorAll('.animate-on-scroll');
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    {
+      threshold: 0.15,
+      rootMargin: '0px 0px -40px 0px',
+    }
+  );
+
+  elements.forEach((el) => observer.observe(el));
+
+  // Smooth nav background on scroll
+  const nav = document.querySelector('.nav');
+
+  window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    if (scrollY > 50) {
+      nav.style.borderBottomColor = 'rgba(255, 255, 255, 0.08)';
+    } else {
+      nav.style.borderBottomColor = 'rgba(255, 255, 255, 0.04)';
+    }
+  }, { passive: true });
+});
+  </script>
+</body>
+</html>
