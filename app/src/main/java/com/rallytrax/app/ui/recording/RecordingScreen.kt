@@ -53,6 +53,7 @@ import com.rallytrax.app.recording.RecordingStatus
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatSpeed
+import com.rallytrax.app.util.speedUnit
 
 @Composable
 fun RecordingScreen(
@@ -62,6 +63,7 @@ fun RecordingScreen(
     val context = LocalContext.current
     val status by viewModel.recordingStatus.collectAsStateWithLifecycle()
     val data by viewModel.recordingData.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     var showStopDialog by remember { mutableStateOf(false) }
 
     // Start recording when screen first opens and not already recording
@@ -150,7 +152,7 @@ fun RecordingScreen(
                 ) {
                     // Speed
                     Text(
-                        text = formatSpeed(data.currentSpeed),
+                        text = formatSpeed(data.currentSpeed, preferences.unitSystem),
                         style = MaterialTheme.typography.displayLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 64.sp,
@@ -158,7 +160,7 @@ fun RecordingScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "km/h",
+                        text = speedUnit(preferences.unitSystem),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -171,7 +173,7 @@ fun RecordingScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
                         StatItem(label = "Time", value = formatElapsedTime(data.elapsedTimeMs))
-                        StatItem(label = "Distance", value = formatDistance(data.distanceMeters))
+                        StatItem(label = "Distance", value = formatDistance(data.distanceMeters, preferences.unitSystem))
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

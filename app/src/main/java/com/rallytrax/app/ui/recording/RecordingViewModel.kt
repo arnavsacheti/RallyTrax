@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.recording.RecordingData
 import com.rallytrax.app.recording.RecordingStatus
 import com.rallytrax.app.recording.TrackingService
@@ -17,7 +19,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class RecordingViewModel @Inject constructor() : ViewModel() {
+class RecordingViewModel @Inject constructor(
+    preferencesRepository: UserPreferencesRepository,
+) : ViewModel() {
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     val recordingStatus: StateFlow<RecordingStatus> = TrackingService.recordingStatus
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RecordingStatus.IDLE)

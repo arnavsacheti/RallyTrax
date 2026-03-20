@@ -117,6 +117,9 @@ dependencies {
     // Lifecycle Service
     implementation(libs.androidx.lifecycle.service)
 
+    // DataStore Preferences
+    implementation(libs.datastore.preferences)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -68,9 +68,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
+import com.rallytrax.app.util.formatSpeed
+import com.rallytrax.app.util.speedUnit
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -79,6 +82,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val pendingDelete by viewModel.pendingDelete.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -304,6 +308,7 @@ fun LibraryScreen(
                                     track = track,
                                     isSelected = track.id in uiState.selectedTrackIds,
                                     isMultiSelectMode = false,
+                                    unitSystem = preferences.unitSystem,
                                     onClick = { onTrackClick(track.id) },
                                     onLongClick = { viewModel.toggleMultiSelect(track.id) },
                                 )
@@ -313,6 +318,7 @@ fun LibraryScreen(
                                 track = track,
                                 isSelected = track.id in uiState.selectedTrackIds,
                                 isMultiSelectMode = true,
+                                unitSystem = preferences.unitSystem,
                                 onClick = { viewModel.toggleMultiSelect(track.id) },
                                 onLongClick = { viewModel.toggleMultiSelect(track.id) },
                                 modifier = Modifier.animateItem(),
@@ -331,6 +337,7 @@ private fun TrackListItem(
     track: TrackEntity,
     isSelected: Boolean,
     isMultiSelectMode: Boolean,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -388,7 +395,7 @@ private fun TrackListItem(
             ) {
                 TrackStatChip(
                     label = "Distance",
-                    value = formatDistance(track.distanceMeters),
+                    value = formatDistance(track.distanceMeters, unitSystem),
                 )
                 TrackStatChip(
                     label = "Duration",
@@ -397,7 +404,7 @@ private fun TrackListItem(
                 if (track.avgSpeedMps > 0) {
                     TrackStatChip(
                         label = "Avg",
-                        value = "${formatSpeed(track.avgSpeedMps)} km/h",
+                        value = "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                     )
                 }
             }
@@ -441,7 +448,3 @@ private fun TrackStatChip(label: String, value: String) {
     }
 }
 
-private fun formatSpeed(mps: Double): String {
-    val kmh = mps * 3.6
-    return String.format(java.util.Locale.US, "%.0f", kmh)
-}

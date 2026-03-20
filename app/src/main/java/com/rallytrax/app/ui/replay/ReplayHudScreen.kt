@@ -78,6 +78,8 @@ import com.google.maps.android.compose.rememberMarkerState
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.replay.ReplayViewModel
 import com.rallytrax.app.util.formatDistance
+import com.rallytrax.app.util.formatSpeed
+import com.rallytrax.app.util.speedUnit
 
 // Dark map style JSON for forced-dark mode
 private const val DARK_MAP_STYLE = """[
@@ -98,6 +100,7 @@ fun ReplayHudScreen(
     viewModel: ReplayViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     var showExitDialog by remember { mutableStateOf(false) }
 
     // Force dark status bar
@@ -350,7 +353,7 @@ fun ReplayHudScreen(
                                     }
                                     if (uiState.distanceToNextNote < 10000) {
                                         Text(
-                                            text = formatDistance(uiState.distanceToNextNote),
+                                            text = formatDistance(uiState.distanceToNextNote, preferences.unitSystem),
                                             color = Color.White.copy(alpha = 0.7f),
                                             style = MaterialTheme.typography.bodyMedium,
                                         )
@@ -370,16 +373,15 @@ fun ReplayHudScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                val speedKmh = uiState.currentSpeedMps * 3.6
                                 Text(
-                                    text = String.format(java.util.Locale.US, "%.0f", speedKmh),
+                                    text = formatSpeed(uiState.currentSpeedMps, preferences.unitSystem),
                                     color = Color.White,
                                     fontSize = 56.sp,
                                     fontWeight = FontWeight.Bold,
                                     lineHeight = 56.sp,
                                 )
                                 Text(
-                                    text = "km/h",
+                                    text = speedUnit(preferences.unitSystem),
                                     color = Color.White.copy(alpha = 0.6f),
                                     style = MaterialTheme.typography.labelMedium,
                                 )

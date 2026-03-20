@@ -85,9 +85,12 @@ import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.recording.LatLng
 import com.rallytrax.app.util.formatDateTime
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
+import com.rallytrax.app.util.formatElevation
 import com.rallytrax.app.util.formatSpeed
+import com.rallytrax.app.util.speedUnit
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -98,6 +101,7 @@ fun TrackDetailScreen(
     viewModel: TrackDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -270,11 +274,13 @@ fun TrackDetailScreen(
                             uiState = uiState,
                             viewModel = viewModel,
                             context = context,
+                            unitSystem = preferences.unitSystem,
                             onShowAddTagDialog = { showAddTagDialog = true },
                         )
                         1 -> PaceNotesTab(
                             uiState = uiState,
                             viewModel = viewModel,
+                            unitSystem = preferences.unitSystem,
                         )
                     }
                 }
@@ -356,6 +362,7 @@ private fun DetailsTab(
     uiState: TrackDetailUiState,
     viewModel: TrackDetailViewModel,
     context: android.content.Context,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     onShowAddTagDialog: () -> Unit,
 ) {
     Column(
@@ -393,7 +400,7 @@ private fun DetailsTab(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        DetailStatItem("Distance", formatDistance(track.distanceMeters))
+                        DetailStatItem("Distance", formatDistance(track.distanceMeters, unitSystem))
                         DetailStatItem("Duration", formatElapsedTime(track.durationMs))
                     }
 
@@ -408,11 +415,11 @@ private fun DetailsTab(
                     ) {
                         DetailStatItem(
                             "Avg Speed",
-                            "${formatSpeed(track.avgSpeedMps)} km/h",
+                            "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                         )
                         DetailStatItem(
                             "Max Speed",
-                            "${formatSpeed(track.maxSpeedMps)} km/h",
+                            "${formatSpeed(track.maxSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                         )
                     }
 
@@ -427,7 +434,7 @@ private fun DetailsTab(
                     ) {
                         DetailStatItem(
                             "Elevation Gain",
-                            "${track.elevationGainM.toInt()} m",
+                            formatElevation(track.elevationGainM, unitSystem),
                         )
                         DetailStatItem(
                             "Points",
@@ -477,7 +484,7 @@ private fun DetailsTab(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = formatDistance(uiState.elevationProfile.last().distanceFromStart),
+                            text = formatDistance(uiState.elevationProfile.last().distanceFromStart, unitSystem),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -582,6 +589,7 @@ private fun DetailsTab(
 private fun PaceNotesTab(
     uiState: TrackDetailUiState,
     viewModel: TrackDetailViewModel,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Sensitivity selector + regenerate
@@ -660,7 +668,7 @@ private fun PaceNotesTab(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(uiState.paceNotes) { note ->
-                    PaceNoteItem(note = note)
+                    PaceNoteItem(note = note, unitSystem = unitSystem)
                 }
             }
         }
@@ -668,7 +676,7 @@ private fun PaceNotesTab(
 }
 
 @Composable
-private fun PaceNoteItem(note: PaceNoteEntity) {
+private fun PaceNoteItem(note: PaceNoteEntity, unitSystem: UnitSystem = UnitSystem.METRIC) {
     val iconColor = when (note.noteType) {
         NoteType.LEFT -> Color(0xFF1A73E8) // Blue
         NoteType.RIGHT -> Color(0xFF34A853) // Green
@@ -722,7 +730,7 @@ private fun PaceNoteItem(note: PaceNoteEntity) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = formatDistance(note.distanceFromStart),
+                text = formatDistance(note.distanceFromStart, unitSystem),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

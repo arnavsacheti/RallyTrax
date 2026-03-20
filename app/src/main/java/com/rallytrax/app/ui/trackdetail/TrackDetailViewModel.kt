@@ -15,14 +15,18 @@ import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -48,7 +52,11 @@ class TrackDetailViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     private val trackId: String = checkNotNull(savedStateHandle["trackId"])
 

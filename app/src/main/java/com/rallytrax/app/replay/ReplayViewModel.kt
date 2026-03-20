@@ -18,11 +18,16 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -59,9 +64,13 @@ class ReplayViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val trackId: String = checkNotNull(savedStateHandle["trackId"])
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     private val _uiState = MutableStateFlow(ReplayUiState())
     val uiState: StateFlow<ReplayUiState> = _uiState.asStateFlow()
@@ -114,8 +123,13 @@ class ReplayViewModel @Inject constructor(
         val engine = replayEngine ?: return
         engine.reset()
 
-        // Init audio
-        audioManager = ReplayAudioManager(application).also { it.initialize() }
+        // Init audio with user preferences
+        val prefs = kotlinx.coroutines.runBlocking {
+            preferencesRepository.preferences.first()
+        }
+        audioManager = ReplayAudioManager(application).also {
+            it.initialize(prefs.ttsRate, prefs.ttsPitch)
+        }
 
         // Start GPS tracking
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)

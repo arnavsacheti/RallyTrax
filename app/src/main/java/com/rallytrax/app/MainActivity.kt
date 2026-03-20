@@ -9,7 +9,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -17,7 +16,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -41,6 +39,8 @@ import com.rallytrax.app.data.gpx.GpxParser
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.navigation.OnboardingRoute
 import com.rallytrax.app.navigation.RallyTraxNavHost
 import com.rallytrax.app.navigation.RecordingRoute
 import com.rallytrax.app.navigation.ReplayHudRoute
@@ -49,6 +49,8 @@ import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.theme.RallyTraxTheme
 import com.rallytrax.app.update.UpdateViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -57,14 +59,28 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var trackDao: TrackDao
     @Inject lateinit var trackPointDao: TrackPointDao
     @Inject lateinit var paceNoteDao: PaceNoteDao
+    @Inject lateinit var preferencesRepository: UserPreferencesRepository
 
     private val updateViewModel: UpdateViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Read onboarding state synchronously to determine start destination
+        val initialPrefs = runBlocking { preferencesRepository.preferences.first() }
+        val startDestination: Any = if (initialPrefs.onboardingCompleted) {
+            com.rallytrax.app.navigation.HomeRoute
+        } else {
+            OnboardingRoute
+        }
+
         setContent {
-            RallyTraxTheme {
+            val prefs by preferencesRepository.preferences.collectAsStateWithLifecycle(
+                initialValue = initialPrefs,
+            )
+
+            RallyTraxTheme(themeMode = prefs.themeMode) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
@@ -72,11 +88,12 @@ class MainActivity : ComponentActivity() {
 
                 val updateState by updateViewModel.uiState.collectAsStateWithLifecycle()
 
-                // Hide bottom bar on recording and track detail screens
+                // Hide bottom bar on certain screens
                 val showBottomBar = currentDestination?.let { dest ->
                     !dest.hasRoute(RecordingRoute::class) &&
                         !dest.hasRoute(TrackDetailRoute::class) &&
-                        !dest.hasRoute(ReplayHudRoute::class)
+                        !dest.hasRoute(ReplayHudRoute::class) &&
+                        !dest.hasRoute(OnboardingRoute::class)
                 } ?: true
 
                 Scaffold(
@@ -120,6 +137,7 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     RallyTraxNavHost(
                         navController = navController,
+                        startDestination = startDestination,
                         modifier = if (showBottomBar) {
                             Modifier.padding(innerPadding)
                         } else {
@@ -128,7 +146,14 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Update available dialog (shown once on launch)
+                // Mark onboarding as completed when navigating away from it
+                LaunchedEffect(currentDestination) {
+                    if (currentDestination?.hasRoute(OnboardingRoute::class) == false && !initialPrefs.onboardingCompleted) {
+                        preferencesRepository.setOnboardingCompleted(true)
+                    }
+                }
+
+                // Update available dialog
                 if (updateState.updateAvailable && !updateState.dismissed && updateState.releaseInfo != null) {
                     val release = updateState.releaseInfo!!
                     AlertDialog(

@@ -10,6 +10,8 @@ import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,7 +52,11 @@ class LibraryViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     private val _searchQuery = MutableStateFlow("")
     private val _sortOption = MutableStateFlow(SortOption.DATE_NEWEST)

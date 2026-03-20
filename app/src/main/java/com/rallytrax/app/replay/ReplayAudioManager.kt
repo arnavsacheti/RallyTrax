@@ -41,13 +41,13 @@ class ReplayAudioManager(
 
     private var pendingCallText: String? = null
 
-    fun initialize() {
+    fun initialize(rate: Float = 1.25f, pitch: Float = 1.15f) {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.apply {
                     language = Locale.US
-                    setPitch(1.15f) // Clipped, urgent
-                    setSpeechRate(1.25f) // Fast cadence
+                    setPitch(pitch)
+                    setSpeechRate(rate)
 
                     setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {}

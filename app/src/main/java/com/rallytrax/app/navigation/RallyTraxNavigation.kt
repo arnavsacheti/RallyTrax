@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
+import com.rallytrax.app.ui.onboarding.OnboardingScreen
 import com.rallytrax.app.ui.recording.RecordingScreen
 import com.rallytrax.app.ui.replay.ReplayScreen
 import com.rallytrax.app.ui.replay.ReplayHudScreen
@@ -16,17 +17,30 @@ import com.rallytrax.app.ui.trackdetail.TrackDetailScreen
 @Composable
 fun RallyTraxNavHost(
     navController: NavHostController,
+    startDestination: Any = HomeRoute,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
         navController = navController,
-        startDestination = HomeRoute,
+        startDestination = startDestination,
         modifier = modifier,
     ) {
+        composable<OnboardingRoute> {
+            OnboardingScreen(
+                onComplete = {
+                    navController.navigate(HomeRoute) {
+                        popUpTo<OnboardingRoute> { inclusive = true }
+                    }
+                },
+            )
+        }
         composable<HomeRoute> {
             HomeScreen(
                 onStartRecording = {
                     navController.navigate(RecordingRoute)
+                },
+                onTrackClick = { trackId ->
+                    navController.navigate(TrackDetailRoute(trackId))
                 },
             )
         }

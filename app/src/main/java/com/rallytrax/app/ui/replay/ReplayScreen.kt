@@ -44,6 +44,7 @@ fun ReplayScreen(
     viewModel: ReplayTrackListViewModel = hiltViewModel(),
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -118,7 +119,7 @@ private fun ReplayTrackItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = formatDistance(track.distanceMeters),
+                        text = formatDistance(track.distanceMeters, preferences.unitSystem),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
