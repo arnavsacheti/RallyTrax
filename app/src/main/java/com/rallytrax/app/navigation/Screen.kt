@@ -12,12 +12,12 @@ import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 
-sealed interface TopLevelRoute {
-    val label: String
-    val selectedIcon: ImageVector
-    val unselectedIcon: ImageVector
-    val route: Any
-}
+data class TopLevelRoute(
+    val label: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val route: Any,
+)
 
 @Serializable data object HomeRoute
 @Serializable data object LibraryRoute
@@ -25,28 +25,28 @@ sealed interface TopLevelRoute {
 @Serializable data object SettingsRoute
 
 val topLevelRoutes = listOf(
-    object : TopLevelRoute {
-        override val label = "Home"
-        override val selectedIcon = Icons.Filled.Home
-        override val unselectedIcon = Icons.Outlined.Home
-        override val route: Any = HomeRoute
-    },
-    object : TopLevelRoute {
-        override val label = "Library"
-        override val selectedIcon = Icons.Filled.VideoLibrary
-        override val unselectedIcon = Icons.Outlined.VideoLibrary
-        override val route: Any = LibraryRoute
-    },
-    object : TopLevelRoute {
-        override val label = "Replay"
-        override val selectedIcon = Icons.Filled.PlayArrow
-        override val unselectedIcon = Icons.Outlined.PlayArrow
-        override val route: Any = ReplayRoute
-    },
-    object : TopLevelRoute {
-        override val label = "Settings"
-        override val selectedIcon = Icons.Filled.Settings
-        override val unselectedIcon = Icons.Outlined.Settings
-        override val route: Any = SettingsRoute
-    },
+    TopLevelRoute(
+        label = "Home",
+        selectedIcon = Icons.Filled.Home,
+        unselectedIcon = Icons.Outlined.Home,
+        route = HomeRoute,
+    ),
+    TopLevelRoute(
+        label = "Library",
+        selectedIcon = Icons.Filled.VideoLibrary,
+        unselectedIcon = Icons.Outlined.VideoLibrary,
+        route = LibraryRoute,
+    ),
+    TopLevelRoute(
+        label = "Replay",
+        selectedIcon = Icons.Filled.PlayArrow,
+        unselectedIcon = Icons.Outlined.PlayArrow,
+        route = ReplayRoute,
+    ),
+    TopLevelRoute(
+        label = "Settings",
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings,
+        route = SettingsRoute,
+    ),
 )
