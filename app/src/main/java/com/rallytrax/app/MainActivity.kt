@@ -43,6 +43,7 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.navigation.RallyTraxNavHost
 import com.rallytrax.app.navigation.RecordingRoute
+import com.rallytrax.app.navigation.ReplayHudRoute
 import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.theme.RallyTraxTheme
@@ -74,7 +75,8 @@ class MainActivity : ComponentActivity() {
                 // Hide bottom bar on recording and track detail screens
                 val showBottomBar = currentDestination?.let { dest ->
                     !dest.hasRoute(RecordingRoute::class) &&
-                        !dest.hasRoute(TrackDetailRoute::class)
+                        !dest.hasRoute(TrackDetailRoute::class) &&
+                        !dest.hasRoute(ReplayHudRoute::class)
                 } ?: true
 
                 Scaffold(

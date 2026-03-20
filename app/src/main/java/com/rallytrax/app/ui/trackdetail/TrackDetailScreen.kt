@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -93,6 +94,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun TrackDetailScreen(
     onBack: () -> Unit,
+    onReplay: (String) -> Unit = {},
     viewModel: TrackDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -124,6 +126,19 @@ fun TrackDetailScreen(
                     }
                 },
                 actions = {
+                    if (uiState.paceNotes.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                uiState.track?.let { onReplay(it.id) }
+                            },
+                        ) {
+                            Icon(
+                                Icons.Filled.PlayArrow,
+                                contentDescription = "Replay",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                     IconButton(onClick = { viewModel.exportGpx(context) }) {
                         Icon(Icons.Filled.Share, contentDescription = "Export & Share")
                     }

@@ -9,6 +9,7 @@ import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
 import com.rallytrax.app.ui.recording.RecordingScreen
 import com.rallytrax.app.ui.replay.ReplayScreen
+import com.rallytrax.app.ui.replay.ReplayHudScreen
 import com.rallytrax.app.ui.settings.SettingsScreen
 import com.rallytrax.app.ui.trackdetail.TrackDetailScreen
 
@@ -37,7 +38,18 @@ fun RallyTraxNavHost(
             )
         }
         composable<ReplayRoute> {
-            ReplayScreen()
+            ReplayScreen(
+                onTrackSelected = { trackId ->
+                    navController.navigate(ReplayHudRoute(trackId))
+                },
+            )
+        }
+        composable<ReplayHudRoute> {
+            ReplayHudScreen(
+                onExit = {
+                    navController.popBackStack()
+                },
+            )
         }
         composable<SettingsRoute> {
             SettingsScreen()
@@ -55,6 +67,9 @@ fun RallyTraxNavHost(
             TrackDetailScreen(
                 onBack = {
                     navController.popBackStack()
+                },
+                onReplay = { trackId ->
+                    navController.navigate(ReplayHudRoute(trackId))
                 },
             )
         }
