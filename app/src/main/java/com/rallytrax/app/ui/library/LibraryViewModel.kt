@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.gpx.GpxParser
+import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.TrackEntity
@@ -48,6 +49,7 @@ data class LibraryUiState(
 class LibraryViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
+    private val paceNoteDao: PaceNoteDao,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -197,6 +199,9 @@ class LibraryViewModel @Inject constructor(
                 val result = inputStream.use { GpxParser.parse(it) }
                 trackDao.insertTrack(result.track)
                 trackPointDao.insertPoints(result.points)
+                if (result.paceNotes.isNotEmpty()) {
+                    paceNoteDao.insertNotes(result.paceNotes)
+                }
                 _snackbarMessage.tryEmit("Imported: ${result.track.name}")
             } catch (e: GpxParseException) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")

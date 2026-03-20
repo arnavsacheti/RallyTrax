@@ -26,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.gpx.GpxParser
+import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.navigation.LibraryRoute
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var trackDao: TrackDao
     @Inject lateinit var trackPointDao: TrackPointDao
+    @Inject lateinit var paceNoteDao: PaceNoteDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -146,6 +148,9 @@ class MainActivity : ComponentActivity() {
             val result = inputStream.use { GpxParser.parse(it) }
             trackDao.insertTrack(result.track)
             trackPointDao.insertPoints(result.points)
+            if (result.paceNotes.isNotEmpty()) {
+                paceNoteDao.insertNotes(result.paceNotes)
+            }
             snackbarHostState.showSnackbar("Imported: ${result.track.name}")
             navigateToTrack(result.track.id)
         } catch (e: GpxParseException) {

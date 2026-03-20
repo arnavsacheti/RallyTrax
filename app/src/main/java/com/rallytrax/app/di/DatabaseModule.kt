@@ -3,6 +3,7 @@ package com.rallytrax.app.di
 import android.content.Context
 import androidx.room.Room
 import com.rallytrax.app.data.local.RallyTraxDatabase
+import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import dagger.Module
@@ -23,7 +24,9 @@ object DatabaseModule {
             context,
             RallyTraxDatabase::class.java,
             "rallytrax.db",
-        ).build()
+        )
+            .addMigrations(RallyTraxDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides
@@ -34,5 +37,10 @@ object DatabaseModule {
     @Provides
     fun provideTrackPointDao(database: RallyTraxDatabase): TrackPointDao {
         return database.trackPointDao()
+    }
+
+    @Provides
+    fun providePaceNoteDao(database: RallyTraxDatabase): PaceNoteDao {
+        return database.paceNoteDao()
     }
 }

@@ -1,5 +1,6 @@
 package com.rallytrax.app.data.gpx
 
+import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import java.io.OutputStream
@@ -15,6 +16,7 @@ object GpxExporter {
         track: TrackEntity,
         points: List<TrackPointEntity>,
         outputStream: OutputStream,
+        paceNotes: List<PaceNoteEntity> = emptyList(),
     ) {
         outputStream.bufferedWriter().use { writer ->
             writer.write("""<?xml version="1.0" encoding="UTF-8"?>""")
@@ -67,6 +69,28 @@ object GpxExporter {
                 writer.write("      <rt:tags>${escapeXml(track.tags)}</rt:tags>")
                 writer.newLine()
             }
+
+            // Pace notes in extensions
+            if (paceNotes.isNotEmpty()) {
+                writer.write("      <rt:paceNotes>")
+                writer.newLine()
+                for (note in paceNotes) {
+                    writer.write("        <rt:paceNote")
+                    writer.write(""" pointIndex="${note.pointIndex}"""")
+                    writer.write(""" distanceFromStart="${note.distanceFromStart}"""")
+                    writer.write(""" noteType="${note.noteType.name}"""")
+                    writer.write(""" severity="${note.severity}"""")
+                    writer.write(""" modifier="${note.modifier.name}"""")
+                    writer.write(""" callDistanceM="${note.callDistanceM}"""")
+                    writer.write(">")
+                    writer.write(escapeXml(note.callText))
+                    writer.write("</rt:paceNote>")
+                    writer.newLine()
+                }
+                writer.write("      </rt:paceNotes>")
+                writer.newLine()
+            }
+
             writer.write("    </extensions>")
             writer.newLine()
 

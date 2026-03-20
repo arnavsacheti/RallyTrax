@@ -14,10 +14,12 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import dagger.hilt.android.AndroidEntryPoint
@@ -41,6 +43,7 @@ class TrackingService : LifecycleService() {
 
     @Inject lateinit var trackDao: TrackDao
     @Inject lateinit var trackPointDao: TrackPointDao
+    @Inject lateinit var paceNoteDao: PaceNoteDao
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -242,7 +245,20 @@ class TrackingService : LifecycleService() {
                 )
             )
 
-            _savedTrackId.tryEmit(trackId)
+            // Generate pace notes in background
+            val savedId = trackId
+            val allPoints = trackPointDao.getPointsForTrackOnce(savedId)
+            try {
+                val paceNotes = PaceNoteGenerator.generate(savedId, allPoints)
+                if (paceNotes.isNotEmpty()) {
+                    paceNoteDao.deleteNotesForTrack(savedId)
+                    paceNoteDao.insertNotes(paceNotes)
+                }
+            } catch (_: Exception) {
+                // Pace note generation is non-critical; don't block save
+            }
+
+            _savedTrackId.tryEmit(savedId)
             _recordingStatus.value = RecordingStatus.IDLE
             _recordingData.value = RecordingData.EMPTY
 

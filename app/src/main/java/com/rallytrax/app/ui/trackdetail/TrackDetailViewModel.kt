@@ -3,18 +3,19 @@ package com.rallytrax.app.ui.trackdetail
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.core.content.FileProvider
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.gpx.GpxExporter
+import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
 import javax.inject.Inject
 
 data class ElevationPoint(
@@ -36,7 +36,10 @@ data class TrackDetailUiState(
     val polylinePoints: List<LatLng> = emptyList(),
     val elevationProfile: List<ElevationPoint> = emptyList(),
     val tags: List<String> = emptyList(),
+    val paceNotes: List<PaceNoteEntity> = emptyList(),
     val isLoading: Boolean = true,
+    val isGeneratingNotes: Boolean = false,
+    val selectedSensitivity: Int = 1, // 0=LOW, 1=MEDIUM, 2=HIGH
 )
 
 @HiltViewModel
@@ -44,6 +47,7 @@ class TrackDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
+    private val paceNoteDao: PaceNoteDao,
 ) : ViewModel() {
 
     private val trackId: String = checkNotNull(savedStateHandle["trackId"])
@@ -77,11 +81,15 @@ class TrackDetailViewModel @Inject constructor(
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
 
+            // Load pace notes
+            val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
+
             _uiState.value = TrackDetailUiState(
                 track = track,
                 polylinePoints = polyline,
                 elevationProfile = elevationProfile,
                 tags = tags,
+                paceNotes = paceNotes,
                 isLoading = false,
             )
         }
@@ -105,6 +113,47 @@ class TrackDetailViewModel @Inject constructor(
             result.add(ElevationPoint(cumulativeDistance, point.elevation))
         }
         return result
+    }
+
+    fun regeneratePaceNotes(sensitivityIndex: Int) {
+        val points = cachedPoints
+        if (points.isEmpty()) {
+            _snackbarMessage.tryEmit("No track points available")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isGeneratingNotes = true,
+            selectedSensitivity = sensitivityIndex,
+        )
+
+        viewModelScope.launch {
+            try {
+                val sensitivity = when (sensitivityIndex) {
+                    0 -> PaceNoteGenerator.Sensitivity.LOW
+                    2 -> PaceNoteGenerator.Sensitivity.HIGH
+                    else -> PaceNoteGenerator.Sensitivity.MEDIUM
+                }
+
+                val notes = PaceNoteGenerator.generate(trackId, points, sensitivity)
+
+                // Persist
+                paceNoteDao.deleteNotesForTrack(trackId)
+                if (notes.isNotEmpty()) {
+                    paceNoteDao.insertNotes(notes)
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    paceNotes = notes,
+                    isGeneratingNotes = false,
+                )
+
+                _snackbarMessage.tryEmit("Generated ${notes.size} pace notes")
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isGeneratingNotes = false)
+                _snackbarMessage.tryEmit("Failed to generate pace notes: ${e.message}")
+            }
+        }
     }
 
     fun addTag(tag: String) {
@@ -160,6 +209,7 @@ class TrackDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val fileName = "${track.name.replace(Regex("[^a-zA-Z0-9_ -]"), "_")}.gpx"
+                val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
 
                 // Save to Downloads via MediaStore
                 val contentValues = ContentValues().apply {
@@ -176,7 +226,7 @@ class TrackDetailViewModel @Inject constructor(
                 }
 
                 resolver.openOutputStream(uri)?.use { outputStream ->
-                    GpxExporter.export(track, points, outputStream)
+                    GpxExporter.export(track, points, outputStream, paceNotes)
                 }
 
                 // Open sharesheet

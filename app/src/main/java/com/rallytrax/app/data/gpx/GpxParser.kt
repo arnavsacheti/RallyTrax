@@ -1,5 +1,8 @@
 package com.rallytrax.app.data.gpx
 
+import com.rallytrax.app.data.local.entity.NoteModifier
+import com.rallytrax.app.data.local.entity.NoteType
+import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import org.xmlpull.v1.XmlPullParser
@@ -18,6 +21,7 @@ import kotlin.math.sqrt
 data class GpxImportResult(
     val track: TrackEntity,
     val points: List<TrackPointEntity>,
+    val paceNotes: List<PaceNoteEntity> = emptyList(),
 )
 
 class GpxParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -46,6 +50,17 @@ object GpxParser {
 
             val points = mutableListOf<TrackPointEntity>()
             var pointIndex = 0
+
+            // Pace notes
+            val paceNotes = mutableListOf<PaceNoteEntity>()
+            var inPaceNotes = false
+            var inPaceNote = false
+            var paceNotePointIndex = 0
+            var paceNoteDistFromStart = 0.0
+            var paceNoteType: NoteType = NoteType.STRAIGHT
+            var paceNoteSeverity = 0
+            var paceNoteModifier: NoteModifier = NoteModifier.NONE
+            var paceNoteCallDistM = 0.0
 
             // Current trkpt state
             var currentLat: Double? = null
@@ -88,6 +103,24 @@ object GpxParser {
                             }
                             tag == "extensions" && inTrkPt -> inExtensions = true
                             tag == "extensions" && inTrk && !inTrkPt -> inTrkExtensions = true
+
+                            // Pace notes
+                            (tag == "paceNotes" || tag.endsWith("paceNotes")) && inTrkExtensions -> {
+                                inPaceNotes = true
+                            }
+                            (tag == "paceNote" || tag.endsWith("paceNote")) && inPaceNotes -> {
+                                inPaceNote = true
+                                paceNotePointIndex = parser.getAttributeValue(null, "pointIndex")?.toIntOrNull() ?: 0
+                                paceNoteDistFromStart = parser.getAttributeValue(null, "distanceFromStart")?.toDoubleOrNull() ?: 0.0
+                                paceNoteType = try {
+                                    NoteType.valueOf(parser.getAttributeValue(null, "noteType") ?: "STRAIGHT")
+                                } catch (_: Exception) { NoteType.STRAIGHT }
+                                paceNoteSeverity = parser.getAttributeValue(null, "severity")?.toIntOrNull() ?: 0
+                                paceNoteModifier = try {
+                                    NoteModifier.valueOf(parser.getAttributeValue(null, "modifier") ?: "NONE")
+                                } catch (_: Exception) { NoteModifier.NONE }
+                                paceNoteCallDistM = parser.getAttributeValue(null, "callDistanceM")?.toDoubleOrNull() ?: 0.0
+                            }
                         }
                         currentTag = tag
                     }
@@ -107,6 +140,26 @@ object GpxParser {
                             tag == "extensions" && inTrkPt -> inExtensions = false
                             tag == "extensions" && inTrk && !inTrkPt -> inTrkExtensions = false
 
+                            // Pace notes
+                            (tag == "paceNotes" || tag.endsWith("paceNotes")) && inPaceNotes -> {
+                                inPaceNotes = false
+                            }
+                            (tag == "paceNote" || tag.endsWith("paceNote")) && inPaceNote -> {
+                                paceNotes.add(
+                                    PaceNoteEntity(
+                                        trackId = trackId,
+                                        pointIndex = paceNotePointIndex,
+                                        distanceFromStart = paceNoteDistFromStart,
+                                        noteType = paceNoteType,
+                                        severity = paceNoteSeverity,
+                                        modifier = paceNoteModifier,
+                                        callText = text,
+                                        callDistanceM = paceNoteCallDistM,
+                                    )
+                                )
+                                inPaceNote = false
+                            }
+
                             // Metadata / track-level name
                             tag == "name" && (inMetadata || (inTrk && !inTrkPt)) && trackName == null -> {
                                 trackName = text
@@ -119,7 +172,7 @@ object GpxParser {
                             }
 
                             // Track extensions
-                            inTrkExtensions -> {
+                            inTrkExtensions && !inPaceNotes -> {
                                 when {
                                     tag.endsWith("durationMs") -> extDurationMs = text.toLongOrNull()
                                     tag.endsWith("distanceMeters") -> extDistanceMeters = text.toDoubleOrNull()
@@ -239,7 +292,7 @@ object GpxParser {
                 tags = tags,
             )
 
-            return GpxImportResult(track, points)
+            return GpxImportResult(track, points, paceNotes)
         } catch (e: GpxParseException) {
             throw e
         } catch (e: Exception) {
