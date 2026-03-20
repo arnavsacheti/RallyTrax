@@ -50,6 +50,10 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.rallytrax.app.recording.RecordingStatus
+import com.rallytrax.app.ui.map.MapProvider
+import com.rallytrax.app.ui.map.OsmMapView
+import com.rallytrax.app.ui.map.OsmPolylineData
+import org.osmdroid.util.GeoPoint
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatSpeed
@@ -85,50 +89,75 @@ fun RecordingScreen(
         showStopDialog = true
     }
 
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(
-            com.google.android.gms.maps.model.LatLng(37.7749, -122.4194),
-            15f,
-        )
-    }
-
-    // Follow current position
-    LaunchedEffect(data.currentLatLng) {
-        data.currentLatLng?.let { pos ->
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(
-                    com.google.android.gms.maps.model.LatLng(pos.latitude, pos.longitude),
-                    17f,
-                ),
-                500,
-            )
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         // Map
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState,
-            properties = MapProperties(isMyLocationEnabled = true),
-            uiSettings = MapUiSettings(
-                zoomControlsEnabled = false,
-                myLocationButtonEnabled = false,
-                compassEnabled = true,
-            ),
-        ) {
-            // Draw polyline segments
-            data.pathSegments.forEach { segment ->
-                if (segment.size >= 2) {
-                    Polyline(
-                        points = segment.map {
-                            com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)
-                        },
-                        color = Color(0xFF1A73E8),
-                        width = 12f,
+        if (MapProvider.useGoogleMaps) {
+            val cameraPositionState = rememberCameraPositionState {
+                position = CameraPosition.fromLatLngZoom(
+                    com.google.android.gms.maps.model.LatLng(37.7749, -122.4194),
+                    15f,
+                )
+            }
+
+            // Follow current position
+            LaunchedEffect(data.currentLatLng) {
+                data.currentLatLng?.let { pos ->
+                    cameraPositionState.animate(
+                        CameraUpdateFactory.newLatLngZoom(
+                            com.google.android.gms.maps.model.LatLng(pos.latitude, pos.longitude),
+                            17f,
+                        ),
+                        500,
                     )
                 }
             }
+
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(isMyLocationEnabled = true),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    myLocationButtonEnabled = false,
+                    compassEnabled = true,
+                ),
+            ) {
+                data.pathSegments.forEach { segment ->
+                    if (segment.size >= 2) {
+                        Polyline(
+                            points = segment.map {
+                                com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)
+                            },
+                            color = Color(0xFF1A73E8),
+                            width = 12f,
+                        )
+                    }
+                }
+            }
+        } else {
+            // OSM fallback
+            val osmPolylines = data.pathSegments.mapNotNull { segment ->
+                if (segment.size >= 2) {
+                    OsmPolylineData(
+                        points = segment.map { GeoPoint(it.latitude, it.longitude) },
+                    )
+                } else {
+                    null
+                }
+            }
+
+            val followPos = data.currentLatLng?.let {
+                GeoPoint(it.latitude, it.longitude)
+            }
+
+            OsmMapView(
+                modifier = Modifier.fillMaxSize(),
+                centerLat = 37.7749,
+                centerLng = -122.4194,
+                zoom = 15.0,
+                polylines = osmPolylines,
+                followPosition = followPos,
+            )
         }
 
         // Stats overlay at bottom

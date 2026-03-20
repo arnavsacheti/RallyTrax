@@ -82,6 +82,12 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.rallytrax.app.data.local.entity.NoteType
+import com.rallytrax.app.ui.map.MapProvider
+import com.rallytrax.app.ui.map.OsmMapView
+import com.rallytrax.app.ui.map.OsmMarkerData
+import com.rallytrax.app.ui.map.OsmPolylineData
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.recording.LatLng
 import com.rallytrax.app.util.formatDateTime
@@ -174,69 +180,113 @@ fun TrackDetailScreen(
             ) {
                 // Map (always visible at top)
                 val points = uiState.polylinePoints
-                val cameraPositionState = rememberCameraPositionState()
 
                 if (points.isNotEmpty()) {
-                    val boundsBuilder = LatLngBounds.builder()
-                    points.forEach { p ->
-                        boundsBuilder.include(
-                            com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)
-                        )
-                    }
-                    val bounds = boundsBuilder.build()
-                    cameraPositionState.position =
-                        CameraPosition.fromLatLngZoom(bounds.center, 14f)
-
-                    GoogleMap(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
-                        cameraPositionState = cameraPositionState,
-                        uiSettings = MapUiSettings(
-                            zoomControlsEnabled = true,
-                            scrollGesturesEnabled = true,
-                            zoomGesturesEnabled = true,
-                        ),
-                    ) {
-                        if (points.size >= 2) {
-                            Polyline(
-                                points = points.map {
-                                    com.google.android.gms.maps.model.LatLng(
-                                        it.latitude,
-                                        it.longitude,
-                                    )
-                                },
-                                color = Color(0xFF1A73E8),
-                                width = 10f,
+                    if (MapProvider.useGoogleMaps) {
+                        val cameraPositionState = rememberCameraPositionState()
+                        val boundsBuilder = LatLngBounds.builder()
+                        points.forEach { p ->
+                            boundsBuilder.include(
+                                com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)
                             )
                         }
+                        val bounds = boundsBuilder.build()
+                        cameraPositionState.position =
+                            CameraPosition.fromLatLngZoom(bounds.center, 14f)
 
-                        // Pace note markers
-                        if (pagerState.currentPage == 1) {
-                            uiState.paceNotes.forEach { note ->
-                                val noteLatLng = findPointForNote(note, uiState.polylinePoints, points)
-                                if (noteLatLng != null) {
-                                    val hue = when (note.noteType) {
-                                        NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
-                                        NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
-                                        NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                                        NoteType.CREST -> BitmapDescriptorFactory.HUE_YELLOW
-                                        NoteType.DIP -> BitmapDescriptorFactory.HUE_ORANGE
-                                        NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
+                        GoogleMap(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp),
+                            cameraPositionState = cameraPositionState,
+                            uiSettings = MapUiSettings(
+                                zoomControlsEnabled = true,
+                                scrollGesturesEnabled = true,
+                                zoomGesturesEnabled = true,
+                            ),
+                        ) {
+                            if (points.size >= 2) {
+                                Polyline(
+                                    points = points.map {
+                                        com.google.android.gms.maps.model.LatLng(
+                                            it.latitude,
+                                            it.longitude,
+                                        )
+                                    },
+                                    color = Color(0xFF1A73E8),
+                                    width = 10f,
+                                )
+                            }
+
+                            if (pagerState.currentPage == 1) {
+                                uiState.paceNotes.forEach { note ->
+                                    val noteLatLng = findPointForNote(note, uiState.polylinePoints, points)
+                                    if (noteLatLng != null) {
+                                        val hue = when (note.noteType) {
+                                            NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
+                                            NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
+                                            NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
+                                            NoteType.CREST -> BitmapDescriptorFactory.HUE_YELLOW
+                                            NoteType.DIP -> BitmapDescriptorFactory.HUE_ORANGE
+                                            NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
+                                        }
+                                        Marker(
+                                            state = MarkerState(
+                                                position = com.google.android.gms.maps.model.LatLng(
+                                                    noteLatLng.latitude,
+                                                    noteLatLng.longitude,
+                                                )
+                                            ),
+                                            title = note.callText,
+                                            icon = BitmapDescriptorFactory.defaultMarker(hue),
+                                        )
                                     }
-                                    Marker(
-                                        state = MarkerState(
-                                            position = com.google.android.gms.maps.model.LatLng(
-                                                noteLatLng.latitude,
-                                                noteLatLng.longitude,
-                                            )
-                                        ),
-                                        title = note.callText,
-                                        icon = BitmapDescriptorFactory.defaultMarker(hue),
-                                    )
                                 }
                             }
                         }
+                    } else {
+                        // OSM fallback
+                        val lats = points.map { it.latitude }
+                        val lngs = points.map { it.longitude }
+                        val fitBounds = BoundingBox(
+                            lats.max(), lngs.max(),
+                            lats.min(), lngs.min(),
+                        )
+
+                        val osmPolylines = if (points.size >= 2) {
+                            listOf(
+                                OsmPolylineData(
+                                    points = points.map { GeoPoint(it.latitude, it.longitude) },
+                                    width = 10f,
+                                ),
+                            )
+                        } else {
+                            emptyList()
+                        }
+
+                        val osmMarkers = if (pagerState.currentPage == 1) {
+                            uiState.paceNotes.mapNotNull { note ->
+                                val noteLatLng = findPointForNote(note, uiState.polylinePoints, points)
+                                noteLatLng?.let {
+                                    OsmMarkerData(
+                                        position = GeoPoint(it.latitude, it.longitude),
+                                        title = note.callText,
+                                    )
+                                }
+                            }
+                        } else {
+                            emptyList()
+                        }
+
+                        OsmMapView(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp),
+                            fitBounds = fitBounds,
+                            polylines = osmPolylines,
+                            markers = osmMarkers,
+                            zoomControlsEnabled = true,
+                        )
                     }
                 }
 

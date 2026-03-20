@@ -76,6 +76,12 @@ import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import com.rallytrax.app.data.local.entity.NoteType
+import com.rallytrax.app.ui.map.MapProvider
+import com.rallytrax.app.ui.map.OsmMapView
+import com.rallytrax.app.ui.map.OsmMarkerData
+import com.rallytrax.app.ui.map.OsmPolylineData
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
 import com.rallytrax.app.replay.ReplayViewModel
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatSpeed
@@ -466,9 +472,17 @@ private fun ReplayMap(
     uiState: com.rallytrax.app.replay.ReplayUiState,
     viewModel: ReplayViewModel,
 ) {
+    if (MapProvider.useGoogleMaps) {
+        GoogleReplayMap(uiState)
+    } else {
+        OsmReplayMap(uiState)
+    }
+}
+
+@Composable
+private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
     val cameraPositionState = rememberCameraPositionState()
 
-    // Follow driver position
     val driverPos = uiState.driverPosition
     if (driverPos != null) {
         cameraPositionState.position = CameraPosition.Builder()
@@ -476,7 +490,6 @@ private fun ReplayMap(
             .zoom(16f)
             .build()
     } else if (uiState.polylinePoints.isNotEmpty()) {
-        // Initial camera: fit the track
         val boundsBuilder = LatLngBounds.builder()
         uiState.polylinePoints.forEach { p ->
             boundsBuilder.include(
@@ -509,7 +522,6 @@ private fun ReplayMap(
             rotationGesturesEnabled = true,
         ),
     ) {
-        // Recorded polyline
         if (uiState.polylinePoints.size >= 2) {
             Polyline(
                 points = uiState.polylinePoints.map {
@@ -520,7 +532,6 @@ private fun ReplayMap(
             )
         }
 
-        // Driver position marker
         if (driverPos != null) {
             val driverMarkerState = rememberMarkerState(
                 key = "driver",
@@ -529,7 +540,6 @@ private fun ReplayMap(
                     driverPos.longitude,
                 ),
             )
-            // Update position on each recomposition
             driverMarkerState.position = com.google.android.gms.maps.model.LatLng(
                 driverPos.latitude,
                 driverPos.longitude,
@@ -541,7 +551,6 @@ private fun ReplayMap(
             )
         }
 
-        // Pace note markers (subtle)
         uiState.paceNotes.forEach { note ->
             val pointIdx = note.pointIndex
             if (pointIdx in uiState.polylinePoints.indices) {
@@ -570,6 +579,68 @@ private fun ReplayMap(
             }
         }
     }
+}
+
+@Composable
+private fun OsmReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
+    val driverPos = uiState.driverPosition
+
+    val osmPolylines = if (uiState.polylinePoints.size >= 2) {
+        listOf(
+            OsmPolylineData(
+                points = uiState.polylinePoints.map { GeoPoint(it.latitude, it.longitude) },
+            ),
+        )
+    } else {
+        emptyList()
+    }
+
+    val osmMarkers = buildList {
+        if (driverPos != null) {
+            add(
+                OsmMarkerData(
+                    position = GeoPoint(driverPos.latitude, driverPos.longitude),
+                    title = "You",
+                    hue = 180f, // Cyan
+                ),
+            )
+        }
+        uiState.paceNotes.forEach { note ->
+            val pointIdx = note.pointIndex
+            if (pointIdx in uiState.polylinePoints.indices) {
+                val pos = uiState.polylinePoints[pointIdx]
+                add(
+                    OsmMarkerData(
+                        position = GeoPoint(pos.latitude, pos.longitude),
+                        title = note.callText,
+                        alpha = 0.6f,
+                    ),
+                )
+            }
+        }
+    }
+
+    val followPos = driverPos?.let { GeoPoint(it.latitude, it.longitude) }
+
+    val fitBounds = if (followPos == null && uiState.polylinePoints.isNotEmpty()) {
+        val lats = uiState.polylinePoints.map { it.latitude }
+        val lngs = uiState.polylinePoints.map { it.longitude }
+        BoundingBox(
+            lats.max(), lngs.max(),
+            lats.min(), lngs.min(),
+        )
+    } else {
+        null
+    }
+
+    OsmMapView(
+        modifier = Modifier.fillMaxSize(),
+        polylines = osmPolylines,
+        markers = osmMarkers,
+        darkMode = true,
+        followPosition = followPos,
+        fitBounds = fitBounds,
+    )
 }
 
 private fun noteTypeColor(type: NoteType): Color = when (type) {

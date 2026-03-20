@@ -40,6 +40,10 @@
 -keep class com.google.android.gms.maps.** { *; }
 -keep class com.google.maps.android.** { *; }
 
+# osmdroid (OpenStreetMap fallback)
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**
+
 # Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}

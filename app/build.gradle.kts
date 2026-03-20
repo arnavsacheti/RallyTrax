@@ -137,6 +137,9 @@ dependencies {
     implementation(libs.play.services.maps)
     implementation(libs.maps.compose)
 
+    // OpenStreetMap (fallback when Google Maps API key is not configured)
+    implementation(libs.osmdroid.android)
+
     // Location
     implementation(libs.play.services.location)
 
