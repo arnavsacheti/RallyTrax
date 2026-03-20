@@ -6,19 +6,31 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -29,12 +41,12 @@ import com.rallytrax.app.data.gpx.GpxParser
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
-import com.rallytrax.app.navigation.LibraryRoute
 import com.rallytrax.app.navigation.RallyTraxNavHost
 import com.rallytrax.app.navigation.RecordingRoute
 import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.theme.RallyTraxTheme
+import com.rallytrax.app.update.UpdateViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -45,6 +57,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var trackPointDao: TrackPointDao
     @Inject lateinit var paceNoteDao: PaceNoteDao
 
+    private val updateViewModel: UpdateViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -54,6 +68,8 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
                 val snackbarHostState = remember { SnackbarHostState() }
+
+                val updateState by updateViewModel.uiState.collectAsStateWithLifecycle()
 
                 // Hide bottom bar on recording and track detail screens
                 val showBottomBar = currentDestination?.let { dest ->
@@ -106,6 +122,42 @@ class MainActivity : ComponentActivity() {
                             Modifier.padding(innerPadding)
                         } else {
                             Modifier
+                        },
+                    )
+                }
+
+                // Update available dialog (shown once on launch)
+                if (updateState.updateAvailable && !updateState.dismissed && updateState.releaseInfo != null) {
+                    val release = updateState.releaseInfo!!
+                    AlertDialog(
+                        onDismissRequest = { updateViewModel.dismissUpdate() },
+                        title = { Text("Update Available") },
+                        text = {
+                            Text(
+                                "Version ${release.versionName} is available. " +
+                                    "You are currently on version ${BuildConfig.VERSION_NAME}."
+                            )
+                        },
+                        confirmButton = {
+                            FilledTonalButton(
+                                onClick = {
+                                    updateViewModel.dismissUpdate()
+                                    val downloadUrl = release.apkDownloadUrl ?: release.htmlUrl
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                                    startActivity(intent)
+                                },
+                            ) {
+                                Icon(Icons.Filled.Download, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    if (release.apkDownloadUrl != null) "Download" else "View Release"
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { updateViewModel.dismissUpdate() }) {
+                                Text("Later")
+                            }
                         },
                     )
                 }
