@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.rallytrax.app.data.local.entity.TrackEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -21,6 +22,9 @@ interface TrackDao {
 
     @Query("DELETE FROM tracks WHERE id = :trackId")
     suspend fun deleteTrack(trackId: String)
+
+    @Update
+    suspend fun updateTrack(track: TrackEntity)
 
     @Query("SELECT COUNT(*) FROM tracks")
     suspend fun getTrackCount(): Int

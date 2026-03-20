@@ -19,6 +19,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rallytrax.app.navigation.RallyTraxNavHost
+import com.rallytrax.app.navigation.RecordingRoute
+import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.theme.RallyTraxTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,45 +36,57 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
+                // Hide bottom bar on recording and track detail screens
+                val showBottomBar = currentDestination?.let { dest ->
+                    !dest.hasRoute(RecordingRoute::class) &&
+                        !dest.hasRoute(TrackDetailRoute::class)
+                } ?: true
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        NavigationBar {
-                            topLevelRoutes.forEach { topLevelRoute ->
-                                val selected = currentDestination?.hierarchy?.any {
-                                    it.hasRoute(topLevelRoute.route::class)
-                                } == true
+                        if (showBottomBar) {
+                            NavigationBar {
+                                topLevelRoutes.forEach { topLevelRoute ->
+                                    val selected = currentDestination?.hierarchy?.any {
+                                        it.hasRoute(topLevelRoute.route::class)
+                                    } == true
 
-                                NavigationBarItem(
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (selected) {
-                                                topLevelRoute.selectedIcon
-                                            } else {
-                                                topLevelRoute.unselectedIcon
-                                            },
-                                            contentDescription = topLevelRoute.label,
-                                        )
-                                    },
-                                    label = { Text(topLevelRoute.label) },
-                                    selected = selected,
-                                    onClick = {
-                                        navController.navigate(topLevelRoute.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
+                                    NavigationBarItem(
+                                        icon = {
+                                            Icon(
+                                                imageVector = if (selected) {
+                                                    topLevelRoute.selectedIcon
+                                                } else {
+                                                    topLevelRoute.unselectedIcon
+                                                },
+                                                contentDescription = topLevelRoute.label,
+                                            )
+                                        },
+                                        label = { Text(topLevelRoute.label) },
+                                        selected = selected,
+                                        onClick = {
+                                            navController.navigate(topLevelRoute.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                )
+                                        },
+                                    )
+                                }
                             }
                         }
                     },
                 ) { innerPadding ->
                     RallyTraxNavHost(
                         navController = navController,
-                        modifier = Modifier.padding(innerPadding),
+                        modifier = if (showBottomBar) {
+                            Modifier.padding(innerPadding)
+                        } else {
+                            Modifier
+                        },
                     )
                 }
             }

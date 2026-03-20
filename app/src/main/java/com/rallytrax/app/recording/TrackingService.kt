@@ -1,0 +1,398 @@
+package com.rallytrax.app.recording
+
+import android.annotation.SuppressLint
+import android.app.NotificationManager
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.location.Location
+import android.os.Build
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.rallytrax.app.data.local.dao.TrackDao
+import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.util.formatDistance
+import com.rallytrax.app.util.formatElapsedTime
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+import javax.inject.Inject
+import kotlin.math.max
+
+@AndroidEntryPoint
+class TrackingService : LifecycleService() {
+
+    @Inject lateinit var trackDao: TrackDao
+    @Inject lateinit var trackPointDao: TrackPointDao
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var notificationManager: TrackingNotificationManager
+
+    private var timerJob: Job? = null
+    private var flushJob: Job? = null
+    private var trackId: String = ""
+    private var pointIndex: Int = 0
+    private var accumulatedTimeMs: Long = 0L
+    private var timerStartMs: Long = 0L
+    private var lastLocation: Location? = null
+    private var previousElevation: Double? = null
+    private var totalDistance: Double = 0.0
+    private var maxSpeed: Double = 0.0
+    private var elevationGain: Double = 0.0
+    private var speedSum: Double = 0.0
+    private var speedCount: Int = 0
+    private var minLat: Double = Double.MAX_VALUE
+    private var maxLat: Double = -Double.MAX_VALUE
+    private var minLon: Double = Double.MAX_VALUE
+    private var maxLon: Double = -Double.MAX_VALUE
+    private var isNewSegment: Boolean = true
+
+    private val pointBuffer = mutableListOf<TrackPointEntity>()
+    private val pathSegments = mutableListOf<MutableList<LatLng>>()
+
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            result.lastLocation?.let { location ->
+                onNewLocation(location)
+            }
+        }
+    }
+
+    companion object {
+        const val ACTION_START = "ACTION_START"
+        const val ACTION_PAUSE = "ACTION_PAUSE"
+        const val ACTION_RESUME = "ACTION_RESUME"
+        const val ACTION_STOP = "ACTION_STOP"
+
+        private val _recordingStatus = MutableStateFlow(RecordingStatus.IDLE)
+        val recordingStatus = _recordingStatus.asStateFlow()
+
+        private val _recordingData = MutableStateFlow(RecordingData.EMPTY)
+        val recordingData = _recordingData.asStateFlow()
+
+        private val _savedTrackId = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val savedTrackId = _savedTrackId.asSharedFlow()
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        notificationManager = TrackingNotificationManager(this)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        when (intent?.action) {
+            ACTION_START -> startRecording()
+            ACTION_PAUSE -> pauseRecording()
+            ACTION_RESUME -> resumeRecording()
+            ACTION_STOP -> stopRecording()
+        }
+        return START_STICKY
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startRecording() {
+        trackId = UUID.randomUUID().toString()
+        pointIndex = 0
+        accumulatedTimeMs = 0L
+        totalDistance = 0.0
+        maxSpeed = 0.0
+        elevationGain = 0.0
+        speedSum = 0.0
+        speedCount = 0
+        lastLocation = null
+        previousElevation = null
+        isNewSegment = true
+        minLat = Double.MAX_VALUE
+        maxLat = -Double.MAX_VALUE
+        minLon = Double.MAX_VALUE
+        maxLon = -Double.MAX_VALUE
+        pointBuffer.clear()
+        pathSegments.clear()
+        pathSegments.add(mutableListOf())
+
+        // Insert skeleton track
+        lifecycleScope.launch {
+            val now = System.currentTimeMillis()
+            val name = generateTrackName(now)
+            trackDao.insertTrack(
+                TrackEntity(
+                    id = trackId,
+                    name = name,
+                    recordedAt = now,
+                )
+            )
+        }
+
+        // Start foreground
+        val notification = notificationManager.createNotification("00:00", "0 m")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                TrackingNotificationManager.NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+            )
+        } else {
+            startForeground(TrackingNotificationManager.NOTIFICATION_ID, notification)
+        }
+
+        // Start GPS
+        val locationRequest = LocationRequest.Builder(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            1000L,
+        ).setMinUpdateIntervalMillis(500L).build()
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            mainLooper,
+        )
+
+        // Start timer
+        startTimer()
+
+        // Start periodic flush
+        startFlushJob()
+
+        _recordingStatus.value = RecordingStatus.RECORDING
+    }
+
+    private fun pauseRecording() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        pauseTimer()
+        isNewSegment = true
+
+        _recordingStatus.value = RecordingStatus.PAUSED
+        updateNotification(isPaused = true)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun resumeRecording() {
+        // Start a new segment for the gap
+        pathSegments.add(mutableListOf())
+        lastLocation = null
+        isNewSegment = true
+
+        val locationRequest = LocationRequest.Builder(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            1000L,
+        ).setMinUpdateIntervalMillis(500L).build()
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            mainLooper,
+        )
+
+        startTimer()
+        _recordingStatus.value = RecordingStatus.RECORDING
+        updateNotification(isPaused = false)
+    }
+
+    private fun stopRecording() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        pauseTimer()
+        flushJob?.cancel()
+
+        _recordingStatus.value = RecordingStatus.STOPPED
+
+        lifecycleScope.launch {
+            // Flush remaining buffer
+            if (pointBuffer.isNotEmpty()) {
+                trackPointDao.insertPoints(pointBuffer.toList())
+                pointBuffer.clear()
+            }
+
+            // Compute final stats
+            val avgSpeed = if (speedCount > 0) speedSum / speedCount else 0.0
+            val durationMs = accumulatedTimeMs
+
+            trackDao.insertTrack(
+                TrackEntity(
+                    id = trackId,
+                    name = generateTrackName(System.currentTimeMillis()),
+                    recordedAt = System.currentTimeMillis() - durationMs,
+                    durationMs = durationMs,
+                    distanceMeters = totalDistance,
+                    maxSpeedMps = maxSpeed,
+                    avgSpeedMps = avgSpeed,
+                    elevationGainM = elevationGain,
+                    boundingBoxNorthLat = if (maxLat != -Double.MAX_VALUE) maxLat else 0.0,
+                    boundingBoxSouthLat = if (minLat != Double.MAX_VALUE) minLat else 0.0,
+                    boundingBoxEastLon = if (maxLon != -Double.MAX_VALUE) maxLon else 0.0,
+                    boundingBoxWestLon = if (minLon != Double.MAX_VALUE) minLon else 0.0,
+                )
+            )
+
+            _savedTrackId.tryEmit(trackId)
+            _recordingStatus.value = RecordingStatus.IDLE
+            _recordingData.value = RecordingData.EMPTY
+
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private fun onNewLocation(location: Location) {
+        val latLng = LatLng(location.latitude, location.longitude)
+
+        // Update bounding box
+        minLat = minOf(minLat, location.latitude)
+        maxLat = maxOf(maxLat, location.latitude)
+        minLon = minOf(minLon, location.longitude)
+        maxLon = maxOf(maxLon, location.longitude)
+
+        // Distance (skip first point of new segment)
+        if (!isNewSegment && lastLocation != null) {
+            val delta = lastLocation!!.distanceTo(location)
+            // Filter out GPS jumps (> 100 m/s which is 360 km/h)
+            if (delta / 1.0 < 100.0) {
+                totalDistance += delta
+            }
+        }
+
+        // Speed
+        val speed = if (location.hasSpeed()) location.speed.toDouble() else 0.0
+        if (speed > 0) {
+            maxSpeed = max(maxSpeed, speed)
+            speedSum += speed
+            speedCount++
+        }
+
+        // Elevation
+        if (location.hasAltitude()) {
+            val elevation = location.altitude
+            previousElevation?.let { prev ->
+                val delta = elevation - prev
+                if (delta > 2.0) { // Threshold to filter GPS noise
+                    elevationGain += delta
+                }
+            }
+            previousElevation = elevation
+        }
+
+        // Add to current segment
+        pathSegments.lastOrNull()?.add(latLng)
+        isNewSegment = false
+        lastLocation = location
+
+        // Buffer point for Room
+        val point = TrackPointEntity(
+            trackId = trackId,
+            index = pointIndex++,
+            lat = location.latitude,
+            lon = location.longitude,
+            elevation = if (location.hasAltitude()) location.altitude else null,
+            timestamp = System.currentTimeMillis(),
+            speed = if (location.hasSpeed()) location.speed.toDouble() else null,
+            bearing = if (location.hasBearing()) location.bearing.toDouble() else null,
+            accuracy = if (location.hasAccuracy()) location.accuracy else null,
+        )
+        pointBuffer.add(point)
+
+        // Check buffer size
+        if (pointBuffer.size >= 50) {
+            flushBuffer()
+        }
+
+        // Update UI state
+        emitRecordingData(speed, latLng)
+    }
+
+    private fun emitRecordingData(speed: Double, latLng: LatLng) {
+        val elapsed = accumulatedTimeMs + (System.currentTimeMillis() - timerStartMs)
+        _recordingData.value = RecordingData(
+            pathSegments = pathSegments.map { it.toList() },
+            currentSpeed = speed,
+            elapsedTimeMs = elapsed,
+            distanceMeters = totalDistance,
+            maxSpeedMps = maxSpeed,
+            elevationGainM = elevationGain,
+            currentLatLng = latLng,
+            pointCount = pointIndex,
+        )
+    }
+
+    private fun startTimer() {
+        timerStartMs = System.currentTimeMillis()
+        timerJob = lifecycleScope.launch {
+            while (true) {
+                delay(1000)
+                val elapsed = accumulatedTimeMs + (System.currentTimeMillis() - timerStartMs)
+                _recordingData.value = _recordingData.value.copy(elapsedTimeMs = elapsed)
+                updateNotification(isPaused = false)
+            }
+        }
+    }
+
+    private fun pauseTimer() {
+        timerJob?.cancel()
+        accumulatedTimeMs += System.currentTimeMillis() - timerStartMs
+    }
+
+    private fun startFlushJob() {
+        flushJob = lifecycleScope.launch {
+            while (true) {
+                delay(30_000)
+                flushBuffer()
+            }
+        }
+    }
+
+    private fun flushBuffer() {
+        if (pointBuffer.isEmpty()) return
+        val points = pointBuffer.toList()
+        pointBuffer.clear()
+        lifecycleScope.launch {
+            trackPointDao.insertPoints(points)
+        }
+    }
+
+    private fun updateNotification(isPaused: Boolean) {
+        val elapsed = if (isPaused) {
+            accumulatedTimeMs
+        } else {
+            accumulatedTimeMs + (System.currentTimeMillis() - timerStartMs)
+        }
+        val notification = notificationManager.createNotification(
+            elapsedTime = formatElapsedTime(elapsed),
+            distance = formatDistance(totalDistance),
+            isPaused = isPaused,
+        )
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(TrackingNotificationManager.NOTIFICATION_ID, notification)
+    }
+
+    private fun generateTrackName(timeMs: Long): String {
+        val dateTime = LocalDateTime.ofInstant(
+            Instant.ofEpochMilli(timeMs),
+            ZoneId.systemDefault(),
+        )
+        return dateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a"))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        timerJob?.cancel()
+        flushJob?.cancel()
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+}

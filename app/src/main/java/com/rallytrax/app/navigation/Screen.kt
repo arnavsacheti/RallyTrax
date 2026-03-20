@@ -23,6 +23,8 @@ data class TopLevelRoute(
 @Serializable data object LibraryRoute
 @Serializable data object ReplayRoute
 @Serializable data object SettingsRoute
+@Serializable data object RecordingRoute
+@Serializable data class TrackDetailRoute(val trackId: String)
 
 val topLevelRoutes = listOf(
     TopLevelRoute(

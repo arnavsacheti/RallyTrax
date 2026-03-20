@@ -92,6 +92,16 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
+    // Google Maps
+    implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
+
+    // Location
+    implementation(libs.play.services.location)
+
+    // Lifecycle Service
+    implementation(libs.androidx.lifecycle.service)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
