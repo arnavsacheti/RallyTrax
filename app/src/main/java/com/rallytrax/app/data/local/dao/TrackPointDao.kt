@@ -13,6 +13,9 @@ interface TrackPointDao {
     @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY `index` ASC")
     fun getPointsForTrack(trackId: String): Flow<List<TrackPointEntity>>
 
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY `index` ASC")
+    suspend fun getPointsForTrackOnce(trackId: String): List<TrackPointEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPoints(points: List<TrackPointEntity>)
 

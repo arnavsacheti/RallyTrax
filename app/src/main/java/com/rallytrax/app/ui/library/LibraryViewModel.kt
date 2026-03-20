@@ -1,0 +1,208 @@
+package com.rallytrax.app.ui.library
+
+import android.content.Context
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.gpx.GpxParseException
+import com.rallytrax.app.data.gpx.GpxParser
+import com.rallytrax.app.data.local.dao.TrackDao
+import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.TrackEntity
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+enum class SortOption(val label: String) {
+    DATE_NEWEST("Newest first"),
+    DATE_OLDEST("Oldest first"),
+    DISTANCE_LONGEST("Longest distance"),
+    DISTANCE_SHORTEST("Shortest distance"),
+    DURATION_LONGEST("Longest duration"),
+    DURATION_SHORTEST("Shortest duration"),
+}
+
+data class LibraryUiState(
+    val tracks: List<TrackEntity> = emptyList(),
+    val searchQuery: String = "",
+    val sortOption: SortOption = SortOption.DATE_NEWEST,
+    val selectedTags: Set<String> = emptySet(),
+    val availableTags: Set<String> = emptySet(),
+    val selectedTrackIds: Set<String> = emptySet(),
+    val isMultiSelectMode: Boolean = false,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@HiltViewModel
+class LibraryViewModel @Inject constructor(
+    private val trackDao: TrackDao,
+    private val trackPointDao: TrackPointDao,
+) : ViewModel() {
+
+    private val _searchQuery = MutableStateFlow("")
+    private val _sortOption = MutableStateFlow(SortOption.DATE_NEWEST)
+    private val _selectedTags = MutableStateFlow<Set<String>>(emptySet())
+    private val _selectedTrackIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _isMultiSelectMode = MutableStateFlow(false)
+
+    private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val snackbarMessage = _snackbarMessage.asSharedFlow()
+
+    // Pending delete for undo
+    private val _pendingDelete = MutableStateFlow<TrackEntity?>(null)
+    val pendingDelete: StateFlow<TrackEntity?> = _pendingDelete.asStateFlow()
+
+    private val allTracks = _searchQuery.flatMapLatest { query ->
+        if (query.isBlank()) {
+            trackDao.getAllTracks()
+        } else {
+            trackDao.searchTracks(query)
+        }
+    }
+
+    val uiState: StateFlow<LibraryUiState> = combine(
+        allTracks,
+        _searchQuery,
+        _sortOption,
+        _selectedTags,
+        _selectedTrackIds,
+    ) { tracks, query, sort, tags, selectedIds ->
+        // Collect all available tags
+        val availableTags = tracks
+            .flatMap { it.tags.split(",").map { t -> t.trim() } }
+            .filter { it.isNotBlank() }
+            .toSet()
+
+        // Filter by selected tags
+        val filteredByTags = if (tags.isEmpty()) {
+            tracks
+        } else {
+            tracks.filter { track ->
+                val trackTags = track.tags.split(",").map { it.trim() }.toSet()
+                tags.any { it in trackTags }
+            }
+        }
+
+        // Sort
+        val sorted = when (sort) {
+            SortOption.DATE_NEWEST -> filteredByTags.sortedByDescending { it.recordedAt }
+            SortOption.DATE_OLDEST -> filteredByTags.sortedBy { it.recordedAt }
+            SortOption.DISTANCE_LONGEST -> filteredByTags.sortedByDescending { it.distanceMeters }
+            SortOption.DISTANCE_SHORTEST -> filteredByTags.sortedBy { it.distanceMeters }
+            SortOption.DURATION_LONGEST -> filteredByTags.sortedByDescending { it.durationMs }
+            SortOption.DURATION_SHORTEST -> filteredByTags.sortedBy { it.durationMs }
+        }
+
+        LibraryUiState(
+            tracks = sorted,
+            searchQuery = query,
+            sortOption = sort,
+            selectedTags = tags,
+            availableTags = availableTags,
+            selectedTrackIds = selectedIds,
+            isMultiSelectMode = _isMultiSelectMode.value,
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        LibraryUiState(),
+    )
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun updateSortOption(option: SortOption) {
+        _sortOption.value = option
+    }
+
+    fun toggleTag(tag: String) {
+        _selectedTags.value = _selectedTags.value.let { current ->
+            if (tag in current) current - tag else current + tag
+        }
+    }
+
+    fun clearTagFilter() {
+        _selectedTags.value = emptySet()
+    }
+
+    // --- Multi-select ---
+
+    fun toggleMultiSelect(trackId: String) {
+        _isMultiSelectMode.value = true
+        _selectedTrackIds.value = _selectedTrackIds.value.let { current ->
+            if (trackId in current) {
+                val newSet = current - trackId
+                if (newSet.isEmpty()) {
+                    _isMultiSelectMode.value = false
+                }
+                newSet
+            } else {
+                current + trackId
+            }
+        }
+    }
+
+    fun exitMultiSelectMode() {
+        _isMultiSelectMode.value = false
+        _selectedTrackIds.value = emptySet()
+    }
+
+    fun deleteSelectedTracks() {
+        val ids = _selectedTrackIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            trackDao.deleteTracks(ids)
+            _snackbarMessage.tryEmit("${ids.size} track(s) deleted")
+        }
+        exitMultiSelectMode()
+    }
+
+    // --- Single track delete with undo ---
+
+    fun requestDeleteTrack(track: TrackEntity) {
+        _pendingDelete.value = track
+    }
+
+    fun confirmDeleteTrack() {
+        val track = _pendingDelete.value ?: return
+        viewModelScope.launch {
+            trackDao.deleteTrack(track.id)
+        }
+        _pendingDelete.value = null
+    }
+
+    fun cancelDeleteTrack() {
+        _pendingDelete.value = null
+    }
+
+    // --- GPX Import ---
+
+    fun importGpx(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                    ?: throw GpxParseException("Could not open file")
+                val result = inputStream.use { GpxParser.parse(it) }
+                trackDao.insertTrack(result.track)
+                trackPointDao.insertPoints(result.points)
+                _snackbarMessage.tryEmit("Imported: ${result.track.name}")
+            } catch (e: GpxParseException) {
+                _snackbarMessage.tryEmit("Import failed: ${e.message}")
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Import failed: ${e.message}")
+            }
+        }
+    }
+}

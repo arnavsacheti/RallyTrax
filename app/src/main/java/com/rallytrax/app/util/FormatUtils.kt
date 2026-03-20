@@ -1,5 +1,8 @@
 package com.rallytrax.app.util
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 fun formatElapsedTime(ms: Long): String {
@@ -25,4 +28,18 @@ fun formatDistance(meters: Double): String {
 fun formatSpeed(mps: Double): String {
     val kmh = mps * 3.6
     return String.format(Locale.US, "%.0f", kmh)
+}
+
+fun formatDate(epochMs: Long): String {
+    val instant = Instant.ofEpochMilli(epochMs)
+    val dateTime = instant.atZone(ZoneId.systemDefault())
+    val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+    return formatter.format(dateTime)
+}
+
+fun formatDateTime(epochMs: Long): String {
+    val instant = Instant.ofEpochMilli(epochMs)
+    val dateTime = instant.atZone(ZoneId.systemDefault())
+    val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a", Locale.US)
+    return formatter.format(dateTime)
 }

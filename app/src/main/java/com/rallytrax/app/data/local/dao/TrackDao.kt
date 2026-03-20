@@ -23,9 +23,15 @@ interface TrackDao {
     @Query("DELETE FROM tracks WHERE id = :trackId")
     suspend fun deleteTrack(trackId: String)
 
+    @Query("DELETE FROM tracks WHERE id IN (:trackIds)")
+    suspend fun deleteTracks(trackIds: List<String>)
+
     @Update
     suspend fun updateTrack(track: TrackEntity)
 
     @Query("SELECT COUNT(*) FROM tracks")
     suspend fun getTrackCount(): Int
+
+    @Query("SELECT * FROM tracks WHERE name LIKE '%' || :query || '%' ORDER BY recordedAt DESC")
+    fun searchTracks(query: String): Flow<List<TrackEntity>>
 }
