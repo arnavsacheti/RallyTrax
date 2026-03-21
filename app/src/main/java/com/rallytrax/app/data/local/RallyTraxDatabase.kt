@@ -13,7 +13,7 @@ import com.rallytrax.app.data.local.entity.TrackPointEntity
 
 @Database(
     entities = [TrackEntity::class, TrackPointEntity::class, PaceNoteEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -23,7 +23,6 @@ abstract class RallyTraxDatabase : RoomDatabase() {
 
     companion object {
         // Planned migrations for v1.1:
-        // v2 → v3 (Stage 1.1.3): ALTER track_points ADD COLUMN accelMps2 REAL, curvatureDegPerM REAL
         // v3 → v4 (Stage 1.1.4): CREATE TABLE grid_cells for heatmap tile provider
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -46,6 +45,13 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_pace_notes_trackId` ON `pace_notes` (`trackId`)")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE track_points ADD COLUMN accelMps2 REAL")
+                db.execSQL("ALTER TABLE track_points ADD COLUMN curvatureDegPerM REAL")
             }
         }
     }

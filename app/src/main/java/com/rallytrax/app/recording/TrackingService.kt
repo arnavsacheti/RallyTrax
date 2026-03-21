@@ -245,9 +245,20 @@ class TrackingService : LifecycleService() {
                 )
             )
 
-            // Generate pace notes in background
+            // Compute acceleration and curvature for all points
             val savedId = trackId
-            val allPoints = trackPointDao.getPointsForTrackOnce(savedId)
+            var allPoints = trackPointDao.getPointsForTrackOnce(savedId)
+            try {
+                val enrichedPoints = com.rallytrax.app.pacenotes.TrackPointComputer.computeFields(allPoints)
+                if (enrichedPoints.isNotEmpty()) {
+                    trackPointDao.insertPoints(enrichedPoints) // REPLACE via OnConflictStrategy
+                    allPoints = enrichedPoints
+                }
+            } catch (_: Exception) {
+                // Non-critical; continue with un-enriched points
+            }
+
+            // Generate pace notes in background
             try {
                 val paceNotes = PaceNoteGenerator.generate(savedId, allPoints)
                 if (paceNotes.isNotEmpty()) {

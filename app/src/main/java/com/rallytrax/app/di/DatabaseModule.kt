@@ -25,7 +25,7 @@ object DatabaseModule {
             RallyTraxDatabase::class.java,
             "rallytrax.db",
         )
-            .addMigrations(RallyTraxDatabase.MIGRATION_1_2)
+            .addMigrations(RallyTraxDatabase.MIGRATION_1_2, RallyTraxDatabase.MIGRATION_2_3)
             .build()
     }
 

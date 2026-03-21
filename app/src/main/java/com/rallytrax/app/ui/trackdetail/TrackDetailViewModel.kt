@@ -29,22 +29,44 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.abs
 
 data class ElevationPoint(
     val distanceFromStart: Double,
     val elevation: Double,
 )
 
+data class SpeedPoint(
+    val distanceFromStart: Double,
+    val speedMps: Double,
+)
+
+data class CurvatureDistribution(
+    val straight: Float = 0f,  // curvature < 0.5 deg/m
+    val gentle: Float = 0f,    // 0.5 - 2.0
+    val moderate: Float = 0f,  // 2.0 - 5.0
+    val tight: Float = 0f,     // 5.0 - 10.0
+    val hairpin: Float = 0f,   // > 10.0
+)
+
 data class TrackDetailUiState(
     val track: TrackEntity? = null,
+    val trackPoints: List<TrackPointEntity> = emptyList(),
     val polylinePoints: List<LatLng> = emptyList(),
     val elevationProfile: List<ElevationPoint> = emptyList(),
+    val speedProfile: List<SpeedPoint> = emptyList(),
+    val curvatureDistribution: CurvatureDistribution = CurvatureDistribution(),
     val tags: List<String> = emptyList(),
     val paceNotes: List<PaceNoteEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isGeneratingNotes: Boolean = false,
     val selectedSensitivity: Int = 1, // 0=LOW, 1=MEDIUM, 2=HIGH
+    val activeLayers: Set<MapLayer> = setOf(MapLayer.ROUTE),
 )
+
+enum class MapLayer {
+    ROUTE, SPEED, ACCEL, ELEVATION, CURVATURE, CALLOUTS
+}
 
 @HiltViewModel
 class TrackDetailViewModel @Inject constructor(
@@ -79,28 +101,37 @@ class TrackDetailViewModel @Inject constructor(
             cachedPoints = points
             val polyline = points.map { LatLng(it.lat, it.lon) }
 
-            // Build elevation profile
             val elevationProfile = buildElevationProfile(points)
+            val speedProfile = buildSpeedProfile(points)
+            val curvatureDistribution = buildCurvatureDistribution(points)
 
-            // Parse tags
             val tags = track?.tags
                 ?.split(",")
                 ?.map { it.trim() }
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
 
-            // Load pace notes
             val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
 
             _uiState.value = TrackDetailUiState(
                 track = track,
+                trackPoints = points,
                 polylinePoints = polyline,
                 elevationProfile = elevationProfile,
+                speedProfile = speedProfile,
+                curvatureDistribution = curvatureDistribution,
                 tags = tags,
                 paceNotes = paceNotes,
                 isLoading = false,
             )
         }
+    }
+
+    fun toggleLayer(layer: MapLayer) {
+        val current = _uiState.value.activeLayers.toMutableSet()
+        if (layer == MapLayer.ROUTE) return // Route is always on
+        if (layer in current) current.remove(layer) else current.add(layer)
+        _uiState.value = _uiState.value.copy(activeLayers = current)
     }
 
     private fun buildElevationProfile(points: List<TrackPointEntity>): List<ElevationPoint> {
@@ -111,16 +142,57 @@ class TrackDetailViewModel @Inject constructor(
 
         for (point in points) {
             if (point.elevation == null) continue
-
             if (prevLat != null && prevLon != null) {
                 cumulativeDistance += haversine(prevLat, prevLon, point.lat, point.lon)
             }
             prevLat = point.lat
             prevLon = point.lon
-
             result.add(ElevationPoint(cumulativeDistance, point.elevation))
         }
         return result
+    }
+
+    private fun buildSpeedProfile(points: List<TrackPointEntity>): List<SpeedPoint> {
+        val result = mutableListOf<SpeedPoint>()
+        var cumulativeDistance = 0.0
+        var prevLat: Double? = null
+        var prevLon: Double? = null
+
+        for (point in points) {
+            val speed = point.speed ?: continue
+            if (prevLat != null && prevLon != null) {
+                cumulativeDistance += haversine(prevLat, prevLon, point.lat, point.lon)
+            }
+            prevLat = point.lat
+            prevLon = point.lon
+            result.add(SpeedPoint(cumulativeDistance, speed))
+        }
+        return result
+    }
+
+    private fun buildCurvatureDistribution(points: List<TrackPointEntity>): CurvatureDistribution {
+        val withCurvature = points.filter { it.curvatureDegPerM != null }
+        if (withCurvature.isEmpty()) return CurvatureDistribution()
+        val total = withCurvature.size.toFloat()
+
+        var straight = 0; var gentle = 0; var moderate = 0; var tight = 0; var hairpin = 0
+        for (pt in withCurvature) {
+            val c = abs(pt.curvatureDegPerM!!)
+            when {
+                c < 0.5 -> straight++
+                c < 2.0 -> gentle++
+                c < 5.0 -> moderate++
+                c < 10.0 -> tight++
+                else -> hairpin++
+            }
+        }
+        return CurvatureDistribution(
+            straight = straight / total,
+            gentle = gentle / total,
+            moderate = moderate / total,
+            tight = tight / total,
+            hairpin = hairpin / total,
+        )
     }
 
     fun regeneratePaceNotes(sensitivityIndex: Int) {
@@ -145,7 +217,6 @@ class TrackDetailViewModel @Inject constructor(
 
                 val notes = PaceNoteGenerator.generate(trackId, points, sensitivity)
 
-                // Persist
                 paceNoteDao.deleteNotesForTrack(trackId)
                 if (notes.isNotEmpty()) {
                     paceNoteDao.insertNotes(notes)
@@ -219,7 +290,6 @@ class TrackDetailViewModel @Inject constructor(
                 val fileName = "${track.name.replace(Regex("[^a-zA-Z0-9_ -]"), "_")}.gpx"
                 val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
 
-                // Save to Downloads via MediaStore
                 val contentValues = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, fileName)
                     put(MediaStore.Downloads.MIME_TYPE, "application/gpx+xml")
@@ -237,7 +307,6 @@ class TrackDetailViewModel @Inject constructor(
                     GpxExporter.export(track, points, outputStream, paceNotes)
                 }
 
-                // Open sharesheet
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "application/gpx+xml"
                     putExtra(Intent.EXTRA_STREAM, uri)
