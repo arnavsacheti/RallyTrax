@@ -143,7 +143,9 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = startDestination,
                         modifier = if (showBottomBar) {
-                            Modifier.padding(innerPadding)
+                            // Only apply bottom padding for the nav bar; each screen's
+                            // own Scaffold handles the top (status bar + app bar) insets.
+                            Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                         } else {
                             Modifier
                         },
