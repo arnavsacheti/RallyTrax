@@ -74,6 +74,8 @@ object GpxParser {
             var inTrk = false
             var inTrkSeg = false
             var inTrkPt = false
+            var inRte = false
+            var inRtePt = false
             var inMetadata = false
             var inExtensions = false
             var inTrkExtensions = false
@@ -101,8 +103,20 @@ object GpxParser {
                                 currentBearing = null
                                 currentAccuracy = null
                             }
-                            tag == "extensions" && inTrkPt -> inExtensions = true
-                            tag == "extensions" && inTrk && !inTrkPt -> inTrkExtensions = true
+                            // Route support: treat <rte> like <trk> and <rtept> like <trkpt>
+                            tag == "rte" -> inRte = true
+                            tag == "rtept" && inRte -> {
+                                inRtePt = true
+                                currentLat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
+                                currentLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
+                                currentEle = null
+                                currentTime = null
+                                currentSpeed = null
+                                currentBearing = null
+                                currentAccuracy = null
+                            }
+                            tag == "extensions" && (inTrkPt || inRtePt) -> inExtensions = true
+                            tag == "extensions" && (inTrk || inRte) && !inTrkPt && !inRtePt -> inTrkExtensions = true
 
                             // Pace notes
                             (tag == "paceNotes" || tag.endsWith("paceNotes")) && inTrkExtensions -> {
@@ -137,8 +151,9 @@ object GpxParser {
                             tag == "metadata" -> inMetadata = false
                             tag == "trk" -> inTrk = false
                             tag == "trkseg" -> inTrkSeg = false
-                            tag == "extensions" && inTrkPt -> inExtensions = false
-                            tag == "extensions" && inTrk && !inTrkPt -> inTrkExtensions = false
+                            tag == "rte" -> inRte = false
+                            tag == "extensions" && (inTrkPt || inRtePt) -> inExtensions = false
+                            tag == "extensions" && (inTrk || inRte) && !inTrkPt && !inRtePt -> inTrkExtensions = false
 
                             // Pace notes
                             (tag == "paceNotes" || tag.endsWith("paceNotes")) && inPaceNotes -> {
@@ -160,11 +175,11 @@ object GpxParser {
                                 inPaceNote = false
                             }
 
-                            // Metadata / track-level name
-                            tag == "name" && (inMetadata || (inTrk && !inTrkPt)) && trackName == null -> {
+                            // Metadata / track-level / route-level name
+                            tag == "name" && (inMetadata || (inTrk && !inTrkPt) || (inRte && !inRtePt)) && trackName == null -> {
                                 trackName = text
                             }
-                            tag == "desc" && (inMetadata || (inTrk && !inTrkPt)) -> {
+                            tag == "desc" && (inMetadata || (inTrk && !inTrkPt) || (inRte && !inRtePt)) -> {
                                 trackDesc = text
                             }
                             tag == "time" && inMetadata && !inTrk -> {
@@ -183,12 +198,12 @@ object GpxParser {
                                 }
                             }
 
-                            // Point-level elements
-                            tag == "ele" && inTrkPt -> currentEle = text.toDoubleOrNull()
-                            tag == "time" && inTrkPt -> currentTime = parseIsoTime(text)
+                            // Point-level elements (trkpt or rtept)
+                            tag == "ele" && (inTrkPt || inRtePt) -> currentEle = text.toDoubleOrNull()
+                            tag == "time" && (inTrkPt || inRtePt) -> currentTime = parseIsoTime(text)
 
                             // Point extensions
-                            inExtensions && inTrkPt -> {
+                            inExtensions && (inTrkPt || inRtePt) -> {
                                 when {
                                     tag.endsWith("speed") -> currentSpeed = text.toDoubleOrNull()
                                     tag.endsWith("bearing") -> currentBearing = text.toDoubleOrNull()
@@ -217,6 +232,28 @@ object GpxParser {
                                 }
                                 inTrkPt = false
                             }
+
+                            // End of rtept
+                            tag == "rtept" && inRtePt -> {
+                                val lat = currentLat
+                                val lon = currentLon
+                                if (lat != null && lon != null) {
+                                    points.add(
+                                        TrackPointEntity(
+                                            trackId = trackId,
+                                            index = pointIndex++,
+                                            lat = lat,
+                                            lon = lon,
+                                            elevation = currentEle,
+                                            timestamp = currentTime ?: System.currentTimeMillis(),
+                                            speed = currentSpeed,
+                                            bearing = currentBearing,
+                                            accuracy = currentAccuracy,
+                                        )
+                                    )
+                                }
+                                inRtePt = false
+                            }
                         }
                         currentTag = null
                     }
@@ -225,13 +262,25 @@ object GpxParser {
             }
 
             if (points.isEmpty()) {
-                throw GpxParseException("GPX file contains no track points")
+                throw GpxParseException("GPX file contains no track points or route points")
+            }
+
+            // If all timestamps are identical (e.g. route with no <time> elements),
+            // assign synthetic timestamps spaced 1 second apart so duration is non-zero
+            // and downstream calculations don't break.
+            val hasRealTimestamps = points.size < 2 ||
+                points.first().timestamp != points.last().timestamp
+            if (!hasRealTimestamps) {
+                val baseTime = points.first().timestamp
+                for (i in points.indices) {
+                    points[i] = points[i].copy(timestamp = baseTime + i * 1000L)
+                }
             }
 
             // Calculate stats from points if not provided in extensions
             val firstTimestamp = points.first().timestamp
             val lastTimestamp = points.last().timestamp
-            val calculatedDuration = lastTimestamp - firstTimestamp
+            val calculatedDuration = (lastTimestamp - firstTimestamp).coerceAtLeast(0L)
 
             var totalDistance = 0.0
             var maxSpeed = 0.0
@@ -277,7 +326,7 @@ object GpxParser {
 
             val track = TrackEntity(
                 id = trackId,
-                name = trackName ?: "Imported Track",
+                name = trackName ?: if (!hasRealTimestamps) "Imported Route" else "Imported Track",
                 description = trackDesc,
                 recordedAt = trackTime ?: firstTimestamp,
                 durationMs = extDurationMs ?: calculatedDuration,
