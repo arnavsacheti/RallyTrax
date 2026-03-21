@@ -112,6 +112,17 @@ a {
   transform: translateY(-1px);
 }
 
+.nav-github {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.nav-github:hover {
+  color: var(--text);
+}
+
 /* ---- Buttons ---- */
 .btn-primary {
   display: inline-flex;
@@ -1321,7 +1332,7 @@ a {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .nav-links a:not(.nav-cta) {
+  .nav-links a:not(.nav-cta):not(.nav-github) {
     display: none;
   }
 }

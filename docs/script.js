@@ -21,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Smooth nav background on scroll
   const nav = document.querySelector('.nav');
-  let lastScroll = 0;
 
   window.addEventListener('scroll', () => {
     const scrollY = window.scrollY;
@@ -30,6 +29,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       nav.style.borderBottomColor = 'rgba(255, 255, 255, 0.04)';
     }
-    lastScroll = scrollY;
   }, { passive: true });
 });
