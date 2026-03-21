@@ -52,6 +52,7 @@ class LibraryViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -173,6 +174,7 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             trackDao.deleteTracks(ids)
             _snackbarMessage.tryEmit("${ids.size} track(s) deleted")
+            recomputeGridCells()
         }
         exitMultiSelectMode()
     }
@@ -196,6 +198,7 @@ class LibraryViewModel @Inject constructor(
         if (pending.isEmpty()) return
         viewModelScope.launch {
             pending.forEach { trackDao.deleteTrack(it.id) }
+            recomputeGridCells()
         }
         _pendingDeletes.value = emptyList()
     }
@@ -213,6 +216,18 @@ class LibraryViewModel @Inject constructor(
             }
         }
         _pendingDeletes.value = emptyList()
+    }
+
+    private fun recomputeGridCells() {
+        viewModelScope.launch {
+            try {
+                val allTracks = trackDao.getAllTracksOnce()
+                val allPoints = allTracks.flatMap { trackPointDao.getPointsForTrackOnce(it.id) }
+                com.rallytrax.app.data.local.GridCellComputer.fullRecompute(allPoints, gridCellDao)
+            } catch (_: Exception) {
+                // Non-critical
+            }
+        }
     }
 
     // --- GPX Import ---

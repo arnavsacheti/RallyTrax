@@ -57,6 +57,10 @@ class ExploreViewModel @Inject constructor(
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
 
     init {
+        refresh()
+    }
+
+    fun refresh() {
         loadData()
     }
 

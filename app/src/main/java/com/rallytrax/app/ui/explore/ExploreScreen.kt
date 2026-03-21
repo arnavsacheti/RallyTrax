@@ -71,6 +71,11 @@ fun ExploreScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
 
+    // Refresh data each time the screen is shown (e.g. after deleting tracks in Library)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
     Scaffold(
         topBar = {
             RallyTraxTopAppBar(
@@ -83,13 +88,6 @@ fun ExploreScreen(
             Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else if (uiState.trackPolylines.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No tracks yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Record a drive to see it on the map", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
         } else {
             Box(Modifier.fillMaxSize().padding(innerPadding)) {
                 // Full-screen map
@@ -99,24 +97,41 @@ fun ExploreScreen(
                     OsmExploreMap(uiState)
                 }
 
-                // Track count chip (top-left)
-                Card(
-                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
-                ) {
-                    Text(
-                        "${uiState.trackCount} tracks",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
+                if (uiState.trackPolylines.isEmpty()) {
+                    // Empty state overlay on top of map
+                    Card(
+                        modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text("No tracks yet", style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Record a drive to see it here", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    // Track count chip (top-left)
+                    Card(
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
+                    ) {
+                        Text(
+                            "${uiState.trackCount} tracks",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+
+                    // Layer toolbar (bottom, above nav)
+                    ExploreLayerToolbar(
+                        activeLayer = uiState.activeLayer,
+                        onLayerSelected = viewModel::setActiveLayer,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
                     )
                 }
-
-                // Layer toolbar (bottom, above nav)
-                ExploreLayerToolbar(
-                    activeLayer = uiState.activeLayer,
-                    onLayerSelected = viewModel::setActiveLayer,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
-                )
 
                 // Recenter FAB (bottom-right)
                 SmallFloatingActionButton(
@@ -236,11 +251,14 @@ private fun GoogleExploreMap(uiState: ExploreUiState, viewModel: ExploreViewMode
 @Composable
 private fun OsmExploreMap(uiState: ExploreUiState) {
     val allPoints = uiState.trackPolylines.flatMap { it.points }
-    if (allPoints.isEmpty()) return
 
-    val lats = allPoints.map { it.latitude }
-    val lngs = allPoints.map { it.longitude }
-    val fitBounds = BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
+    val fitBounds = if (allPoints.isNotEmpty()) {
+        val lats = allPoints.map { it.latitude }
+        val lngs = allPoints.map { it.longitude }
+        BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
+    } else {
+        null
+    }
 
     val polylines = uiState.trackPolylines.map { track ->
         OsmPolylineData(
