@@ -44,6 +44,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var trackDao: TrackDao
     @Inject lateinit var trackPointDao: TrackPointDao
     @Inject lateinit var paceNoteDao: PaceNoteDao
+    @Inject lateinit var gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -267,6 +268,13 @@ class TrackingService : LifecycleService() {
                 }
             } catch (_: Exception) {
                 // Pace note generation is non-critical; don't block save
+            }
+
+            // Update heatmap grid cells incrementally
+            try {
+                com.rallytrax.app.data.local.GridCellComputer.updateForTrack(allPoints, gridCellDao)
+            } catch (_: Exception) {
+                // Non-critical
             }
 
             _savedTrackId.tryEmit(savedId)

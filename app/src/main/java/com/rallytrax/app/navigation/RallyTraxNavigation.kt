@@ -56,6 +56,12 @@ fun RallyTraxNavHost(
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
+                onViewDetail = { trackId ->
+                    navController.navigate(TrackDetailRoute(trackId))
+                },
+                onReplayTrack = { trackId ->
+                    navController.navigate(ReplayHudRoute(trackId))
+                },
             )
         }
         composable<LibraryRoute> {

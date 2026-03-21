@@ -4,27 +4,27 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.GridCellEntity
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 
 @Database(
-    entities = [TrackEntity::class, TrackPointEntity::class, PaceNoteEntity::class],
-    version = 3,
+    entities = [TrackEntity::class, TrackPointEntity::class, PaceNoteEntity::class, GridCellEntity::class],
+    version = 4,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     abstract fun trackPointDao(): TrackPointDao
     abstract fun paceNoteDao(): PaceNoteDao
+    abstract fun gridCellDao(): GridCellDao
 
     companion object {
-        // Planned migrations for v1.1:
-        // v3 → v4 (Stage 1.1.4): CREATE TABLE grid_cells for heatmap tile provider
-
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -52,6 +52,24 @@ abstract class RallyTraxDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE track_points ADD COLUMN accelMps2 REAL")
                 db.execSQL("ALTER TABLE track_points ADD COLUMN curvatureDegPerM REAL")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `grid_cells` (
+                        `cellId` INTEGER NOT NULL,
+                        `gridLat` INTEGER NOT NULL,
+                        `gridLon` INTEGER NOT NULL,
+                        `trackCount` INTEGER NOT NULL DEFAULT 0,
+                        `pointCount` INTEGER NOT NULL DEFAULT 0,
+                        `lastUpdated` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`cellId`)
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

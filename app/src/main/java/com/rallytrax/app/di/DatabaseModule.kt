@@ -3,6 +3,7 @@ package com.rallytrax.app.di
 import android.content.Context
 import androidx.room.Room
 import com.rallytrax.app.data.local.RallyTraxDatabase
+import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -25,7 +26,11 @@ object DatabaseModule {
             RallyTraxDatabase::class.java,
             "rallytrax.db",
         )
-            .addMigrations(RallyTraxDatabase.MIGRATION_1_2, RallyTraxDatabase.MIGRATION_2_3)
+            .addMigrations(
+                RallyTraxDatabase.MIGRATION_1_2,
+                RallyTraxDatabase.MIGRATION_2_3,
+                RallyTraxDatabase.MIGRATION_3_4,
+            )
             .build()
     }
 
@@ -42,5 +47,10 @@ object DatabaseModule {
     @Provides
     fun providePaceNoteDao(database: RallyTraxDatabase): PaceNoteDao {
         return database.paceNoteDao()
+    }
+
+    @Provides
+    fun provideGridCellDao(database: RallyTraxDatabase): GridCellDao {
+        return database.gridCellDao()
     }
 }
