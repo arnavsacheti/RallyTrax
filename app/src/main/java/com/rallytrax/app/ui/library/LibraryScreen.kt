@@ -274,21 +274,21 @@ fun LibraryScreen(
                         items = uiState.tracks,
                         key = { it.id },
                     ) { track ->
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { value ->
-                                when (value) {
-                                    SwipeToDismissBoxValue.EndToStart -> {
-                                        viewModel.requestDeleteTrack(track)
-                                        true
-                                    }
-                                    SwipeToDismissBoxValue.StartToEnd -> {
-                                        onReplayTrack(track.id)
-                                        false // don't dismiss, just trigger replay
-                                    }
-                                    else -> false
+                        val dismissState = rememberSwipeToDismissBoxState()
+
+                        LaunchedEffect(dismissState.currentValue) {
+                            when (dismissState.currentValue) {
+                                SwipeToDismissBoxValue.EndToStart -> {
+                                    viewModel.requestDeleteTrack(track)
+                                    dismissState.snapTo(SwipeToDismissBoxValue.Settled)
                                 }
-                            },
-                        )
+                                SwipeToDismissBoxValue.StartToEnd -> {
+                                    onReplayTrack(track.id)
+                                    dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                                }
+                                else -> {}
+                            }
+                        }
 
                         if (!uiState.isMultiSelectMode) {
                             SwipeToDismissBox(

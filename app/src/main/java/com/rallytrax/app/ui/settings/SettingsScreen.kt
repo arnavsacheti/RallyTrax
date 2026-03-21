@@ -337,7 +337,7 @@ fun SettingsScreen(
                     }
 
                     fun speakPreview(rate: Float, pitch: Float) {
-                        if (!ttsReady || tts == null) return
+                        if (!ttsReady) return
                         tts.setSpeechRate(rate)
                         tts.setPitch(pitch)
                         val phrase = previewPhrases.random()
