@@ -159,7 +159,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Update available dialog
+                // Update available dialog — uses in-app download (same as Settings)
                 if (updateState.updateAvailable && !updateState.dismissed && updateState.releaseInfo != null) {
                     val release = updateState.releaseInfo!!
                     AlertDialog(
@@ -172,19 +172,29 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         confirmButton = {
-                            FilledTonalButton(
-                                onClick = {
-                                    updateViewModel.dismissUpdate()
-                                    val downloadUrl = release.apkDownloadUrl ?: release.htmlUrl
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
-                                    startActivity(intent)
-                                },
-                            ) {
-                                Icon(Icons.Filled.Download, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    if (release.apkDownloadUrl != null) "Download" else "View Release"
-                                )
+                            if (release.apkDownloadUrl != null) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        updateViewModel.dismissUpdate()
+                                        updateViewModel.startDownload()
+                                    },
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Download")
+                                }
+                            } else {
+                                FilledTonalButton(
+                                    onClick = {
+                                        updateViewModel.dismissUpdate()
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.htmlUrl))
+                                        startActivity(intent)
+                                    },
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("View Release")
+                                }
                             }
                         },
                         dismissButton = {
@@ -193,6 +203,14 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                     )
+                }
+
+                // Auto-install after in-app download completes
+                val downloadState by updateViewModel.downloadState.collectAsStateWithLifecycle()
+                if (downloadState.status == com.rallytrax.app.update.DownloadStatus.DOWNLOADED) {
+                    LaunchedEffect(Unit) {
+                        updateViewModel.installUpdate(this@MainActivity)
+                    }
                 }
 
                 // Handle incoming GPX intent
