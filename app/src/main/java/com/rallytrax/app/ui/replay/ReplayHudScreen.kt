@@ -175,7 +175,7 @@ fun ReplayHudScreen(
                 }
             } else {
                 // Full-screen map
-                ReplayMap(uiState, viewModel)
+                ReplayMap(uiState, viewModel, preferences.mapProvider)
 
                 // HUD overlays
                 Column(
@@ -471,8 +471,9 @@ fun ReplayHudScreen(
 private fun ReplayMap(
     uiState: com.rallytrax.app.replay.ReplayUiState,
     viewModel: ReplayViewModel,
+    mapProvider: com.rallytrax.app.data.preferences.MapProviderPreference,
 ) {
-    if (MapProvider.useGoogleMaps) {
+    if (MapProvider.useGoogleMaps(mapProvider)) {
         GoogleReplayMap(uiState)
     } else {
         OsmReplayMap(uiState)

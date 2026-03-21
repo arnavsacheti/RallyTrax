@@ -17,11 +17,13 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "us
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 enum class UnitSystem { METRIC, IMPERIAL }
 enum class GpsAccuracy { HIGH, BATTERY_SAVER }
+enum class MapProviderPreference { AUTO, GOOGLE_MAPS, OPENSTREETMAP }
 
 data class UserPreferencesData(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val gpsAccuracy: GpsAccuracy = GpsAccuracy.HIGH,
+    val mapProvider: MapProviderPreference = MapProviderPreference.AUTO,
     val ttsRate: Float = 1.25f,
     val ttsPitch: Float = 1.15f,
     val ttsEnabled: Boolean = true,
@@ -36,6 +38,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val GPS_ACCURACY = stringPreferencesKey("gps_accuracy")
         val TTS_RATE = floatPreferencesKey("tts_rate")
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
+        val MAP_PROVIDER = stringPreferencesKey("map_provider")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
@@ -51,6 +54,9 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             gpsAccuracy = prefs[Keys.GPS_ACCURACY]?.let {
                 try { GpsAccuracy.valueOf(it) } catch (_: Exception) { GpsAccuracy.HIGH }
             } ?: GpsAccuracy.HIGH,
+            mapProvider = prefs[Keys.MAP_PROVIDER]?.let {
+                try { MapProviderPreference.valueOf(it) } catch (_: Exception) { MapProviderPreference.AUTO }
+            } ?: MapProviderPreference.AUTO,
             ttsRate = prefs[Keys.TTS_RATE] ?: 1.25f,
             ttsPitch = prefs[Keys.TTS_PITCH] ?: 1.15f,
             ttsEnabled = prefs[Keys.TTS_ENABLED] ?: true,
@@ -68,6 +74,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setGpsAccuracy(accuracy: GpsAccuracy) {
         dataStore.edit { it[Keys.GPS_ACCURACY] = accuracy.name }
+    }
+
+    suspend fun setMapProvider(provider: MapProviderPreference) {
+        dataStore.edit { it[Keys.MAP_PROVIDER] = provider.name }
     }
 
     suspend fun setTtsRate(rate: Float) {

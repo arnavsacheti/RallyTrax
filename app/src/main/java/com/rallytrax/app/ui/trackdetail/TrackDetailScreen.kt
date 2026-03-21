@@ -182,7 +182,7 @@ fun TrackDetailScreen(
                 val points = uiState.polylinePoints
 
                 if (points.isNotEmpty()) {
-                    if (MapProvider.useGoogleMaps) {
+                    if (MapProvider.useGoogleMaps(preferences.mapProvider)) {
                         val cameraPositionState = rememberCameraPositionState()
                         val boundsBuilder = LatLngBounds.builder()
                         points.forEach { p ->

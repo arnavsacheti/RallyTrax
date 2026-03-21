@@ -91,7 +91,7 @@ fun RecordingScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Map
-        if (MapProvider.useGoogleMaps) {
+        if (MapProvider.useGoogleMaps(preferences.mapProvider)) {
             val cameraPositionState = rememberCameraPositionState {
                 position = CameraPosition.fromLatLngZoom(
                     com.google.android.gms.maps.model.LatLng(37.7749, -122.4194),

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -58,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.BuildConfig
 import com.rallytrax.app.data.preferences.GpsAccuracy
+import com.rallytrax.app.data.preferences.MapProviderPreference
 import com.rallytrax.app.data.preferences.ThemeMode
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.update.UpdateViewModel
@@ -214,6 +216,55 @@ fun SettingsScreen(
                     text = when (preferences.gpsAccuracy) {
                         GpsAccuracy.HIGH -> "Best accuracy, higher battery usage"
                         GpsAccuracy.BATTERY_SAVER -> "Reduced accuracy, longer battery life"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Map Provider
+            SettingsSectionCard(title = "Map Provider", icon = { Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(20.dp)) }) {
+                Text(
+                    text = "Tile Source",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    MapProviderPreference.entries.forEachIndexed { index, provider ->
+                        SegmentedButton(
+                            selected = preferences.mapProvider == provider,
+                            onClick = { settingsViewModel.setMapProvider(provider) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = MapProviderPreference.entries.size,
+                            ),
+                            modifier = Modifier.semantics {
+                                contentDescription = when (provider) {
+                                    MapProviderPreference.AUTO -> "Auto map provider"
+                                    MapProviderPreference.GOOGLE_MAPS -> "Google Maps"
+                                    MapProviderPreference.OPENSTREETMAP -> "OpenStreetMap"
+                                }
+                            },
+                        ) {
+                            Text(
+                                when (provider) {
+                                    MapProviderPreference.AUTO -> "Auto"
+                                    MapProviderPreference.GOOGLE_MAPS -> "Google"
+                                    MapProviderPreference.OPENSTREETMAP -> "OSM"
+                                },
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = when (preferences.mapProvider) {
+                        MapProviderPreference.AUTO -> "Uses Google Maps if API key is configured, otherwise OpenStreetMap"
+                        MapProviderPreference.GOOGLE_MAPS -> "Google Maps (requires API key)"
+                        MapProviderPreference.OPENSTREETMAP -> "OpenStreetMap (no API key required)"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

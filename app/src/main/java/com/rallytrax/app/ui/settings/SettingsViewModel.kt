@@ -6,6 +6,7 @@ import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.preferences.GpsAccuracy
+import com.rallytrax.app.data.preferences.MapProviderPreference
 import com.rallytrax.app.data.preferences.ThemeMode
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.data.preferences.UserPreferencesData
@@ -56,6 +57,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setGpsAccuracy(accuracy: GpsAccuracy) {
         viewModelScope.launch { preferencesRepository.setGpsAccuracy(accuracy) }
+    }
+
+    fun setMapProvider(provider: MapProviderPreference) {
+        viewModelScope.launch { preferencesRepository.setMapProvider(provider) }
     }
 
     fun setTtsRate(rate: Float) {
