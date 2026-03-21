@@ -18,6 +18,8 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.preferences.GpsAccuracy
+import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.recording.LatLng
@@ -134,10 +136,23 @@ class ReplayViewModel @Inject constructor(
         // Start GPS tracking
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
 
-        val locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            1000L,
-        ).setMinUpdateIntervalMillis(500L).build()
+        val locationRequest = when (prefs.gpsAccuracy) {
+            GpsAccuracy.HIGH -> LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                GpsIntervalConfig.HIGH_INTERVAL_MS,
+            )
+                .setMinUpdateIntervalMillis(GpsIntervalConfig.HIGH_MIN_INTERVAL_MS)
+                .setMinUpdateDistanceMeters(GpsIntervalConfig.HIGH_MIN_DISTANCE_M)
+                .build()
+
+            GpsAccuracy.BATTERY_SAVER -> LocationRequest.Builder(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                GpsIntervalConfig.SAVER_INTERVAL_MS,
+            )
+                .setMinUpdateIntervalMillis(GpsIntervalConfig.SAVER_MIN_INTERVAL_MS)
+                .setMinUpdateDistanceMeters(GpsIntervalConfig.SAVER_MIN_DISTANCE_M)
+                .build()
+        }
 
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {

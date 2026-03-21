@@ -19,6 +19,18 @@ enum class UnitSystem { METRIC, IMPERIAL }
 enum class GpsAccuracy { HIGH, BATTERY_SAVER }
 enum class MapProviderPreference { AUTO, GOOGLE_MAPS, OPENSTREETMAP }
 
+object GpsIntervalConfig {
+    // HIGH accuracy: rally/motorsport — aggressive updates for smooth tracking
+    const val HIGH_INTERVAL_MS = 200L
+    const val HIGH_MIN_INTERVAL_MS = 100L
+    const val HIGH_MIN_DISTANCE_M = 0f
+
+    // BATTERY_SAVER: relaxed updates
+    const val SAVER_INTERVAL_MS = 2000L
+    const val SAVER_MIN_INTERVAL_MS = 1000L
+    const val SAVER_MIN_DISTANCE_M = 5f
+}
+
 data class UserPreferencesData(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
@@ -28,6 +40,7 @@ data class UserPreferencesData(
     val ttsPitch: Float = 1.15f,
     val ttsEnabled: Boolean = true,
     val onboardingCompleted: Boolean = false,
+    val keepScreenOn: Boolean = false,
 )
 
 class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
@@ -41,6 +54,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val MAP_PROVIDER = stringPreferencesKey("map_provider")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
     }
 
     val preferences: Flow<UserPreferencesData> = dataStore.data.map { prefs ->
@@ -61,6 +75,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             ttsPitch = prefs[Keys.TTS_PITCH] ?: 1.15f,
             ttsEnabled = prefs[Keys.TTS_ENABLED] ?: true,
             onboardingCompleted = prefs[Keys.ONBOARDING_COMPLETED] ?: false,
+            keepScreenOn = prefs[Keys.KEEP_SCREEN_ON] ?: false,
         )
     }
 
@@ -94,6 +109,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { it[Keys.ONBOARDING_COMPLETED] = completed }
+    }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        dataStore.edit { it[Keys.KEEP_SCREEN_ON] = enabled }
     }
 
     suspend fun clearAllPreferences() {

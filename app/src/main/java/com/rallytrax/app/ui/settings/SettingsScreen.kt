@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -234,6 +235,36 @@ fun SettingsScreen(
                         GpsAccuracy.HIGH -> "Best accuracy, higher battery usage"
                         GpsAccuracy.BATTERY_SAVER -> "Reduced accuracy, longer battery life"
                     },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Display
+            SettingsSectionCard(title = "Display", icon = { Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.size(20.dp)) }) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Keep Screen On",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Switch(
+                        checked = preferences.keepScreenOn,
+                        onCheckedChange = { settingsViewModel.setKeepScreenOn(it) },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Toggle keep screen on during recording and replay"
+                        },
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Prevents screen from sleeping during recording and replay",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
