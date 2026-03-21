@@ -107,7 +107,7 @@ fun LibraryScreen(
         }
     }
 
-    // Undo delete snackbar
+    // Undo delete snackbar — item disappears immediately, deletion on snackbar expiry
     LaunchedEffect(pendingDelete) {
         pendingDelete?.let { track ->
             val result = snackbarHostState.showSnackbar(
@@ -241,7 +241,12 @@ fun LibraryScreen(
                 }
             }
 
-            if (uiState.tracks.isEmpty()) {
+            val visibleTracks = remember(uiState.tracks, pendingDelete) {
+                val pendingId = pendingDelete?.id
+                if (pendingId != null) uiState.tracks.filter { it.id != pendingId } else uiState.tracks
+            }
+
+            if (visibleTracks.isEmpty()) {
                 // Empty state
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -271,7 +276,7 @@ fun LibraryScreen(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     items(
-                        items = uiState.tracks,
+                        items = visibleTracks,
                         key = { it.id },
                     ) { track ->
                         val dismissState = rememberSwipeToDismissBoxState()
