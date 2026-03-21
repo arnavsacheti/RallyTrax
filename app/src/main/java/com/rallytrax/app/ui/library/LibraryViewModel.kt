@@ -67,9 +67,9 @@ class LibraryViewModel @Inject constructor(
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()
 
-    // Pending delete for undo
-    private val _pendingDelete = MutableStateFlow<TrackEntity?>(null)
-    val pendingDelete: StateFlow<TrackEntity?> = _pendingDelete.asStateFlow()
+    // Pending deletes for undo — most recent is the one shown in the snackbar
+    private val _pendingDeletes = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val pendingDeletes: StateFlow<List<TrackEntity>> = _pendingDeletes.asStateFlow()
 
     private val allTracks = _searchQuery.flatMapLatest { query ->
         if (query.isBlank()) {
@@ -180,19 +180,39 @@ class LibraryViewModel @Inject constructor(
     // --- Single track delete with undo ---
 
     fun requestDeleteTrack(track: TrackEntity) {
-        _pendingDelete.value = track
+        // Auto-confirm any previously pending deletes
+        val current = _pendingDeletes.value
+        if (current.isNotEmpty()) {
+            viewModelScope.launch {
+                current.forEach { trackDao.deleteTrack(it.id) }
+            }
+        }
+        // Set the new one as the only pending (gets the snackbar)
+        _pendingDeletes.value = listOf(track)
     }
 
     fun confirmDeleteTrack() {
-        val track = _pendingDelete.value ?: return
+        val pending = _pendingDeletes.value
+        if (pending.isEmpty()) return
         viewModelScope.launch {
-            trackDao.deleteTrack(track.id)
+            pending.forEach { trackDao.deleteTrack(it.id) }
         }
-        _pendingDelete.value = null
+        _pendingDeletes.value = emptyList()
     }
 
     fun cancelDeleteTrack() {
-        _pendingDelete.value = null
+        // Undo only the most recent (last) pending delete
+        val pending = _pendingDeletes.value
+        if (pending.isEmpty()) return
+        val restored = pending.last()
+        val rest = pending.dropLast(1)
+        // Confirm all prior ones, undo the last
+        if (rest.isNotEmpty()) {
+            viewModelScope.launch {
+                rest.forEach { trackDao.deleteTrack(it.id) }
+            }
+        }
+        _pendingDeletes.value = emptyList()
     }
 
     // --- GPX Import ---

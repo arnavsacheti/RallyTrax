@@ -87,7 +87,7 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-    val pendingDelete by viewModel.pendingDelete.collectAsStateWithLifecycle()
+    val pendingDeletes by viewModel.pendingDeletes.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -108,8 +108,10 @@ fun LibraryScreen(
     }
 
     // Undo delete snackbar — item disappears immediately, deletion on snackbar expiry
-    LaunchedEffect(pendingDelete) {
-        pendingDelete?.let { track ->
+    val latestPending = pendingDeletes.lastOrNull()
+    LaunchedEffect(latestPending?.id) {
+        latestPending?.let { track ->
+            snackbarHostState.currentSnackbarData?.dismiss() // dismiss any prior snackbar
             val result = snackbarHostState.showSnackbar(
                 message = "${track.name} deleted",
                 actionLabel = "Undo",
@@ -241,9 +243,9 @@ fun LibraryScreen(
                 }
             }
 
-            val visibleTracks = remember(uiState.tracks, pendingDelete) {
-                val pendingId = pendingDelete?.id
-                if (pendingId != null) uiState.tracks.filter { it.id != pendingId } else uiState.tracks
+            val visibleTracks = remember(uiState.tracks, pendingDeletes) {
+                val pendingIds = pendingDeletes.map { it.id }.toSet()
+                if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
             }
 
             if (visibleTracks.isEmpty()) {
