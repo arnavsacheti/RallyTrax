@@ -76,7 +76,7 @@ import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.rallytrax.app.data.local.entity.NoteType
@@ -362,7 +362,7 @@ private fun GoogleTrackMap(
                 val color = if (accel > 0) LayerAccel else LayerDecel
                 val alpha = (abs(accel) / 3.0).coerceIn(0.2, 1.0).toFloat()
                 Marker(
-                    state = MarkerState(com.google.android.gms.maps.model.LatLng(pt.lat, pt.lon)),
+                    state = rememberMarkerState(position = com.google.android.gms.maps.model.LatLng(pt.lat, pt.lon)),
                     alpha = alpha,
                     icon = BitmapDescriptorFactory.defaultMarker(
                         if (accel > 0) BitmapDescriptorFactory.HUE_AZURE else BitmapDescriptorFactory.HUE_ORANGE,
@@ -386,7 +386,7 @@ private fun GoogleTrackMap(
                         NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
                     }
                     Marker(
-                        state = MarkerState(com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)),
+                        state = rememberMarkerState(position = com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)),
                         title = note.callText,
                         snippet = "Severity ${note.severity}",
                         icon = BitmapDescriptorFactory.defaultMarker(hue),

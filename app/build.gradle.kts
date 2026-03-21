@@ -94,6 +94,12 @@ android {
     room {
         schemaDirectory("$projectDir/schemas")
     }
+
+    lint {
+        // NonNullableMutableLiveDataDetector crashes with Kotlin 2.1+ analysis APIs
+        // (IncompatibleClassChangeError). Safe to disable — project uses StateFlow, not LiveData.
+        disable += "NullSafeMutableLiveData"
+    }
 }
 
 dependencies {
