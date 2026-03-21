@@ -22,6 +22,8 @@ import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
+import com.rallytrax.app.data.preferences.GpsAccuracy
+import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,6 +37,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import kotlin.math.max
 
@@ -45,6 +48,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var trackPointDao: TrackPointDao
     @Inject lateinit var paceNoteDao: PaceNoteDao
     @Inject lateinit var gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao
+    @Inject lateinit var preferencesRepository: com.rallytrax.app.data.preferences.UserPreferencesRepository
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -159,10 +163,7 @@ class TrackingService : LifecycleService() {
         }
 
         // Start GPS
-        val locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            1000L,
-        ).setMinUpdateIntervalMillis(500L).build()
+        val locationRequest = buildLocationRequest()
 
         fusedLocationClient.requestLocationUpdates(
             locationRequest,
@@ -195,10 +196,7 @@ class TrackingService : LifecycleService() {
         lastLocation = null
         isNewSegment = true
 
-        val locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            1000L,
-        ).setMinUpdateIntervalMillis(500L).build()
+        val locationRequest = buildLocationRequest()
 
         fusedLocationClient.requestLocationUpdates(
             locationRequest,
@@ -209,6 +207,29 @@ class TrackingService : LifecycleService() {
         startTimer()
         _recordingStatus.value = RecordingStatus.RECORDING
         updateNotification(isPaused = false)
+    }
+
+    private fun buildLocationRequest(): LocationRequest {
+        val prefs = kotlinx.coroutines.runBlocking {
+            preferencesRepository.preferences.first()
+        }
+        return when (prefs.gpsAccuracy) {
+            GpsAccuracy.HIGH -> LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                GpsIntervalConfig.HIGH_INTERVAL_MS,
+            )
+                .setMinUpdateIntervalMillis(GpsIntervalConfig.HIGH_MIN_INTERVAL_MS)
+                .setMinUpdateDistanceMeters(GpsIntervalConfig.HIGH_MIN_DISTANCE_M)
+                .build()
+
+            GpsAccuracy.BATTERY_SAVER -> LocationRequest.Builder(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                GpsIntervalConfig.SAVER_INTERVAL_MS,
+            )
+                .setMinUpdateIntervalMillis(GpsIntervalConfig.SAVER_MIN_INTERVAL_MS)
+                .setMinUpdateDistanceMeters(GpsIntervalConfig.SAVER_MIN_DISTANCE_M)
+                .build()
+        }
     }
 
     private fun stopRecording() {

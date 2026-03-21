@@ -75,6 +75,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setTtsEnabled(enabled) }
     }
 
+    fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
+    }
+
     fun showDeleteConfirmation() {
         _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
     }

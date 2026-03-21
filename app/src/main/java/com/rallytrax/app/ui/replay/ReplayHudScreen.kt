@@ -125,6 +125,16 @@ fun ReplayHudScreen(
         }
     }
 
+    // Keep screen on during replay when enabled
+    DisposableEffect(preferences.keepScreenOn) {
+        if (preferences.keepScreenOn) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     DisposableEffect(Unit) { onDispose { viewModel.stopReplay() } }
 
     BackHandler {
