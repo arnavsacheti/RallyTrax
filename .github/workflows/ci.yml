@@ -93,6 +93,8 @@ jobs:
         with:
           name: source-bumped
 
+      - run: chmod +x gradlew
+
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -113,6 +115,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: source-bumped
+
+      - run: chmod +x gradlew
 
       - uses: actions/setup-java@v4
         with:
