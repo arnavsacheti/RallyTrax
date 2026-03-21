@@ -20,7 +20,7 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE id = :trackId")
     suspend fun getTrackById(trackId: String): TrackEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTrack(track: TrackEntity)
 
     @Query("DELETE FROM tracks WHERE id = :trackId")
