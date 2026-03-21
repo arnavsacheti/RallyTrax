@@ -1,7 +1,5 @@
 package com.rallytrax.app.ui.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +31,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +61,7 @@ import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.MapProviderPreference
 import com.rallytrax.app.data.preferences.ThemeMode
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.update.DownloadStatus
 import com.rallytrax.app.update.UpdateViewModel
 import java.util.Locale
 
@@ -72,6 +72,7 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val updateState by updateViewModel.uiState.collectAsStateWithLifecycle()
+    val downloadState by updateViewModel.downloadState.collectAsStateWithLifecycle()
     val preferences by settingsViewModel.preferences.collectAsStateWithLifecycle()
     val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -434,19 +435,71 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        FilledTonalButton(
-                            onClick = {
-                                val downloadUrl = release.apkDownloadUrl ?: release.htmlUrl
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Filled.Download, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                if (release.apkDownloadUrl != null) "Download APK" else "View Release"
-                            )
+                        when (downloadState.status) {
+                            DownloadStatus.IDLE -> {
+                                if (release.apkDownloadUrl != null) {
+                                    FilledTonalButton(
+                                        onClick = { updateViewModel.startDownload() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Icon(Icons.Filled.Download, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Download Update")
+                                    }
+                                }
+                            }
+                            DownloadStatus.DOWNLOADING -> {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            text = "Downloading...",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        Text(
+                                            text = "${downloadState.progress}%",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    LinearProgressIndicator(
+                                        progress = { downloadState.progress / 100f },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
+                            DownloadStatus.DOWNLOADED -> {
+                                FilledTonalButton(
+                                    onClick = { updateViewModel.installUpdate(context) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Install Update")
+                                }
+                            }
+                            DownloadStatus.ERROR -> {
+                                Text(
+                                    text = downloadState.errorMessage ?: "Download failed",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                FilledTonalButton(
+                                    onClick = {
+                                        updateViewModel.resetDownload()
+                                        updateViewModel.startDownload()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(Icons.Filled.Refresh, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Retry Download")
+                                }
+                            }
                         }
                     } else if (updateState.lastCheckError != null) {
                         Text(

@@ -1,5 +1,6 @@
 package com.rallytrax.app.update
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.BuildConfig
@@ -22,10 +23,13 @@ data class UpdateUiState(
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     private val updateChecker: UpdateChecker,
+    val updateManager: AppUpdateManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UpdateUiState())
     val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
+
+    val downloadState: StateFlow<DownloadState> = updateManager.state
 
     init {
         checkForUpdate()
@@ -58,6 +62,26 @@ class UpdateViewModel @Inject constructor(
                 releaseInfo = release,
             )
         }
+    }
+
+    fun startDownload() {
+        val release = _uiState.value.releaseInfo ?: return
+        val url = release.apkDownloadUrl ?: return
+
+        updateManager.startDownload(url, release.versionName)
+
+        // Poll for progress in the background
+        viewModelScope.launch {
+            updateManager.pollProgress()
+        }
+    }
+
+    fun installUpdate(context: Context) {
+        updateManager.installUpdate(context)
+    }
+
+    fun resetDownload() {
+        updateManager.reset()
     }
 
     fun dismissUpdate() {

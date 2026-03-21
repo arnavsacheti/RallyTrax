@@ -106,15 +106,7 @@ jobs:
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "Bumped version: $CURRENT -> $NEW_VERSION (code $CURRENT_CODE -> $NEW_CODE)"
 
-      # --- Build APKs with bumped version (uncommitted) ---
-      - name: Build debug APK
-        if: >
-          github.event_name == 'push' && github.ref == 'refs/heads/main'
-          && steps.changes.outputs.app_changed == 'true'
-        env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
-        run: ./gradlew assembleDebug
-
+      # --- Build release APK with bumped version (uncommitted) ---
       - name: Decode release keystore
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -179,14 +171,16 @@ jobs:
             echo "Tag $TAG already exists, skipping"
           fi
 
-      - name: Upload debug APK
+      - name: Rename release APK
         if: >
           github.event_name == 'push' && github.ref == 'refs/heads/main'
           && steps.changes.outputs.app_changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+        run: |
+          VERSION="${{ steps.release_version.outputs.version }}"
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -n "$RELEASE_APK" ]; then
+            cp "$RELEASE_APK" "app/build/outputs/apk/release/RallyTrax-v${VERSION}.apk"
+          fi
 
       - name: Generate release notes
         if: >
@@ -225,18 +219,9 @@ jobs:
           TAG="${{ steps.release_version.outputs.tag }}"
           VERSION="${{ steps.release_version.outputs.version }}"
 
-          ASSETS=""
-          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
-          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -1)
-
-          if [ -n "$DEBUG_APK" ]; then
-            ASSETS="$ASSETS $DEBUG_APK"
-          fi
-          if [ -n "$RELEASE_APK" ]; then
-            ASSETS="$ASSETS $RELEASE_APK"
-          fi
+          RELEASE_APK="app/build/outputs/apk/release/RallyTrax-v${VERSION}.apk"
 
           gh release create "$TAG" \
             --title "RallyTrax $VERSION" \
             --notes-file /tmp/release_notes.md \
-            $ASSETS
+            "$RELEASE_APK"

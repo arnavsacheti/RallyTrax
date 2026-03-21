@@ -59,18 +59,26 @@ class UpdateChecker @Inject constructor() {
             val htmlUrl = json.optString("html_url", "")
             val publishedAt = json.optString("published_at", "")
 
-            // Find APK asset
+            // Find APK asset — prefer release, skip debug
             var apkUrl: String? = null
             val assets = json.optJSONArray("assets")
             if (assets != null) {
+                var fallbackUrl: String? = null
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
                     val name = asset.optString("name", "")
                     if (name.endsWith(".apk")) {
-                        apkUrl = asset.optString("browser_download_url")
-                        break
+                        val url = asset.optString("browser_download_url")
+                        if (name.contains("debug", ignoreCase = true)) {
+                            // Only use debug APK as last resort
+                            if (fallbackUrl == null) fallbackUrl = url
+                        } else {
+                            apkUrl = url
+                            break
+                        }
                     }
                 }
+                if (apkUrl == null) apkUrl = fallbackUrl
             }
 
             ReleaseInfo(
