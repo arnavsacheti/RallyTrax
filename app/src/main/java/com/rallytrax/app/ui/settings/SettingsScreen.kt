@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import android.speech.tts.TextToSpeech
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -47,6 +49,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -296,6 +301,38 @@ fun SettingsScreen(
                 }
 
                 if (preferences.ttsEnabled) {
+                    // TTS engine for voice preview
+                    var ttsReady by remember { mutableStateOf(false) }
+                    val tts = remember {
+                        var engine: TextToSpeech? = null
+                        engine = TextToSpeech(context) { status ->
+                            ttsReady = status == TextToSpeech.SUCCESS
+                        }
+                        engine
+                    }
+
+                    DisposableEffect(Unit) {
+                        onDispose { tts?.shutdown() }
+                    }
+
+                    val previewPhrases = remember {
+                        listOf(
+                            "Left 3 into right 4",
+                            "Hairpin left, tightens",
+                            "Crest, keep in",
+                            "Right 2 long over crest",
+                            "Flat out through dip",
+                        )
+                    }
+
+                    fun speakPreview(rate: Float, pitch: Float) {
+                        if (!ttsReady || tts == null) return
+                        tts.setSpeechRate(rate)
+                        tts.setPitch(pitch)
+                        val phrase = previewPhrases.random()
+                        tts.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, "settings_preview")
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(modifier = Modifier.height(12.dp))
@@ -322,6 +359,9 @@ fun SettingsScreen(
                     Slider(
                         value = preferences.ttsRate,
                         onValueChange = { settingsViewModel.setTtsRate(it) },
+                        onValueChangeFinished = {
+                            speakPreview(preferences.ttsRate, preferences.ttsPitch)
+                        },
                         valueRange = 0.5f..2.0f,
                         steps = 5,
                         modifier = Modifier
@@ -349,6 +389,9 @@ fun SettingsScreen(
                     Slider(
                         value = preferences.ttsPitch,
                         onValueChange = { settingsViewModel.setTtsPitch(it) },
+                        onValueChangeFinished = {
+                            speakPreview(preferences.ttsRate, preferences.ttsPitch)
+                        },
                         valueRange = 0.5f..2.0f,
                         steps = 5,
                         modifier = Modifier
