@@ -72,6 +72,7 @@ class TrackingService : LifecycleService() {
     private var maxLon: Double = -Double.MAX_VALUE
     private var isNewSegment: Boolean = true
 
+    private var pendingFlushJob: Job? = null
     private val pointBuffer = mutableListOf<TrackPointEntity>()
     private val pathSegments = mutableListOf<MutableList<LatLng>>()
 
@@ -137,20 +138,7 @@ class TrackingService : LifecycleService() {
         pathSegments.clear()
         pathSegments.add(mutableListOf())
 
-        // Insert skeleton track
-        lifecycleScope.launch {
-            val now = System.currentTimeMillis()
-            val name = generateTrackName(now)
-            trackDao.insertTrack(
-                TrackEntity(
-                    id = trackId,
-                    name = name,
-                    recordedAt = now,
-                )
-            )
-        }
-
-        // Start foreground
+        // Start foreground immediately (doesn't need DB)
         val notification = notificationManager.createNotification("00:00", "0 m")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -162,22 +150,30 @@ class TrackingService : LifecycleService() {
             startForeground(TrackingNotificationManager.NOTIFICATION_ID, notification)
         }
 
-        // Start GPS
-        val locationRequest = buildLocationRequest()
+        // Insert skeleton track, then start GPS after it's persisted
+        lifecycleScope.launch {
+            val now = System.currentTimeMillis()
+            val name = generateTrackName(now)
+            trackDao.insertTrack(
+                TrackEntity(
+                    id = trackId,
+                    name = name,
+                    recordedAt = now,
+                )
+            )
 
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            mainLooper,
-        )
+            // Start GPS only after skeleton track exists in DB
+            val locationRequest = buildLocationRequest()
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                mainLooper,
+            )
 
-        // Start timer
-        startTimer()
-
-        // Start periodic flush
-        startFlushJob()
-
-        _recordingStatus.value = RecordingStatus.RECORDING
+            startTimer()
+            startFlushJob()
+            _recordingStatus.value = RecordingStatus.RECORDING
+        }
     }
 
     private fun pauseRecording() {
@@ -240,6 +236,9 @@ class TrackingService : LifecycleService() {
         _recordingStatus.value = RecordingStatus.STOPPED
 
         lifecycleScope.launch {
+            // Await any in-flight flush from a previous flushBuffer() call
+            pendingFlushJob?.join()
+
             // Flush remaining buffer
             if (pointBuffer.isNotEmpty()) {
                 trackPointDao.insertPoints(pointBuffer.toList())
@@ -250,7 +249,7 @@ class TrackingService : LifecycleService() {
             val avgSpeed = if (speedCount > 0) speedSum / speedCount else 0.0
             val durationMs = accumulatedTimeMs
 
-            trackDao.insertTrack(
+            trackDao.updateTrack(
                 TrackEntity(
                     id = trackId,
                     name = generateTrackName(System.currentTimeMillis()),
@@ -417,7 +416,7 @@ class TrackingService : LifecycleService() {
         if (pointBuffer.isEmpty()) return
         val points = pointBuffer.toList()
         pointBuffer.clear()
-        lifecycleScope.launch {
+        pendingFlushJob = lifecycleScope.launch {
             trackPointDao.insertPoints(points)
         }
     }
