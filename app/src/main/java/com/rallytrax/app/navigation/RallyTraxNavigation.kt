@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.rallytrax.app.ui.explore.ExploreScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
 import com.rallytrax.app.ui.onboarding.OnboardingScreen
@@ -42,12 +43,28 @@ fun RallyTraxNavHost(
                 onTrackClick = { trackId ->
                     navController.navigate(TrackDetailRoute(trackId))
                 },
+                onReplayTrack = { trackId ->
+                    navController.navigate(ReplayHudRoute(trackId))
+                },
+                onNavigateToSettings = {
+                    navController.navigate(SettingsRoute)
+                },
+            )
+        }
+        composable<ExploreRoute> {
+            ExploreScreen(
+                onNavigateToSettings = {
+                    navController.navigate(SettingsRoute)
+                },
             )
         }
         composable<LibraryRoute> {
             LibraryScreen(
                 onTrackClick = { trackId ->
                     navController.navigate(TrackDetailRoute(trackId))
+                },
+                onNavigateToSettings = {
+                    navController.navigate(SettingsRoute)
                 },
             )
         }
@@ -66,7 +83,9 @@ fun RallyTraxNavHost(
             )
         }
         composable<SettingsRoute> {
-            SettingsScreen()
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+            )
         }
         composable<RecordingRoute> {
             RecordingScreen(

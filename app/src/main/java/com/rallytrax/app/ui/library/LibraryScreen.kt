@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,6 +80,7 @@ import com.rallytrax.app.util.speedUnit
 @Composable
 fun LibraryScreen(
     onTrackClick: (String) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -179,6 +181,11 @@ fun LibraryScreen(
                             IconButton(onClick = { showTagFilter = !showTagFilter }) {
                                 Icon(Icons.Filled.FilterList, contentDescription = "Filter by tag")
                             }
+                        }
+
+                        // Settings gear icon
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                     }
                 },

@@ -74,6 +74,8 @@ fun RallyTraxTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        shapes = RallyTraxShapes,
+        typography = RallyTraxTypography,
         content = content,
     )
 }

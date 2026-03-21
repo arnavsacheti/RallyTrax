@@ -1,14 +1,12 @@
 package com.rallytrax.app.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 
@@ -20,6 +18,7 @@ data class TopLevelRoute(
 )
 
 @Serializable data object HomeRoute
+@Serializable data object ExploreRoute
 @Serializable data object LibraryRoute
 @Serializable data object ReplayRoute
 @Serializable data object SettingsRoute
@@ -36,21 +35,15 @@ val topLevelRoutes = listOf(
         route = HomeRoute,
     ),
     TopLevelRoute(
+        label = "Explore",
+        selectedIcon = Icons.Filled.Explore,
+        unselectedIcon = Icons.Outlined.Explore,
+        route = ExploreRoute,
+    ),
+    TopLevelRoute(
         label = "Library",
-        selectedIcon = Icons.Filled.VideoLibrary,
-        unselectedIcon = Icons.Outlined.VideoLibrary,
+        selectedIcon = Icons.Filled.Folder,
+        unselectedIcon = Icons.Outlined.Folder,
         route = LibraryRoute,
-    ),
-    TopLevelRoute(
-        label = "Replay",
-        selectedIcon = Icons.Filled.PlayArrow,
-        unselectedIcon = Icons.Outlined.PlayArrow,
-        route = ReplayRoute,
-    ),
-    TopLevelRoute(
-        label = "Settings",
-        selectedIcon = Icons.Filled.Settings,
-        unselectedIcon = Icons.Outlined.Settings,
-        route = SettingsRoute,
     ),
 )

@@ -44,6 +44,8 @@ import com.rallytrax.app.navigation.OnboardingRoute
 import com.rallytrax.app.navigation.RallyTraxNavHost
 import com.rallytrax.app.navigation.RecordingRoute
 import com.rallytrax.app.navigation.ReplayHudRoute
+import com.rallytrax.app.navigation.ReplayRoute
+import com.rallytrax.app.navigation.SettingsRoute
 import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.theme.RallyTraxTheme
@@ -88,12 +90,14 @@ class MainActivity : ComponentActivity() {
 
                 val updateState by updateViewModel.uiState.collectAsStateWithLifecycle()
 
-                // Hide bottom bar on certain screens
+                // Hide bottom bar on non-tab screens
                 val showBottomBar = currentDestination?.let { dest ->
                     !dest.hasRoute(RecordingRoute::class) &&
                         !dest.hasRoute(TrackDetailRoute::class) &&
                         !dest.hasRoute(ReplayHudRoute::class) &&
-                        !dest.hasRoute(OnboardingRoute::class)
+                        !dest.hasRoute(OnboardingRoute::class) &&
+                        !dest.hasRoute(SettingsRoute::class) &&
+                        !dest.hasRoute(ReplayRoute::class)
                 } ?: true
 
                 Scaffold(
