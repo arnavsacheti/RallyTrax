@@ -63,6 +63,9 @@ fun RallyTraxNavHost(
                 onTrackClick = { trackId ->
                     navController.navigate(TrackDetailRoute(trackId))
                 },
+                onReplayTrack = { trackId ->
+                    navController.navigate(ReplayHudRoute(trackId))
+                },
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },

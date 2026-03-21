@@ -25,10 +25,20 @@ import java.time.ZoneId
 import java.time.temporal.ChronoField
 import javax.inject.Inject
 
+data class DailyDistance(
+    val dayLabel: String, // e.g. "Mon", "Tue"
+    val distanceMeters: Double,
+)
+
 data class HomeDashboardState(
     val recentTracks: List<TrackEntity> = emptyList(),
+    val totalDistanceMeters: Double = 0.0,
+    val tracksThisWeek: Int = 0,
+    val longestRouteMeters: Double = 0.0,
     val weeklyDistanceMeters: Double = 0.0,
     val monthlyRecordingCount: Int = 0,
+    val dailyDistances: List<DailyDistance> = emptyList(),
+    val totalTrackCount: Int = 0,
 )
 
 @HiltViewModel
@@ -59,16 +69,36 @@ class HomeViewModel @Inject constructor(
             val startOfMonth = today.withDayOfMonth(1)
             val monthStartMs = startOfMonth.atStartOfDay(zone).toInstant().toEpochMilli()
 
-            val weeklyDistance = tracks
-                .filter { it.recordedAt >= weekStartMs }
-                .sumOf { it.distanceMeters }
-
+            val weeklyTracks = tracks.filter { it.recordedAt >= weekStartMs }
+            val weeklyDistance = weeklyTracks.sumOf { it.distanceMeters }
             val monthlyCount = tracks.count { it.recordedAt >= monthStartMs }
+            val totalDistance = tracks.sumOf { it.distanceMeters }
+            val longestRoute = tracks.maxOfOrNull { it.distanceMeters } ?: 0.0
+
+            // Daily distances for the past 7 days
+            val dayFormatter = java.time.format.DateTimeFormatter.ofPattern("EEE")
+            val dailyDistances = (6 downTo 0).map { daysAgo ->
+                val day = today.minusDays(daysAgo.toLong())
+                val dayStartMs = day.atStartOfDay(zone).toInstant().toEpochMilli()
+                val dayEndMs = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+                val distance = tracks
+                    .filter { it.recordedAt in dayStartMs until dayEndMs }
+                    .sumOf { it.distanceMeters }
+                DailyDistance(
+                    dayLabel = day.format(dayFormatter),
+                    distanceMeters = distance,
+                )
+            }
 
             HomeDashboardState(
                 recentTracks = tracks.take(5),
+                totalDistanceMeters = totalDistance,
+                tracksThisWeek = weeklyTracks.size,
+                longestRouteMeters = longestRoute,
                 weeklyDistanceMeters = weeklyDistance,
                 monthlyRecordingCount = monthlyCount,
+                dailyDistances = dailyDistances,
+                totalTrackCount = tracks.size,
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeDashboardState())

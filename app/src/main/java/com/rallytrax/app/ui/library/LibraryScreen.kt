@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -80,6 +81,7 @@ import com.rallytrax.app.util.speedUnit
 @Composable
 fun LibraryScreen(
     onTrackClick: (String) -> Unit = {},
+    onReplayTrack: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -274,11 +276,16 @@ fun LibraryScreen(
                     ) { track ->
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
-                                if (value == SwipeToDismissBoxValue.EndToStart) {
-                                    viewModel.requestDeleteTrack(track)
-                                    true
-                                } else {
-                                    false
+                                when (value) {
+                                    SwipeToDismissBoxValue.EndToStart -> {
+                                        viewModel.requestDeleteTrack(track)
+                                        true
+                                    }
+                                    SwipeToDismissBoxValue.StartToEnd -> {
+                                        onReplayTrack(track.id)
+                                        false // don't dismiss, just trigger replay
+                                    }
+                                    else -> false
                                 }
                             },
                         )
@@ -287,9 +294,10 @@ fun LibraryScreen(
                             SwipeToDismissBox(
                                 state = dismissState,
                                 backgroundContent = {
-                                    val color by animateColorAsState(
+                                    val bgColor by animateColorAsState(
                                         when (dismissState.targetValue) {
                                             SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+                                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
                                             else -> Color.Transparent
                                         },
                                         label = "swipe_bg",
@@ -297,18 +305,29 @@ fun LibraryScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(color)
-                                            .padding(end = 24.dp),
-                                        contentAlignment = Alignment.CenterEnd,
+                                            .background(bgColor),
                                     ) {
+                                        // Replay icon (swipe right)
+                                        Icon(
+                                            Icons.Filled.PlayArrow,
+                                            contentDescription = "Replay",
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier
+                                                .align(Alignment.CenterStart)
+                                                .padding(start = 24.dp),
+                                        )
+                                        // Delete icon (swipe left)
                                         Icon(
                                             Icons.Filled.Delete,
                                             contentDescription = "Delete",
                                             tint = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier
+                                                .align(Alignment.CenterEnd)
+                                                .padding(end = 24.dp),
                                         )
                                     }
                                 },
-                                enableDismissFromStartToEnd = false,
+                                enableDismissFromStartToEnd = true,
                                 modifier = Modifier.animateItem(),
                             ) {
                                 TrackListItem(
@@ -359,14 +378,14 @@ private fun TrackListItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
