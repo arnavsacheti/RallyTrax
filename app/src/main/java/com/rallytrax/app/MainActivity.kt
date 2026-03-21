@@ -213,11 +213,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Handle incoming GPX intent
-                val gpxUri = handleGpxIntent(intent)
-                LaunchedEffect(gpxUri) {
-                    if (gpxUri != null) {
-                        importGpxFromIntent(gpxUri, snackbarHostState) { trackId ->
+                // Handle incoming file intents (Open with, Share)
+                val importUris = handleIncomingIntent(intent)
+                LaunchedEffect(importUris) {
+                    for (uri in importUris) {
+                        importTrackFromIntent(uri, snackbarHostState) { trackId ->
                             navController.navigate(TrackDetailRoute(trackId))
                         }
                     }
@@ -231,16 +231,31 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
     }
 
-    private fun handleGpxIntent(intent: Intent?): Uri? {
-        if (intent == null) return null
-        val action = intent.action
-        if (action == Intent.ACTION_VIEW) {
-            return intent.data
+    @Suppress("DEPRECATION")
+    private fun handleIncomingIntent(intent: Intent?): List<Uri> {
+        if (intent == null) return emptyList()
+        return when (intent.action) {
+            Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+            Intent.ACTION_SEND -> {
+                val uri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
+                listOfNotNull(uri)
+            }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+                } ?: emptyList()
+            }
+            else -> emptyList()
         }
-        return null
     }
 
-    private suspend fun importGpxFromIntent(
+    private suspend fun importTrackFromIntent(
         uri: Uri,
         snackbarHostState: SnackbarHostState,
         navigateToTrack: (String) -> Unit,
@@ -248,7 +263,7 @@ class MainActivity : ComponentActivity() {
         try {
             val inputStream = contentResolver.openInputStream(uri)
                 ?: throw GpxParseException("Could not open file")
-            val result = inputStream.use { GpxParser.parse(it) }
+            val result = inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
             trackDao.insertTrack(result.track)
             trackPointDao.insertPoints(result.points)
             if (result.paceNotes.isNotEmpty()) {

@@ -109,7 +109,7 @@ class HomeViewModel @Inject constructor(
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
                     ?: throw GpxParseException("Could not open file")
-                val result = inputStream.use { GpxParser.parse(it) }
+                val result = inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
                 trackDao.insertTrack(result.track)
                 trackPointDao.insertPoints(result.points)
                 if (result.paceNotes.isNotEmpty()) {
