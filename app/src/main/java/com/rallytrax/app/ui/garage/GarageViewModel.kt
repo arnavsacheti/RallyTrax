@@ -14,10 +14,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class VehicleWarning {
+    MISSING_VIN,
+    NO_TRACKS,
+    INCOMPLETE_SPECS,
+}
+
 data class VehicleWithStats(
     val vehicle: VehicleEntity,
     val trackCount: Int = 0,
     val totalDistanceM: Double = 0.0,
+    val warnings: List<VehicleWarning> = emptyList(),
 )
 
 data class GarageUiState(
@@ -35,7 +42,8 @@ class GarageViewModel @Inject constructor(
             val withStats = vehicles.map { vehicle ->
                 val trackCount = vehicleRepository.getTrackCountForVehicle(vehicle.id)
                 val totalDistance = vehicleRepository.getTotalDistanceForVehicle(vehicle.id)
-                VehicleWithStats(vehicle, trackCount, totalDistance)
+                val warnings = computeWarnings(vehicle, trackCount)
+                VehicleWithStats(vehicle, trackCount, totalDistance, warnings)
             }
             GarageUiState(vehicles = withStats, isLoading = false)
         }
@@ -61,6 +69,16 @@ class GarageViewModel @Inject constructor(
         _pendingArchive.value = null
         viewModelScope.launch {
             vehicleRepository.unarchiveVehicle(vehicle.id)
+        }
+    }
+
+    private fun computeWarnings(vehicle: VehicleEntity, trackCount: Int): List<VehicleWarning> {
+        return buildList {
+            if (vehicle.vin.isNullOrBlank()) add(VehicleWarning.MISSING_VIN)
+            if (trackCount == 0) add(VehicleWarning.NO_TRACKS)
+            if (vehicle.horsePower == null && vehicle.engineDisplacementL == null && vehicle.curbWeightKg == null) {
+                add(VehicleWarning.INCOMPLETE_SPECS)
+            }
         }
     }
 
