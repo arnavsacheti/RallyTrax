@@ -130,7 +130,7 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
     implementation("com.google.firebase:firebase-analytics")
-    implementation(libs.firebase.auth.ktx)
+    implementation("com.google.firebase:firebase-auth-ktx")
 
     // Google Sign-In (Credential Manager)
     implementation(libs.credentials)
