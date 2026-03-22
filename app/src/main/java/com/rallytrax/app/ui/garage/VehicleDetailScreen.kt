@@ -1,5 +1,6 @@
 package com.rallytrax.app.ui.garage
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -123,6 +124,9 @@ fun VehicleDetailScreen(
                     Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
                         Text("Maintenance", modifier = Modifier.padding(12.dp))
                     }
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }) {
+                        Text("Analytics", modifier = Modifier.padding(12.dp))
+                    }
                 }
 
                 when (selectedTab) {
@@ -137,6 +141,7 @@ fun VehicleDetailScreen(
                         onAddSchedule = { showAddScheduleSheet = true },
                         onCompleteSchedule = { viewModel.completeSchedule(it) },
                     )
+                    3 -> AnalyticsTab(analytics = uiState.analytics, unitSystem = UnitSystem.METRIC)
                 }
             }
 
@@ -627,6 +632,160 @@ private fun MaintenanceTab(
         }
 
         Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun AnalyticsTab(
+    analytics: VehicleAnalytics,
+    unitSystem: UnitSystem,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Summary stats
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = formatDistance(analytics.totalDistanceM, unitSystem),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text("Total Distance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val hours = analytics.totalTimeMs / 3_600_000
+                        val mins = (analytics.totalTimeMs % 3_600_000) / 60_000
+                        Text(
+                            text = "${hours}h ${mins}m",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text("Total Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${"%.0f".format(analytics.avgSpeedMps * 3.6)} km/h",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text("Avg Speed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${"%.0f".format(analytics.topSpeedMps * 3.6)} km/h",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text("Top Speed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${analytics.trackCount}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text("Tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
+                }
+            }
+        }
+
+        // Route type breakdown
+        if (analytics.routeTypeBreakdown.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Route Types", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            BreakdownCard(analytics.routeTypeBreakdown)
+        }
+
+        // Surface breakdown
+        if (analytics.surfaceBreakdown.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Surface Types", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            BreakdownCard(analytics.surfaceBreakdown)
+        }
+
+        // Difficulty distribution
+        if (analytics.curvinessDistribution.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Difficulty Distribution", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            BreakdownCard(analytics.curvinessDistribution)
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun BreakdownCard(data: Map<String, Int>) {
+    val total = data.values.sum().toFloat()
+    if (total == 0f) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            data.entries.sortedByDescending { it.value }.forEach { (label, count) ->
+                val fraction = count / total
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.width(120.dp),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(16.dp)
+                            .background(
+                                MaterialTheme.colorScheme.outlineVariant,
+                                androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            ),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction)
+                                .height(16.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                ),
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${(fraction * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.width(36.dp),
+                    )
+                }
+            }
+        }
     }
 }
 

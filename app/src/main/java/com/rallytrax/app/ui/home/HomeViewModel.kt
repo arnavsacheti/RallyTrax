@@ -14,6 +14,7 @@ import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -40,6 +41,8 @@ data class HomeDashboardState(
     val dailyDistances: List<DailyDistance> = emptyList(),
     val totalTrackCount: Int = 0,
     val maintenanceDueCount: Int = 0,
+    val showActiveVehicleOnly: Boolean = false,
+    val activeVehicleName: String? = null,
 )
 
 @HiltViewModel
@@ -48,6 +51,7 @@ class HomeViewModel @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
     private val maintenanceDao: com.rallytrax.app.data.local.dao.MaintenanceDao,
+    private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -129,5 +133,11 @@ class HomeViewModel @Inject constructor(
             }
         }
         return importedTrackId
+    }
+
+    private val _showActiveVehicleOnly = MutableStateFlow(false)
+
+    fun toggleVehicleFilter() {
+        _showActiveVehicleOnly.value = !_showActiveVehicleOnly.value
     }
 }

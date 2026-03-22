@@ -93,6 +93,13 @@ class SyncManager @Inject constructor(
                 error = null,
             )
 
+            // 5. GPX backup (Tier 2) — if enabled, schedule via WorkManager
+            val prefs = preferencesRepository.preferences.first()
+            if (prefs.backupTracksEnabled) {
+                Log.d(TAG, "GPX backup is enabled — will sync on Wi-Fi + charging")
+                scheduleGpxBackup()
+            }
+
             Log.d(TAG, "Sync completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Sync failed", e)
@@ -148,6 +155,27 @@ class SyncManager @Inject constructor(
         Log.d(TAG, "Periodic sync cancelled")
     }
 
+    /**
+     * Schedule GPX backup on Wi-Fi + charging (Tier 2).
+     */
+    fun scheduleGpxBackup() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.UNMETERED) // Wi-Fi only
+            .setRequiresCharging(true)
+            .build()
+
+        val backupRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            GPX_BACKUP_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            backupRequest,
+        )
+        Log.d(TAG, "GPX backup scheduled (Wi-Fi + charging)")
+    }
+
     private fun enqueueOneTimeSync() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -170,5 +198,6 @@ class SyncManager @Inject constructor(
         private const val PERIODIC_SYNC_HOURS = 6L
         private const val PERIODIC_SYNC_WORK_NAME = "rallytrax_periodic_sync"
         private const val ONE_TIME_SYNC_WORK_NAME = "rallytrax_debounced_sync"
+        private const val GPX_BACKUP_WORK_NAME = "rallytrax_gpx_backup"
     }
 }

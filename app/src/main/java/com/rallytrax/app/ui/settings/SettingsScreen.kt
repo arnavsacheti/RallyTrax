@@ -176,7 +176,6 @@ fun SettingsScreen(
                             checked = preferences.backupTracksEnabled,
                             onCheckedChange = {
                                 settingsViewModel.setBackupTracksEnabled(it)
-                                // Non-functional until Stage 1.2.5
                             },
                             modifier = Modifier.semantics {
                                 contentDescription = "Toggle track backup"

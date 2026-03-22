@@ -199,6 +199,28 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
+                // Vehicle filter chip
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    androidx.compose.material3.FilterChip(
+                        selected = dashboard.showActiveVehicleOnly,
+                        onClick = { viewModel.toggleVehicleFilter() },
+                        label = {
+                            Text(
+                                text = if (dashboard.showActiveVehicleOnly) {
+                                    dashboard.activeVehicleName ?: "Active Vehicle"
+                                } else {
+                                    "All Vehicles"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        },
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
                 // 1. Focus Metrics Row (horizontal scroll)
                 FocusMetricsRow(
                     totalDistance = formatDistance(dashboard.totalDistanceMeters, preferences.unitSystem),

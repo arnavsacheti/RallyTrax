@@ -22,12 +22,25 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class VehicleAnalytics(
+    val totalDistanceM: Double = 0.0,
+    val totalTimeMs: Long = 0L,
+    val avgSpeedMps: Double = 0.0,
+    val topSpeedMps: Double = 0.0,
+    val trackCount: Int = 0,
+    val routeTypeBreakdown: Map<String, Int> = emptyMap(),
+    val surfaceBreakdown: Map<String, Int> = emptyMap(),
+    val curvinessDistribution: Map<String, Int> = emptyMap(), // Casual/Moderate/Spirited/Expert
+    val monthlyDistances: Map<String, Double> = emptyMap(), // "2026-01" -> meters
+)
+
 data class VehicleDetailUiState(
     val vehicle: VehicleEntity? = null,
     val tracks: List<TrackEntity> = emptyList(),
     val totalDistanceM: Double = 0.0,
     val lifetimeMpg: Double? = null,
     val costPerMile: Double? = null,
+    val analytics: VehicleAnalytics = VehicleAnalytics(),
     val isLoading: Boolean = true,
 )
 
@@ -71,15 +84,61 @@ class VehicleDetailViewModel @Inject constructor(
             val logs = fuelLogDao.getLogsForVehicleOnce(vehicleId)
             val lifetimeMpg = MpgCalculator.lifetimeAverage(logs)
             val costPerMile = MpgCalculator.costPerMile(logs)
+            val analytics = computeAnalytics()
 
             _uiState.value = VehicleDetailUiState(
                 vehicle = vehicle,
                 totalDistanceM = totalDistance,
                 lifetimeMpg = lifetimeMpg,
                 costPerMile = costPerMile,
+                analytics = analytics,
                 isLoading = false,
             )
         }
+    }
+
+    private suspend fun computeAnalytics(): VehicleAnalytics {
+        val tracksList = tracks.value
+        if (tracksList.isEmpty()) return VehicleAnalytics()
+
+        val totalDistance = tracksList.sumOf { it.distanceMeters }
+        val totalTime = tracksList.sumOf { it.durationMs }
+        val avgSpeed = if (tracksList.isNotEmpty()) tracksList.map { it.avgSpeedMps }.average() else 0.0
+        val topSpeed = tracksList.maxOfOrNull { it.maxSpeedMps } ?: 0.0
+
+        // Route type breakdown
+        val routeTypes = tracksList.mapNotNull { it.routeType }
+            .groupingBy { it }.eachCount()
+
+        // Surface breakdown
+        val surfaces = tracksList.mapNotNull { it.primarySurface }
+            .groupingBy { it }.eachCount()
+
+        // Curviness → difficulty distribution
+        val difficulties = tracksList.mapNotNull { it.difficultyRating }
+            .groupingBy { it }.eachCount()
+
+        // Monthly distances (last 12 months)
+        val monthlyDistances = tracksList
+            .groupBy {
+                val date = java.time.Instant.ofEpochMilli(it.recordedAt)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate()
+                "${date.year}-${"%02d".format(date.monthValue)}"
+            }
+            .mapValues { (_, tracks) -> tracks.sumOf { it.distanceMeters } }
+
+        return VehicleAnalytics(
+            totalDistanceM = totalDistance,
+            totalTimeMs = totalTime,
+            avgSpeedMps = avgSpeed,
+            topSpeedMps = topSpeed,
+            trackCount = tracksList.size,
+            routeTypeBreakdown = routeTypes,
+            surfaceBreakdown = surfaces,
+            curvinessDistribution = difficulties,
+            monthlyDistances = monthlyDistances,
+        )
     }
 
     fun setActive() {
