@@ -1,5 +1,7 @@
 package com.rallytrax.app.ui.trackdetail
 
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -29,6 +31,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -71,6 +75,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLngBounds
@@ -122,6 +127,7 @@ fun TrackDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showAddTagDialog by remember { mutableStateOf(false) }
+    var isMapFullscreen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
@@ -176,6 +182,7 @@ fun TrackDetailScreen(
                             paceNotes = uiState.paceNotes,
                             activeLayers = uiState.activeLayers,
                             useGoogleMaps = MapProvider.useGoogleMaps(preferences.mapProvider),
+                            modifier = Modifier.fillMaxWidth().height(300.dp),
                         )
 
                         // Gradient legend
@@ -199,6 +206,24 @@ fun TrackDetailScreen(
                                     "Straight", "Tight")
                             }
                         }
+
+                        // Fullscreen toggle button
+                        IconButton(
+                            onClick = { isMapFullscreen = true },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                    RoundedCornerShape(8.dp),
+                                ),
+                        ) {
+                            Icon(
+                                Icons.Filled.Fullscreen,
+                                contentDescription = "Fullscreen map",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
                     }
 
                     // Layer toggle chips
@@ -206,6 +231,7 @@ fun TrackDetailScreen(
                         activeLayers = uiState.activeLayers,
                         onToggle = viewModel::toggleLayer,
                     )
+
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -306,6 +332,21 @@ fun TrackDetailScreen(
             dismissButton = { TextButton(onClick = { showAddTagDialog = false }) { Text("Cancel") } },
         )
     }
+
+    // Fullscreen map overlay
+    if (isMapFullscreen) {
+        val points = uiState.polylinePoints
+        if (points.isNotEmpty()) {
+            FullscreenMapDialog(
+                points = points,
+                trackPoints = uiState.trackPoints,
+                paceNotes = uiState.paceNotes,
+                activeLayers = uiState.activeLayers,
+                useGoogleMaps = MapProvider.useGoogleMaps(preferences.mapProvider),
+                onDismiss = { isMapFullscreen = false },
+            )
+        }
+    }
 }
 
 // ── Map ─────────────────────────────────────────────────────────────────────
@@ -317,11 +358,12 @@ private fun TrackMap(
     paceNotes: List<PaceNoteEntity>,
     activeLayers: Set<MapLayer>,
     useGoogleMaps: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     if (useGoogleMaps) {
-        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers)
+        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier)
     } else {
-        OsmTrackMap(points, trackPoints, paceNotes, activeLayers)
+        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier)
     }
 }
 
@@ -331,14 +373,21 @@ private fun GoogleTrackMap(
     trackPoints: List<TrackPointEntity>,
     paceNotes: List<PaceNoteEntity>,
     activeLayers: Set<MapLayer>,
+    modifier: Modifier = Modifier,
 ) {
     val cameraPositionState = rememberCameraPositionState()
-    val boundsBuilder = LatLngBounds.builder()
-    points.forEach { boundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
-    cameraPositionState.position = CameraPosition.fromLatLngZoom(boundsBuilder.build().center, 14f)
+    val bounds = remember(points) {
+        val boundsBuilder = LatLngBounds.builder()
+        points.forEach { boundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
+        boundsBuilder.build()
+    }
+    // Set initial position at center; LaunchedEffect will fit bounds once map is laid out
+    LaunchedEffect(bounds) {
+        cameraPositionState.move(CameraUpdateFactory.newLatLngBounds(bounds, 64))
+    }
 
     GoogleMap(
-        modifier = Modifier.fillMaxWidth().height(300.dp),
+        modifier = modifier,
         cameraPositionState = cameraPositionState,
         uiSettings = MapUiSettings(zoomControlsEnabled = true, scrollGesturesEnabled = true, zoomGesturesEnabled = true),
     ) {
@@ -416,6 +465,7 @@ private fun OsmTrackMap(
     trackPoints: List<TrackPointEntity>,
     paceNotes: List<PaceNoteEntity>,
     activeLayers: Set<MapLayer>,
+    modifier: Modifier = Modifier,
 ) {
     val lats = points.map { it.latitude }
     val lngs = points.map { it.longitude }
@@ -437,9 +487,59 @@ private fun OsmTrackMap(
     }
 
     OsmMapView(
-        modifier = Modifier.fillMaxWidth().height(300.dp),
+        modifier = modifier,
         fitBounds = fitBounds, polylines = polylines, markers = markers, zoomControlsEnabled = true,
     )
+}
+
+// ── Fullscreen Map Dialog ────────────────────────────────────────────────────
+
+@Composable
+private fun FullscreenMapDialog(
+    points: List<LatLng>,
+    trackPoints: List<TrackPointEntity>,
+    paceNotes: List<PaceNoteEntity>,
+    activeLayers: Set<MapLayer>,
+    useGoogleMaps: Boolean,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            TrackMap(
+                points = points,
+                trackPoints = trackPoints,
+                paceNotes = paceNotes,
+                activeLayers = activeLayers,
+                useGoogleMaps = useGoogleMaps,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            // Exit fullscreen button
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        RoundedCornerShape(8.dp),
+                    ),
+            ) {
+                Icon(
+                    Icons.Filled.FullscreenExit,
+                    contentDescription = "Exit fullscreen",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
 }
 
 // ── Layer Toolbar ───────────────────────────────────────────────────────────
