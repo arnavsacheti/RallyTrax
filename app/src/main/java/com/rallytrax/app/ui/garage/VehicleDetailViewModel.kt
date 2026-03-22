@@ -3,6 +3,9 @@ package com.rallytrax.app.ui.garage
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.fuel.MpgCalculator
+import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.entity.FuelLogEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.repository.VehicleRepository
@@ -19,6 +22,8 @@ data class VehicleDetailUiState(
     val vehicle: VehicleEntity? = null,
     val tracks: List<TrackEntity> = emptyList(),
     val totalDistanceM: Double = 0.0,
+    val lifetimeMpg: Double? = null,
+    val costPerMile: Double? = null,
     val isLoading: Boolean = true,
 )
 
@@ -26,6 +31,7 @@ data class VehicleDetailUiState(
 class VehicleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val vehicleRepository: VehicleRepository,
+    private val fuelLogDao: FuelLogDao,
 ) : ViewModel() {
 
     private val vehicleId: String = savedStateHandle["vehicleId"]
@@ -37,6 +43,9 @@ class VehicleDetailViewModel @Inject constructor(
     val tracks: StateFlow<List<TrackEntity>> = vehicleRepository.getTracksForVehicle(vehicleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val fuelLogs: StateFlow<List<FuelLogEntity>> = fuelLogDao.getLogsForVehicle(vehicleId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         loadVehicle()
     }
@@ -45,9 +54,15 @@ class VehicleDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val vehicle = vehicleRepository.getVehicleById(vehicleId)
             val totalDistance = vehicleRepository.getTotalDistanceForVehicle(vehicleId)
+            val logs = fuelLogDao.getLogsForVehicleOnce(vehicleId)
+            val lifetimeMpg = MpgCalculator.lifetimeAverage(logs)
+            val costPerMile = MpgCalculator.costPerMile(logs)
+
             _uiState.value = VehicleDetailUiState(
                 vehicle = vehicle,
                 totalDistanceM = totalDistance,
+                lifetimeMpg = lifetimeMpg,
+                costPerMile = costPerMile,
                 isLoading = false,
             )
         }
@@ -56,7 +71,7 @@ class VehicleDetailViewModel @Inject constructor(
     fun setActive() {
         viewModelScope.launch {
             vehicleRepository.setActiveVehicle(vehicleId)
-            loadVehicle() // Refresh to update isActive state
+            loadVehicle()
         }
     }
 
@@ -65,5 +80,9 @@ class VehicleDetailViewModel @Inject constructor(
             vehicleRepository.updateVehicle(updated)
             loadVehicle()
         }
+    }
+
+    fun refresh() {
+        loadVehicle()
     }
 }

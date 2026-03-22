@@ -50,6 +50,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao
     @Inject lateinit var preferencesRepository: com.rallytrax.app.data.preferences.UserPreferencesRepository
     @Inject lateinit var vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao
+    @Inject lateinit var gasStationDetector: com.rallytrax.app.data.fuel.GasStationDetector
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -73,6 +74,11 @@ class TrackingService : LifecycleService() {
     private var maxLon: Double = -Double.MAX_VALUE
     private var isNewSegment: Boolean = true
 
+    // Gas station pause detection
+    private var pauseStartTime: Long? = null
+    private var pauseLocation: Location? = null
+    private var pauseAlerted: Boolean = false
+
     private var pendingFlushJob: Job? = null
     private val pointBuffer = mutableListOf<TrackPointEntity>()
     private val pathSegments = mutableListOf<MutableList<LatLng>>()
@@ -86,6 +92,12 @@ class TrackingService : LifecycleService() {
     }
 
     companion object {
+        // Gas station pause detection thresholds
+        private const val PAUSE_SPEED_THRESHOLD_MPS = 0.5     // ~1.1 mph
+        private const val RESUME_SPEED_THRESHOLD_MPS = 2.0    // ~4.5 mph
+        private const val PAUSE_DURATION_THRESHOLD_MS = 120_000L // 2 minutes
+        private const val PAUSE_RADIUS_M = 30f                 // 30 metre radius
+
         const val ACTION_START = "ACTION_START"
         const val ACTION_PAUSE = "ACTION_PAUSE"
         const val ACTION_RESUME = "ACTION_RESUME"
@@ -99,7 +111,17 @@ class TrackingService : LifecycleService() {
 
         private val _savedTrackId = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val savedTrackId = _savedTrackId.asSharedFlow()
+
+        private val _gasStationDetected = MutableSharedFlow<GasStationPrompt>(extraBufferCapacity = 1)
+        val gasStationDetected = _gasStationDetected.asSharedFlow()
     }
+
+    data class GasStationPrompt(
+        val stationName: String,
+        val lat: Double,
+        val lon: Double,
+        val trackId: String,
+    )
 
     override fun onCreate() {
         super.onCreate()
@@ -336,6 +358,9 @@ class TrackingService : LifecycleService() {
             speedCount++
         }
 
+        // Gas station pause detection
+        detectGasStationPause(location, speed)
+
         // Elevation
         if (location.hasAltitude()) {
             val elevation = location.altitude
@@ -388,6 +413,49 @@ class TrackingService : LifecycleService() {
             currentLatLng = latLng,
             pointCount = pointIndex,
         )
+    }
+
+    private fun detectGasStationPause(location: Location, speed: Double) {
+        val now = System.currentTimeMillis()
+
+        if (speed < PAUSE_SPEED_THRESHOLD_MPS) {
+            if (pauseStartTime == null) {
+                pauseStartTime = now
+                pauseLocation = location
+                pauseAlerted = false
+            } else if (!pauseAlerted) {
+                val pauseDurationMs = now - (pauseStartTime ?: now)
+                val distFromPauseStart = pauseLocation?.distanceTo(location) ?: 0f
+
+                if (pauseDurationMs >= PAUSE_DURATION_THRESHOLD_MS && distFromPauseStart <= PAUSE_RADIUS_M) {
+                    pauseAlerted = true
+                    lifecycleScope.launch {
+                        try {
+                            val station = gasStationDetector.findNearbyStation(
+                                location.latitude, location.longitude,
+                            )
+                            if (station != null) {
+                                _gasStationDetected.tryEmit(
+                                    GasStationPrompt(
+                                        stationName = station.name,
+                                        lat = station.lat,
+                                        lon = station.lon,
+                                        trackId = trackId,
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            // Silent — gas station detection is best-effort
+                        }
+                    }
+                }
+            }
+        } else if (speed > RESUME_SPEED_THRESHOLD_MPS) {
+            // Moving again — clear pause state
+            pauseStartTime = null
+            pauseLocation = null
+            pauseAlerted = false
+        }
     }
 
     private fun startTimer() {

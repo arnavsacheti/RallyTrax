@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Route
@@ -75,6 +76,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.auth.GoogleSignInCard
+import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
@@ -125,6 +127,7 @@ fun HomeScreen(
 
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var showReplaySheet by remember { mutableStateOf(false) }
+    var showFillUpSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
@@ -171,6 +174,10 @@ fun HomeScreen(
                     gpxImportLauncher.launch(
                         arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
                     )
+                },
+                onLogFillUp = {
+                    isFabMenuExpanded = false
+                    showFillUpSheet = true
                 },
             )
         },
@@ -261,6 +268,10 @@ fun HomeScreen(
             },
             onDismiss = { showReplaySheet = false },
         )
+    }
+
+    if (showFillUpSheet) {
+        FillUpSheet(onDismiss = { showFillUpSheet = false })
     }
 }
 
@@ -556,6 +567,7 @@ private fun RallyTraxFabMenu(
     onRecord: () -> Unit,
     onReplay: () -> Unit,
     onImportGpx: () -> Unit,
+    onLogFillUp: () -> Unit,
 ) {
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 45f else 0f,
@@ -583,6 +595,11 @@ private fun RallyTraxFabMenu(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                FabMenuItem(
+                    icon = Icons.Filled.LocalGasStation,
+                    label = "Log fill-up",
+                    onClick = onLogFillUp,
+                )
                 FabMenuItem(
                     icon = Icons.Filled.FileOpen,
                     label = "Import GPX",

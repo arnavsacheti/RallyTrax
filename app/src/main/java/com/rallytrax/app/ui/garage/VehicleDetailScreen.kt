@@ -17,6 +17,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.rallytrax.app.data.fuel.MpgCalculator
+import com.rallytrax.app.data.local.entity.FuelLogEntity
+import com.rallytrax.app.ui.fuel.FillUpSheet
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
@@ -40,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDistance
@@ -54,7 +64,10 @@ fun VehicleDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val fuelLogs by viewModel.fuelLogs.collectAsStateWithLifecycle()
     val vehicle = uiState.vehicle
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var showFillUpSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -91,7 +104,48 @@ fun VehicleDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    .padding(innerPadding),
+            ) {
+                // Tab row
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                        Text("Overview", modifier = Modifier.padding(12.dp))
+                    }
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                        Text("Fuel", modifier = Modifier.padding(12.dp))
+                    }
+                }
+
+                when (selectedTab) {
+                    0 -> OverviewTab(vehicle, uiState.totalDistanceM, tracks, onTrackClick)
+                    1 -> FuelTab(vehicle, fuelLogs, uiState.lifetimeMpg, uiState.costPerMile) {
+                        showFillUpSheet = true
+                    }
+                }
+            }
+
+            if (showFillUpSheet) {
+                FillUpSheet(
+                    onDismiss = {
+                        showFillUpSheet = false
+                        viewModel.refresh()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverviewTab(
+    vehicle: VehicleEntity,
+    totalDistanceM: Double,
+    tracks: List<TrackEntity>,
+    onTrackClick: (String) -> Unit,
+) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp),
             ) {
@@ -146,7 +200,7 @@ fun VehicleDetailScreen(
                     ),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        SpecsGrid(vehicle, uiState.totalDistanceM)
+                        SpecsGrid(vehicle, totalDistanceM)
                     }
                 }
 
@@ -235,7 +289,176 @@ fun VehicleDetailScreen(
 
                 Spacer(modifier = Modifier.height(80.dp))
             }
+}
+
+@Composable
+private fun FuelTab(
+    vehicle: VehicleEntity,
+    fuelLogs: List<FuelLogEntity>,
+    lifetimeMpg: Double?,
+    costPerMile: Double?,
+    onLogFillUp: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // MPG summary card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = lifetimeMpg?.let { "%.1f".format(it) } ?: "--",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Text(
+                        text = "Actual MPG",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    )
+                }
+                vehicle.epaCombinedMpg?.let { epa ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${epa.toInt()}",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "EPA Combined",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+                costPerMile?.let { cpm ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "$%.2f".format(cpm),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "Cost/Mile",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+            }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Fuel log list
+        Text(
+            text = "Fill-Up History (${fuelLogs.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (fuelLogs.isEmpty()) {
+            Text(
+                text = "No fill-ups logged yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+            ) {
+                fuelLogs.forEachIndexed { index, log ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = formatDate(log.date),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(
+                                    text = "%.1f L".format(log.volumeL),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                log.stationName?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        log.computedMpg?.let { mpg ->
+                            Text(
+                                text = "%.1f MPG".format(mpg),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (vehicle.epaCombinedMpg != null && mpg >= vehicle.epaCombinedMpg) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                            )
+                        }
+                        log.totalCost?.let { cost ->
+                            Text(
+                                text = "$%.2f".format(cost),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (index < fuelLogs.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Log fill-up button
+        androidx.compose.material3.FilledTonalButton(
+            onClick = onLogFillUp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Log Fill-Up")
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }
 

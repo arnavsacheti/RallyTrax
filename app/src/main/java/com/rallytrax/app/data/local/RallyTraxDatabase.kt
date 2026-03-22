@@ -8,7 +8,11 @@ import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.dao.GasStationDao
 import com.rallytrax.app.data.local.dao.VehicleDao
+import com.rallytrax.app.data.local.entity.FuelLogEntity
+import com.rallytrax.app.data.local.entity.GasStationEntity
 import com.rallytrax.app.data.local.entity.GridCellEntity
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
@@ -22,8 +26,10 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         PaceNoteEntity::class,
         GridCellEntity::class,
         VehicleEntity::class,
+        FuelLogEntity::class,
+        GasStationEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -32,6 +38,8 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun paceNoteDao(): PaceNoteDao
     abstract fun gridCellDao(): GridCellDao
     abstract fun vehicleDao(): VehicleDao
+    abstract fun fuelLogDao(): FuelLogDao
+    abstract fun gasStationDao(): GasStationDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -119,6 +127,50 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                         `createdAt` INTEGER NOT NULL DEFAULT 0,
                         `updatedAt` INTEGER NOT NULL DEFAULT 0,
                         PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create fuel_logs table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `fuel_logs` (
+                        `id` TEXT NOT NULL,
+                        `vehicleId` TEXT NOT NULL,
+                        `trackId` TEXT,
+                        `date` INTEGER NOT NULL DEFAULT 0,
+                        `odometerKm` REAL NOT NULL DEFAULT 0.0,
+                        `volumeL` REAL NOT NULL DEFAULT 0.0,
+                        `isFullTank` INTEGER NOT NULL DEFAULT 1,
+                        `pricePerUnit` REAL,
+                        `totalCost` REAL,
+                        `fuelGrade` TEXT,
+                        `stationName` TEXT,
+                        `stationLat` REAL,
+                        `stationLon` REAL,
+                        `computedMpg` REAL,
+                        `isMissed` INTEGER NOT NULL DEFAULT 0,
+                        `notes` TEXT,
+                        `createdAt` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+
+                // Create gas_stations cache table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `gas_stations` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `lat` REAL NOT NULL,
+                        `lon` REAL NOT NULL,
+                        `brand` TEXT,
+                        `fetchedAt` INTEGER NOT NULL DEFAULT 0
                     )
                     """.trimIndent()
                 )
