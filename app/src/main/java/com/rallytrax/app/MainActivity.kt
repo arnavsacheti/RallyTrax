@@ -40,6 +40,7 @@ import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.navigation.ExploreRoute
 import com.rallytrax.app.navigation.OnboardingRoute
 import com.rallytrax.app.navigation.RallyTraxNavHost
 import com.rallytrax.app.navigation.RecordingRoute
@@ -50,9 +51,12 @@ import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.theme.RallyTraxTheme
 import com.rallytrax.app.update.UpdateViewModel
+import com.rallytrax.app.util.GoogleMapsUrlParser
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -213,13 +217,30 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Handle incoming file intents (Open with, Share)
-                val importUris = handleIncomingIntent(intent)
-                LaunchedEffect(importUris) {
-                    for (uri in importUris) {
-                        importTrackFromIntent(uri, snackbarHostState) { trackId ->
-                            navController.navigate(TrackDetailRoute(trackId))
+                // Handle incoming intents (Open with, Share)
+                val intentResult = handleIncomingIntent(intent)
+                LaunchedEffect(intentResult) {
+                    when (intentResult) {
+                        is IntentResult.FileUris -> {
+                            for (uri in intentResult.uris) {
+                                importTrackFromIntent(uri, snackbarHostState) { trackId ->
+                                    navController.navigate(TrackDetailRoute(trackId))
+                                }
+                            }
                         }
+                        is IntentResult.SharedText -> {
+                            val coords = withContext(Dispatchers.IO) {
+                                GoogleMapsUrlParser.parse(intentResult.text)
+                            }
+                            if (coords != null) {
+                                navController.navigate(
+                                    ExploreRoute(focusLat = coords.latitude, focusLng = coords.longitude),
+                                )
+                            } else {
+                                snackbarHostState.showSnackbar("Could not extract location from shared link")
+                            }
+                        }
+                        IntentResult.None -> { /* nothing */ }
                     }
                 }
             }
@@ -231,27 +252,43 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
     }
 
+    private sealed interface IntentResult {
+        data object None : IntentResult
+        data class FileUris(val uris: List<Uri>) : IntentResult
+        data class SharedText(val text: String) : IntentResult
+    }
+
     @Suppress("DEPRECATION")
-    private fun handleIncomingIntent(intent: Intent?): List<Uri> {
-        if (intent == null) return emptyList()
+    private fun handleIncomingIntent(intent: Intent?): IntentResult {
+        if (intent == null) return IntentResult.None
         return when (intent.action) {
-            Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+            Intent.ACTION_VIEW -> {
+                val uris = listOfNotNull(intent.data)
+                if (uris.isNotEmpty()) IntentResult.FileUris(uris) else IntentResult.None
+            }
             Intent.ACTION_SEND -> {
+                // Check for file attachment first, then fall back to shared text (URLs)
                 val uri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
                 } else {
                     intent.getParcelableExtra(Intent.EXTRA_STREAM)
                 }
-                listOfNotNull(uri)
+                if (uri != null) {
+                    IntentResult.FileUris(listOf(uri))
+                } else {
+                    val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+                    if (text != null) IntentResult.SharedText(text) else IntentResult.None
+                }
             }
             Intent.ACTION_SEND_MULTIPLE -> {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val uris = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
                 } else {
                     intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
                 } ?: emptyList()
+                if (uris.isNotEmpty()) IntentResult.FileUris(uris) else IntentResult.None
             }
-            else -> emptyList()
+            else -> IntentResult.None
         }
     }
 

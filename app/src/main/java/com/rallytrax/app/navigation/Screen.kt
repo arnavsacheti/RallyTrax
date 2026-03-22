@@ -18,7 +18,10 @@ data class TopLevelRoute(
 )
 
 @Serializable data object HomeRoute
-@Serializable data object ExploreRoute
+@Serializable data class ExploreRoute(
+    val focusLat: Double? = null,
+    val focusLng: Double? = null,
+)
 @Serializable data object LibraryRoute
 @Serializable data object ReplayRoute
 @Serializable data object SettingsRoute
@@ -38,7 +41,7 @@ val topLevelRoutes = listOf(
         label = "Explore",
         selectedIcon = Icons.Filled.Explore,
         unselectedIcon = Icons.Outlined.Explore,
-        route = ExploreRoute,
+        route = ExploreRoute(),
     ),
     TopLevelRoute(
         label = "Library",

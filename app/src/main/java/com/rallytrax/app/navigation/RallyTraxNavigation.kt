@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.rallytrax.app.ui.explore.ExploreScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
@@ -51,8 +52,11 @@ fun RallyTraxNavHost(
                 },
             )
         }
-        composable<ExploreRoute> {
+        composable<ExploreRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<ExploreRoute>()
             ExploreScreen(
+                focusLat = route.focusLat,
+                focusLng = route.focusLng,
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
