@@ -275,22 +275,20 @@ class TrackingService : LifecycleService() {
             val avgSpeed = if (speedCount > 0) speedSum / speedCount else 0.0
             val durationMs = accumulatedTimeMs
 
-            trackDao.updateTrack(
-                TrackEntity(
-                    id = trackId,
-                    name = generateTrackName(System.currentTimeMillis()),
-                    recordedAt = System.currentTimeMillis() - durationMs,
-                    durationMs = durationMs,
-                    distanceMeters = totalDistance,
-                    maxSpeedMps = maxSpeed,
-                    avgSpeedMps = avgSpeed,
-                    elevationGainM = elevationGain,
-                    boundingBoxNorthLat = if (maxLat != -Double.MAX_VALUE) maxLat else 0.0,
-                    boundingBoxSouthLat = if (minLat != Double.MAX_VALUE) minLat else 0.0,
-                    boundingBoxEastLon = if (maxLon != -Double.MAX_VALUE) maxLon else 0.0,
-                    boundingBoxWestLon = if (minLon != Double.MAX_VALUE) minLon else 0.0,
-                )
+            // Read existing skeleton track to preserve vehicleId and other fields
+            val existingTrack = trackDao.getTrackById(trackId)
+            val finalTrack = (existingTrack ?: TrackEntity(id = trackId, name = generateTrackName(System.currentTimeMillis()), recordedAt = System.currentTimeMillis() - durationMs)).copy(
+                durationMs = durationMs,
+                distanceMeters = totalDistance,
+                maxSpeedMps = maxSpeed,
+                avgSpeedMps = avgSpeed,
+                elevationGainM = elevationGain,
+                boundingBoxNorthLat = if (maxLat != -Double.MAX_VALUE) maxLat else 0.0,
+                boundingBoxSouthLat = if (minLat != Double.MAX_VALUE) minLat else 0.0,
+                boundingBoxEastLon = if (maxLon != -Double.MAX_VALUE) maxLon else 0.0,
+                boundingBoxWestLon = if (minLon != Double.MAX_VALUE) minLon else 0.0,
             )
+            trackDao.updateTrack(finalTrack)
 
             // Compute acceleration and curvature for all points
             val savedId = trackId

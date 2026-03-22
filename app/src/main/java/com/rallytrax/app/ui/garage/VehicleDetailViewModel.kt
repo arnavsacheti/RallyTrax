@@ -141,9 +141,15 @@ class VehicleDetailViewModel @Inject constructor(
         )
     }
 
-    fun setActive() {
+    fun toggleActive() {
         viewModelScope.launch {
-            vehicleRepository.setActiveVehicle(vehicleId)
+            val current = vehicleRepository.getActiveVehicle()
+            if (current?.id == vehicleId) {
+                // Already active — deactivate it
+                vehicleRepository.updateVehicle(current.copy(isActive = false))
+            } else {
+                vehicleRepository.setActiveVehicle(vehicleId)
+            }
             loadVehicle()
         }
     }

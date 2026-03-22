@@ -87,7 +87,7 @@ fun VehicleDetailScreen(
                 },
                 actions = {
                     if (vehicle != null) {
-                        IconButton(onClick = { viewModel.setActive() }) {
+                        IconButton(onClick = { viewModel.toggleActive() }) {
                             Icon(
                                 imageVector = if (vehicle.isActive) Icons.Filled.Star else Icons.Outlined.StarOutline,
                                 contentDescription = if (vehicle.isActive) "Active vehicle" else "Set as active",
