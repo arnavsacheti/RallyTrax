@@ -37,4 +37,13 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks WHERE name LIKE '%' || :query || '%' ORDER BY recordedAt DESC")
     fun searchTracks(query: String): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM tracks WHERE vehicleId = :vehicleId ORDER BY recordedAt DESC")
+    fun getTracksByVehicleId(vehicleId: String): Flow<List<TrackEntity>>
+
+    @Query("SELECT COALESCE(SUM(distanceMeters), 0.0) FROM tracks WHERE vehicleId = :vehicleId")
+    suspend fun getTotalDistanceForVehicle(vehicleId: String): Double
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE vehicleId = :vehicleId")
+    suspend fun getTrackCountForVehicle(vehicleId: String): Int
 }

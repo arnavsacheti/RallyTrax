@@ -1,9 +1,11 @@
 package com.rallytrax.app.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
@@ -23,12 +25,14 @@ data class TopLevelRoute(
     val focusLng: Double? = null,
 )
 @Serializable data object LibraryRoute
+@Serializable data object GarageRoute
 @Serializable data object ReplayRoute
 @Serializable data object SettingsRoute
 @Serializable data object OnboardingRoute
 @Serializable data object RecordingRoute
 @Serializable data class TrackDetailRoute(val trackId: String)
 @Serializable data class ReplayHudRoute(val trackId: String)
+@Serializable data class VehicleDetailRoute(val vehicleId: String)
 
 val topLevelRoutes = listOf(
     TopLevelRoute(
@@ -48,5 +52,11 @@ val topLevelRoutes = listOf(
         selectedIcon = Icons.Filled.Folder,
         unselectedIcon = Icons.Outlined.Folder,
         route = LibraryRoute,
+    ),
+    TopLevelRoute(
+        label = "Garage",
+        selectedIcon = Icons.Filled.DirectionsCar,
+        unselectedIcon = Icons.Outlined.DirectionsCar,
+        route = GarageRoute,
     ),
 )

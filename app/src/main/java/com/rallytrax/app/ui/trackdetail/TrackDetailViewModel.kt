@@ -74,6 +74,7 @@ class TrackDetailViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -332,5 +333,20 @@ class TrackDetailViewModel @Inject constructor(
             kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
         val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
         return r * c
+    }
+
+    // ── Vehicle assignment ──────────────────────────────────────────────────
+
+    val allVehicles = vehicleDao.getAllVehicles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun assignVehicle(vehicleId: String) {
+        val track = _uiState.value.track ?: return
+        viewModelScope.launch {
+            val updated = track.copy(vehicleId = vehicleId)
+            trackDao.updateTrack(updated)
+            _uiState.value = _uiState.value.copy(track = updated)
+            _snackbarMessage.tryEmit("Vehicle assigned")
+        }
     }
 }

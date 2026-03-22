@@ -13,6 +13,8 @@ import com.rallytrax.app.data.preferences.ThemeMode
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.data.local.dao.VehicleDao
+import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,7 @@ class SettingsViewModel @Inject constructor(
     private val paceNoteDao: PaceNoteDao,
     private val syncManager: SyncManager,
     private val authRepository: AuthRepository,
+    private val vehicleDao: VehicleDao,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
@@ -147,6 +150,17 @@ class SettingsViewModel @Inject constructor(
             } catch (_: Exception) {
                 _uiState.value = _uiState.value.copy(isDeleting = false)
             }
+        }
+    }
+
+    // ── Archived vehicles ───────────────────────────────────────────────────
+
+    val archivedVehicles: StateFlow<List<VehicleEntity>> = vehicleDao.getArchivedVehicles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun restoreVehicle(vehicleId: String) {
+        viewModelScope.launch {
+            vehicleDao.unarchiveVehicle(vehicleId)
         }
     }
 }

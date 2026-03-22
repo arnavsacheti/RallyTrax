@@ -157,6 +157,14 @@ dependencies {
     // Image loading (avatars)
     implementation(libs.coil.compose)
 
+    // ML Kit Barcode Scanning (VIN scanner)
+    implementation(libs.mlkit.barcode.scanning)
+
+    // CameraX (VIN scanner preview)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+
     // Navigation
     implementation(libs.androidx.navigation.compose)
 

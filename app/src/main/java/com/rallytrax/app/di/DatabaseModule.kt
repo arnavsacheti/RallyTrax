@@ -7,6 +7,7 @@ import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.dao.VehicleDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,6 +31,7 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_1_2,
                 RallyTraxDatabase.MIGRATION_2_3,
                 RallyTraxDatabase.MIGRATION_3_4,
+                RallyTraxDatabase.MIGRATION_4_5,
             )
             .build()
     }
@@ -52,5 +54,10 @@ object DatabaseModule {
     @Provides
     fun provideGridCellDao(database: RallyTraxDatabase): GridCellDao {
         return database.gridCellDao()
+    }
+
+    @Provides
+    fun provideVehicleDao(database: RallyTraxDatabase): VehicleDao {
+        return database.vehicleDao()
     }
 }

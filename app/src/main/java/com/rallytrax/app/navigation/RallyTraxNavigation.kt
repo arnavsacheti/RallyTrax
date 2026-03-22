@@ -8,6 +8,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.ui.explore.ExploreScreen
+import com.rallytrax.app.ui.garage.GarageScreen
+import com.rallytrax.app.ui.garage.VehicleDetailScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
 import com.rallytrax.app.ui.onboarding.OnboardingScreen
@@ -97,6 +99,27 @@ fun RallyTraxNavHost(
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onProfileClick = onProfileClick,
+            )
+        }
+        composable<GarageRoute> {
+            GarageScreen(
+                onVehicleClick = { vehicleId ->
+                    navController.navigate(VehicleDetailRoute(vehicleId))
+                },
+                onNavigateToSettings = {
+                    navController.navigate(SettingsRoute)
+                },
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onProfileClick = onProfileClick,
+            )
+        }
+        composable<VehicleDetailRoute> {
+            VehicleDetailScreen(
+                onBack = { navController.popBackStack() },
+                onTrackClick = { trackId ->
+                    navController.navigate(TrackDetailRoute(trackId))
+                },
             )
         }
         composable<ReplayRoute> {

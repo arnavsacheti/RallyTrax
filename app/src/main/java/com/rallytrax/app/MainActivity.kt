@@ -50,6 +50,7 @@ import com.rallytrax.app.navigation.ReplayHudRoute
 import com.rallytrax.app.navigation.ReplayRoute
 import com.rallytrax.app.navigation.SettingsRoute
 import com.rallytrax.app.navigation.TrackDetailRoute
+import com.rallytrax.app.navigation.VehicleDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
 import com.rallytrax.app.ui.auth.AuthViewModel
 import com.rallytrax.app.ui.auth.FirstSignInSheet
@@ -114,6 +115,7 @@ class MainActivity : ComponentActivity() {
                 val showBottomBar = currentDestination?.let { dest ->
                     !dest.hasRoute(RecordingRoute::class) &&
                         !dest.hasRoute(TrackDetailRoute::class) &&
+                        !dest.hasRoute(VehicleDetailRoute::class) &&
                         !dest.hasRoute(ReplayHudRoute::class) &&
                         !dest.hasRoute(OnboardingRoute::class) &&
                         !dest.hasRoute(SettingsRoute::class) &&

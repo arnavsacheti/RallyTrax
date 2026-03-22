@@ -49,6 +49,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var paceNoteDao: PaceNoteDao
     @Inject lateinit var gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao
     @Inject lateinit var preferencesRepository: com.rallytrax.app.data.preferences.UserPreferencesRepository
+    @Inject lateinit var vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -154,11 +155,14 @@ class TrackingService : LifecycleService() {
         lifecycleScope.launch {
             val now = System.currentTimeMillis()
             val name = generateTrackName(now)
+            // Link to active vehicle if one exists
+            val activeVehicleId = vehicleDao.getActiveVehicle()?.id
             trackDao.insertTrack(
                 TrackEntity(
                     id = trackId,
                     name = name,
                     recordedAt = now,
+                    vehicleId = activeVehicleId,
                 )
             )
 

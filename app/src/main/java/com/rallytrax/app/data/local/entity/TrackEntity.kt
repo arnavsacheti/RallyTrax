@@ -23,4 +23,5 @@ data class TrackEntity(
     val tags: String = "", // comma-separated
     val gpxFilePath: String = "",
     val thumbnailPath: String? = null,
+    val vehicleId: String? = null,
 )
