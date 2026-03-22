@@ -54,3 +54,7 @@ val LayerCurvature = Color(0xFFE91E63)
 val LayerCallout = Color(0xFF202124)
 val HeatmapCold = Color(0xFF4285F4)
 val HeatmapHot = Color(0xFFEA4335)
+
+// Dashboard warning light colors
+val WarningAmber = Color(0xFFFFB300)
+val WarningRed = Color(0xFFEF5350)

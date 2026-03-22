@@ -16,18 +16,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -36,7 +40,10 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +59,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import com.rallytrax.app.ui.theme.WarningAmber
+import com.rallytrax.app.ui.theme.WarningRed
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.data.preferences.UserPreferencesData
@@ -223,61 +232,80 @@ private fun VehicleCard(
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        Box {
+            Column(
+                modifier = Modifier.padding(16.dp),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = vehicle.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${vehicle.year} ${vehicle.make} ${vehicle.model}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = vehicle.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "${vehicle.year} ${vehicle.make} ${vehicle.model}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (vehicle.isActive) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Active vehicle",
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
-                if (vehicle.isActive) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = "Active vehicle",
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Stats row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    StatItem(
+                        value = "${vehicleWithStats.trackCount}",
+                        label = "tracks",
                     )
+                    StatItem(
+                        value = formatDistance(vehicleWithStats.totalDistanceM, UnitSystem.METRIC),
+                        label = "distance",
+                    )
+                    vehicle.epaCombinedMpg?.let { mpg ->
+                        StatItem(
+                            value = "${mpg.toInt()}",
+                            label = "EPA MPG",
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Stats row
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                StatItem(
-                    value = "${vehicleWithStats.trackCount}",
-                    label = "tracks",
-                )
-                StatItem(
-                    value = formatDistance(vehicleWithStats.totalDistanceM, UnitSystem.METRIC),
-                    label = "distance",
-                )
-                vehicle.epaCombinedMpg?.let { mpg ->
-                    StatItem(
-                        value = "${mpg.toInt()}",
-                        label = "EPA MPG",
-                    )
+            // Warning lights in bottom-right corner
+            if (vehicleWithStats.warnings.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    vehicleWithStats.warnings.forEach { warning ->
+                        WarningLight(warning = warning)
+                    }
                 }
             }
         }
@@ -297,5 +325,35 @@ private fun StatItem(value: String, label: String) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WarningLight(warning: VehicleWarning) {
+    val (icon, color, description) = when (warning) {
+        VehicleWarning.MISSING_VIN -> Triple(Icons.Filled.ErrorOutline, WarningAmber, "No VIN")
+        VehicleWarning.NO_TRACKS -> Triple(Icons.Filled.ErrorOutline, WarningAmber, "No tracks")
+        VehicleWarning.INCOMPLETE_SPECS -> Triple(Icons.Filled.Warning, WarningAmber, "Incomplete specs")
+    }
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(description) } },
+        state = rememberTooltipState(),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(color.copy(alpha = 0.15f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                modifier = Modifier.size(14.dp),
+                tint = color,
+            )
+        }
     }
 }
