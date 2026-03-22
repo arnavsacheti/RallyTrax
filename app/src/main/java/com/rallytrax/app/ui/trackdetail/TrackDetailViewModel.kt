@@ -65,7 +65,7 @@ data class TrackDetailUiState(
 )
 
 enum class MapLayer {
-    ROUTE, SPEED, ACCEL, ELEVATION, CURVATURE, CALLOUTS
+    ROUTE, SPEED, ACCEL, ELEVATION, CURVATURE, CALLOUTS, SURFACE
 }
 
 @HiltViewModel

@@ -55,6 +55,19 @@ val LayerCallout = Color(0xFF202124)
 val HeatmapCold = Color(0xFF4285F4)
 val HeatmapHot = Color(0xFFEA4335)
 
+// Surface layer colors
+val SurfacePaved = Color(0xFF616161)     // Gray
+val SurfaceGravel = Color(0xFFA1887F)    // Brown
+val SurfaceDirt = Color(0xFF8D6E63)      // Dark brown
+val SurfaceCobblestone = Color(0xFF78909C) // Blue-gray
+val SurfaceUnknown = Color(0xFFBDBDBD)   // Light gray
+
+// Difficulty colors
+val DifficultyGreen = Color(0xFF34A853)
+val DifficultyAmber = Color(0xFFFBBC04)
+val DifficultyOrange = Color(0xFFE8710A)
+val DifficultyRed = Color(0xFFEA4335)
+
 // Dashboard warning light colors
 val WarningAmber = Color(0xFFFFB300)
 val WarningRed = Color(0xFFEF5350)

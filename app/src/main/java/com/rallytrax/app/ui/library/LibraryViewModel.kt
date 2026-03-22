@@ -44,6 +44,13 @@ data class LibraryUiState(
     val availableTags: Set<String> = emptySet(),
     val selectedTrackIds: Set<String> = emptySet(),
     val isMultiSelectMode: Boolean = false,
+    // Route classification filters
+    val selectedRouteTypes: Set<String> = emptySet(),
+    val selectedDifficulties: Set<String> = emptySet(),
+    val selectedSurfaces: Set<String> = emptySet(),
+    val availableRouteTypes: Set<String> = emptySet(),
+    val availableDifficulties: Set<String> = emptySet(),
+    val availableSurfaces: Set<String> = emptySet(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -64,6 +71,9 @@ class LibraryViewModel @Inject constructor(
     private val _selectedTags = MutableStateFlow<Set<String>>(emptySet())
     private val _selectedTrackIds = MutableStateFlow<Set<String>>(emptySet())
     private val _isMultiSelectMode = MutableStateFlow(false)
+    private val _selectedRouteTypes = MutableStateFlow<Set<String>>(emptySet())
+    private val _selectedDifficulties = MutableStateFlow<Set<String>>(emptySet())
+    private val _selectedSurfaces = MutableStateFlow<Set<String>>(emptySet())
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()
@@ -144,6 +154,24 @@ class LibraryViewModel @Inject constructor(
 
     fun clearTagFilter() {
         _selectedTags.value = emptySet()
+    }
+
+    fun toggleRouteTypeFilter(routeType: String) {
+        _selectedRouteTypes.value = _selectedRouteTypes.value.let { current ->
+            if (routeType in current) current - routeType else current + routeType
+        }
+    }
+
+    fun toggleDifficultyFilter(difficulty: String) {
+        _selectedDifficulties.value = _selectedDifficulties.value.let { current ->
+            if (difficulty in current) current - difficulty else current + difficulty
+        }
+    }
+
+    fun toggleSurfaceFilter(surface: String) {
+        _selectedSurfaces.value = _selectedSurfaces.value.let { current ->
+            if (surface in current) current - surface else current + surface
+        }
     }
 
     // --- Multi-select ---

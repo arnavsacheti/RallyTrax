@@ -34,7 +34,7 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         MaintenanceRecordEntity::class,
         MaintenanceScheduleEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -225,6 +225,20 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add route classification fields to tracks
+                db.execSQL("ALTER TABLE tracks ADD COLUMN routeType TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN activityTags TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN difficultyRating TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN curvinessScore REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN primarySurface TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN surfaceBreakdown TEXT DEFAULT NULL")
+                // Add surface type to track points
+                db.execSQL("ALTER TABLE track_points ADD COLUMN surfaceType TEXT DEFAULT NULL")
             }
         }
     }

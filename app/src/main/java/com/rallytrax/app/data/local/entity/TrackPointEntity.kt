@@ -29,4 +29,5 @@ data class TrackPointEntity(
     val accuracy: Float? = null,
     val accelMps2: Double? = null, // m/s² (positive=accel, negative=decel)
     val curvatureDegPerM: Double? = null, // bearing change per metre
+    val surfaceType: String? = null, // paved/gravel/dirt/cobblestone
 )

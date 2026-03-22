@@ -1,6 +1,7 @@
 package com.rallytrax.app.ui.recording
 
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -102,6 +103,20 @@ fun RecordingScreen(
         viewModel.navigateToTrackDetail.collect { trackId ->
             onTrackSaved(trackId)
         }
+    }
+
+    // Post-recording classification sheet
+    val classificationPending by viewModel.classificationPending.collectAsStateWithLifecycle()
+    classificationPending?.let { pending ->
+        PostRecordingSheet(
+            suggestedRouteType = pending.result.suggestedRouteType,
+            curvinessScore = pending.result.curvinessScore,
+            difficultyRating = pending.result.difficultyRating,
+            onAccept = { routeType, difficulty, tags ->
+                viewModel.acceptClassification(routeType, difficulty, tags)
+            },
+            onDismiss = { viewModel.skipClassification() },
+        )
     }
 
     BackHandler(enabled = status == RecordingStatus.RECORDING || status == RecordingStatus.PAUSED) {

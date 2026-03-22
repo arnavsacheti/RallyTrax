@@ -24,4 +24,11 @@ data class TrackEntity(
     val gpxFilePath: String = "",
     val thumbnailPath: String? = null,
     val vehicleId: String? = null,
+    // Route classification (Stage 1.2.5)
+    val routeType: String? = null,
+    val activityTags: String = "",
+    val difficultyRating: String? = null,
+    val curvinessScore: Double? = null,
+    val primarySurface: String? = null,
+    val surfaceBreakdown: String? = null,
 )
