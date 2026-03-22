@@ -1,4 +1,5 @@
 import java.util.Properties
+import groovy.json.JsonSlurper
 
 plugins {
     alias(libs.plugins.android.application)
@@ -61,9 +62,22 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
 
-        // Google Sign-In Web Client ID
+        // Google Sign-In Web Client ID: local.properties → env var → google-services.json
         val webClientId = localProperties.getProperty("WEB_CLIENT_ID")
             ?: System.getenv("WEB_CLIENT_ID")
+            ?: run {
+                val gsFile = file("google-services.json")
+                if (gsFile.exists()) {
+                    @Suppress("UNCHECKED_CAST")
+                    val json = JsonSlurper().parseText(gsFile.readText()) as Map<String, Any>
+                    val clients = json["client"] as? List<Map<String, Any>> ?: emptyList()
+                    clients.firstNotNullOfOrNull { client ->
+                        val oauthClients = client["oauth_client"] as? List<Map<String, Any>> ?: emptyList()
+                        oauthClients.firstOrNull { (it["client_type"] as? Number)?.toInt() == 3 }
+                            ?.get("client_id") as? String
+                    }
+                } else null
+            }
             ?: ""
         buildConfigField("String", "WEB_CLIENT_ID", "\"$webClientId\"")
     }
