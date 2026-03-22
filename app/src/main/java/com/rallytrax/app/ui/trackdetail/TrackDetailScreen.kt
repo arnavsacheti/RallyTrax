@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
@@ -116,6 +117,7 @@ fun TrackDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+    val allVehicles by viewModel.allVehicles.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -211,6 +213,17 @@ fun TrackDetailScreen(
                 // ── Summary Card (2-column grid) ──────────────────────
                 uiState.track?.let { track ->
                     SummaryCard(track, uiState, preferences.unitSystem)
+                }
+
+                // ── Vehicle Assignment ───────────────────────────────
+                if (allVehicles.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    VehicleAssignmentCard(
+                        currentVehicleId = uiState.track?.vehicleId,
+                        vehicles = allVehicles,
+                        onAssign = { viewModel.assignVehicle(it) },
+                        onClear = { viewModel.clearVehicle() },
+                    )
                 }
 
                 // ── Speed Profile Card ────────────────────────────────
@@ -485,6 +498,97 @@ private fun GradientLegend(title: String, startColor: Color, midColor: Color, en
             Row(modifier = Modifier.width(120.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(minLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(maxLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+// ── Vehicle Assignment Card ──────────────────────────────────────────────────
+
+@Composable
+private fun VehicleAssignmentCard(
+    currentVehicleId: String?,
+    vehicles: List<com.rallytrax.app.data.local.entity.VehicleEntity>,
+    onAssign: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    val currentVehicle = vehicles.find { it.id == currentVehicleId }
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Vehicle", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (currentVehicle != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "${currentVehicle.year} ${currentVehicle.make} ${currentVehicle.model}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        currentVehicle.trim?.let {
+                            Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    IconButton(onClick = onClear) {
+                        Icon(Icons.Filled.Close, "Remove vehicle", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            // Change / assign button
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(if (currentVehicle != null) "Change Vehicle" else "Assign Vehicle")
+            }
+
+            if (expanded) {
+                vehicles.forEach { vehicle ->
+                    val isSelected = vehicle.id == currentVehicleId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent,
+                                RoundedCornerShape(8.dp),
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .then(
+                                if (!isSelected) Modifier.background(Color.Transparent) else Modifier,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${vehicle.year} ${vehicle.make} ${vehicle.model}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        }
+                        if (!isSelected) {
+                            TextButton(onClick = { onAssign(vehicle.id); expanded = false }) {
+                                Text("Select")
+                            }
+                        } else {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
     }

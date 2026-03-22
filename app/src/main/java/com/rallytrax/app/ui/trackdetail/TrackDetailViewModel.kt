@@ -349,4 +349,14 @@ class TrackDetailViewModel @Inject constructor(
             _snackbarMessage.tryEmit("Vehicle assigned")
         }
     }
+
+    fun clearVehicle() {
+        val track = _uiState.value.track ?: return
+        viewModelScope.launch {
+            val updated = track.copy(vehicleId = null)
+            trackDao.updateTrack(updated)
+            _uiState.value = _uiState.value.copy(track = updated)
+            _snackbarMessage.tryEmit("Vehicle removed")
+        }
+    }
 }
