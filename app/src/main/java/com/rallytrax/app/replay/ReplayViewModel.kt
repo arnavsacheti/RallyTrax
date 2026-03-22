@@ -22,8 +22,11 @@ import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.recording.GpsKalmanFilter
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -81,6 +84,8 @@ class ReplayViewModel @Inject constructor(
     private var audioManager: ReplayAudioManager? = null
     private var fusedLocationClient: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
+    private val replayKalmanFilter = GpsKalmanFilter()
+    private var replayPredictionJob: Job? = null
 
     init {
         loadTrackData()
@@ -168,6 +173,9 @@ class ReplayViewModel @Inject constructor(
             Looper.getMainLooper(),
         )
 
+        replayKalmanFilter.reset()
+        startReplayPredictionJob()
+
         _uiState.value = _uiState.value.copy(
             isActive = true,
             isFinished = false,
@@ -180,10 +188,25 @@ class ReplayViewModel @Inject constructor(
         val engine = replayEngine ?: return
         val audio = audioManager ?: return
 
-        val speedMps = if (location.hasSpeed()) location.speed.toDouble() else 0.0
-        val driverPos = LatLng(location.latitude, location.longitude)
+        val now = System.currentTimeMillis()
+        val accuracy = if (location.hasAccuracy()) location.accuracy else 10f
+        val rawSpeed = if (location.hasSpeed()) location.speed.toDouble() else null
+        val rawBearing = if (location.hasBearing()) location.bearing.toDouble() else null
 
-        val result = engine.update(location.latitude, location.longitude, speedMps)
+        // Feed GPS into Kalman filter for smoothed replay position
+        val filtered = replayKalmanFilter.update(
+            lat = location.latitude,
+            lon = location.longitude,
+            accuracyM = accuracy,
+            speedMps = rawSpeed,
+            bearingDeg = rawBearing,
+            timestampMs = now,
+        )
+
+        val driverPos = LatLng(filtered.lat, filtered.lon)
+        val speedMps = filtered.speedMps
+
+        val result = engine.update(filtered.lat, filtered.lon, speedMps)
 
         // Speak the note if we have one
         result.noteToSpeak?.let { note ->
@@ -207,7 +230,27 @@ class ReplayViewModel @Inject constructor(
         )
     }
 
+    /**
+     * High-rate prediction for smooth driver marker movement during replay.
+     * Runs at 20 Hz between GPS fixes so the map marker doesn't jump.
+     */
+    private fun startReplayPredictionJob() {
+        replayPredictionJob?.cancel()
+        replayPredictionJob = viewModelScope.launch {
+            while (true) {
+                delay(50) // 20 Hz
+                if (!replayKalmanFilter.isInitialized) continue
+                val predicted = replayKalmanFilter.predict(System.currentTimeMillis())
+                _uiState.value = _uiState.value.copy(
+                    driverPosition = LatLng(predicted.lat, predicted.lon),
+                    currentSpeedMps = predicted.speedMps,
+                )
+            }
+        }
+    }
+
     fun stopReplay() {
+        replayPredictionJob?.cancel()
         stopLocationUpdates()
         audioManager?.stop()
         audioManager?.shutdown()
@@ -238,6 +281,7 @@ class ReplayViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        replayPredictionJob?.cancel()
         stopLocationUpdates()
         audioManager?.shutdown()
     }

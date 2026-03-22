@@ -74,6 +74,10 @@ class TrackingService : LifecycleService() {
     private var maxLon: Double = -Double.MAX_VALUE
     private var isNewSegment: Boolean = true
 
+    // Kalman filter for smooth, high-rate position tracking
+    private val kalmanFilter = GpsKalmanFilter()
+    private var predictionJob: Job? = null
+
     // Gas station pause detection
     private var pauseStartTime: Long? = null
     private var pauseLocation: Location? = null
@@ -153,6 +157,7 @@ class TrackingService : LifecycleService() {
         lastLocation = null
         previousElevation = null
         isNewSegment = true
+        kalmanFilter.reset()
         minLat = Double.MAX_VALUE
         maxLat = -Double.MAX_VALUE
         minLon = Double.MAX_VALUE
@@ -198,6 +203,7 @@ class TrackingService : LifecycleService() {
 
             startTimer()
             startFlushJob()
+            startPredictionJob()
             _recordingStatus.value = RecordingStatus.RECORDING
         }
     }
@@ -205,6 +211,7 @@ class TrackingService : LifecycleService() {
     private fun pauseRecording() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
         pauseTimer()
+        predictionJob?.cancel()
         isNewSegment = true
 
         _recordingStatus.value = RecordingStatus.PAUSED
@@ -217,6 +224,7 @@ class TrackingService : LifecycleService() {
         pathSegments.add(mutableListOf())
         lastLocation = null
         isNewSegment = true
+        kalmanFilter.reset()
 
         val locationRequest = buildLocationRequest()
 
@@ -227,6 +235,7 @@ class TrackingService : LifecycleService() {
         )
 
         startTimer()
+        startPredictionJob()
         _recordingStatus.value = RecordingStatus.RECORDING
         updateNotification(isPaused = false)
     }
@@ -257,6 +266,7 @@ class TrackingService : LifecycleService() {
     private fun stopRecording() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
         pauseTimer()
+        predictionJob?.cancel()
         flushJob?.cancel()
 
         _recordingStatus.value = RecordingStatus.STOPPED
@@ -331,15 +341,31 @@ class TrackingService : LifecycleService() {
     }
 
     private fun onNewLocation(location: Location) {
-        val latLng = LatLng(location.latitude, location.longitude)
+        val now = System.currentTimeMillis()
+        val accuracy = if (location.hasAccuracy()) location.accuracy else 10f
+        val rawSpeed = if (location.hasSpeed()) location.speed.toDouble() else null
+        val rawBearing = if (location.hasBearing()) location.bearing.toDouble() else null
 
-        // Update bounding box
+        // Feed raw GPS into Kalman filter
+        val filtered = kalmanFilter.update(
+            lat = location.latitude,
+            lon = location.longitude,
+            accuracyM = accuracy,
+            speedMps = rawSpeed,
+            bearingDeg = rawBearing,
+            timestampMs = now,
+        )
+
+        // Use filtered position for path display and UI
+        val filteredLatLng = LatLng(filtered.lat, filtered.lon)
+
+        // Update bounding box (use raw for accurate bounds)
         minLat = minOf(minLat, location.latitude)
         maxLat = maxOf(maxLat, location.latitude)
         minLon = minOf(minLon, location.longitude)
         maxLon = maxOf(maxLon, location.longitude)
 
-        // Distance (skip first point of new segment)
+        // Distance from filtered positions (skip first point of new segment)
         if (!isNewSegment && lastLocation != null) {
             val delta = lastLocation!!.distanceTo(location)
             // Filter out GPS jumps (> 100 m/s which is 360 km/h)
@@ -348,15 +374,15 @@ class TrackingService : LifecycleService() {
             }
         }
 
-        // Speed
-        val speed = if (location.hasSpeed()) location.speed.toDouble() else 0.0
+        // Speed — use Kalman-filtered speed for smoother stats
+        val speed = if (rawSpeed != null && rawSpeed > 0) rawSpeed else filtered.speedMps
         if (speed > 0) {
             maxSpeed = max(maxSpeed, speed)
             speedSum += speed
             speedCount++
         }
 
-        // Gas station pause detection
+        // Gas station pause detection (use raw for accuracy)
         detectGasStationPause(location, speed)
 
         // Elevation
@@ -371,21 +397,21 @@ class TrackingService : LifecycleService() {
             previousElevation = elevation
         }
 
-        // Add to current segment
-        pathSegments.lastOrNull()?.add(latLng)
+        // Add filtered position to the visible path segment
+        pathSegments.lastOrNull()?.add(filteredLatLng)
         isNewSegment = false
         lastLocation = location
 
-        // Buffer point for Room
+        // Store raw GPS in database (preserves ground-truth data for post-processing)
         val point = TrackPointEntity(
             trackId = trackId,
             index = pointIndex++,
             lat = location.latitude,
             lon = location.longitude,
             elevation = if (location.hasAltitude()) location.altitude else null,
-            timestamp = System.currentTimeMillis(),
-            speed = if (location.hasSpeed()) location.speed.toDouble() else null,
-            bearing = if (location.hasBearing()) location.bearing.toDouble() else null,
+            timestamp = now,
+            speed = rawSpeed,
+            bearing = rawBearing,
             accuracy = if (location.hasAccuracy()) location.accuracy else null,
         )
         pointBuffer.add(point)
@@ -395,8 +421,8 @@ class TrackingService : LifecycleService() {
             flushBuffer()
         }
 
-        // Update UI state
-        emitRecordingData(speed, latLng)
+        // Update UI state with filtered speed and position
+        emitRecordingData(filtered.speedMps, filteredLatLng)
     }
 
     private fun emitRecordingData(speed: Double, latLng: LatLng) {
@@ -473,6 +499,29 @@ class TrackingService : LifecycleService() {
         accumulatedTimeMs += System.currentTimeMillis() - timerStartMs
     }
 
+    /**
+     * High-rate prediction loop: runs at ~20 Hz (every 50ms) to produce smooth
+     * interpolated positions between GPS fixes. This gives the UI buttery-smooth
+     * map tracking without waiting for the next GPS callback.
+     */
+    private fun startPredictionJob() {
+        predictionJob?.cancel()
+        predictionJob = lifecycleScope.launch {
+            while (true) {
+                delay(50) // 20 Hz prediction rate
+                if (!kalmanFilter.isInitialized) continue
+                val predicted = kalmanFilter.predict(System.currentTimeMillis())
+                val predictedLatLng = LatLng(predicted.lat, predicted.lon)
+                // Update only the current position and speed for smooth UI;
+                // path segments are only appended on real GPS updates
+                _recordingData.value = _recordingData.value.copy(
+                    currentLatLng = predictedLatLng,
+                    currentSpeed = predicted.speedMps,
+                )
+            }
+        }
+    }
+
     private fun startFlushJob() {
         flushJob = lifecycleScope.launch {
             while (true) {
@@ -518,6 +567,7 @@ class TrackingService : LifecycleService() {
         super.onDestroy()
         timerJob?.cancel()
         flushJob?.cancel()
+        predictionJob?.cancel()
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 }
