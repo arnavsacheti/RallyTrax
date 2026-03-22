@@ -2,6 +2,7 @@ package com.rallytrax.app.ui.garage
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.repository.VehicleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +19,7 @@ enum class VehicleWarning {
     MISSING_VIN,
     NO_TRACKS,
     INCOMPLETE_SPECS,
+    MAINTENANCE_DUE,
 }
 
 data class VehicleWithStats(
@@ -35,6 +37,7 @@ data class GarageUiState(
 @HiltViewModel
 class GarageViewModel @Inject constructor(
     private val vehicleRepository: VehicleRepository,
+    private val maintenanceDao: MaintenanceDao,
 ) : ViewModel() {
 
     val uiState: StateFlow<GarageUiState> = vehicleRepository.getAllVehicles()
@@ -72,13 +75,15 @@ class GarageViewModel @Inject constructor(
         }
     }
 
-    private fun computeWarnings(vehicle: VehicleEntity, trackCount: Int): List<VehicleWarning> {
+    private suspend fun computeWarnings(vehicle: VehicleEntity, trackCount: Int): List<VehicleWarning> {
         return buildList {
             if (vehicle.vin.isNullOrBlank()) add(VehicleWarning.MISSING_VIN)
             if (trackCount == 0) add(VehicleWarning.NO_TRACKS)
             if (vehicle.horsePower == null && vehicle.engineDisplacementL == null && vehicle.curbWeightKg == null) {
                 add(VehicleWarning.INCOMPLETE_SPECS)
             }
+            val dueSchedules = maintenanceDao.getDueSchedulesForVehicle(vehicle.id)
+            if (dueSchedules.isNotEmpty()) add(VehicleWarning.MAINTENANCE_DUE)
         }
     }
 

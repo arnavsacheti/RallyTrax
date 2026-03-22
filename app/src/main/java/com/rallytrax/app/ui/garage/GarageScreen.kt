@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Star
@@ -335,6 +336,7 @@ private fun WarningLight(warning: VehicleWarning) {
         VehicleWarning.MISSING_VIN -> Triple(Icons.Filled.ErrorOutline, WarningAmber, "No VIN")
         VehicleWarning.NO_TRACKS -> Triple(Icons.Filled.ErrorOutline, WarningAmber, "No tracks")
         VehicleWarning.INCOMPLETE_SPECS -> Triple(Icons.Filled.Warning, WarningAmber, "Incomplete specs")
+        VehicleWarning.MAINTENANCE_DUE -> Triple(Icons.Filled.Build, WarningRed, "Maintenance due")
     }
 
     TooltipBox(
