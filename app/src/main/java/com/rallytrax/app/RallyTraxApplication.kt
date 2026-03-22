@@ -52,6 +52,16 @@ class RallyTraxApplication : Application(), Configuration.Provider {
             syncManager.schedulePeriodicSync()
         }
 
+        // Schedule daily maintenance reminder check
+        val maintenanceReminderRequest = PeriodicWorkRequestBuilder<com.rallytrax.app.data.maintenance.MaintenanceReminderWorker>(
+            1, TimeUnit.DAYS,
+        ).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            com.rallytrax.app.data.maintenance.MaintenanceReminderWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            maintenanceReminderRequest,
+        )
+
         // Schedule gas station cache refresh (monthly, requires network)
         val gasStationRequest = PeriodicWorkRequestBuilder<com.rallytrax.app.data.fuel.GasStationCacheWorker>(
             30, TimeUnit.DAYS,

@@ -10,6 +10,7 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.GasStationDao
+import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.entity.FuelLogEntity
 import com.rallytrax.app.data.local.entity.GasStationEntity
@@ -17,6 +18,8 @@ import com.rallytrax.app.data.local.entity.GridCellEntity
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
+import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 
 @Database(
@@ -28,8 +31,10 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         VehicleEntity::class,
         FuelLogEntity::class,
         GasStationEntity::class,
+        MaintenanceRecordEntity::class,
+        MaintenanceScheduleEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -40,6 +45,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun vehicleDao(): VehicleDao
     abstract fun fuelLogDao(): FuelLogDao
     abstract fun gasStationDao(): GasStationDao
+    abstract fun maintenanceDao(): MaintenanceDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -171,6 +177,51 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                         `lon` REAL NOT NULL,
                         `brand` TEXT,
                         `fetchedAt` INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `maintenance_records` (
+                        `id` TEXT NOT NULL,
+                        `vehicleId` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `serviceType` TEXT NOT NULL,
+                        `date` INTEGER NOT NULL DEFAULT 0,
+                        `odometerKm` REAL,
+                        `costParts` REAL,
+                        `costLabor` REAL,
+                        `costTotal` REAL NOT NULL DEFAULT 0.0,
+                        `provider` TEXT,
+                        `isDiy` INTEGER NOT NULL DEFAULT 0,
+                        `notes` TEXT,
+                        `receiptPhotoUri` TEXT,
+                        `createdAt` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `maintenance_schedules` (
+                        `id` TEXT NOT NULL,
+                        `vehicleId` TEXT NOT NULL,
+                        `serviceType` TEXT NOT NULL,
+                        `intervalKm` REAL,
+                        `intervalMonths` INTEGER,
+                        `lastServiceDate` INTEGER,
+                        `lastServiceOdometerKm` REAL,
+                        `nextDueDate` INTEGER,
+                        `nextDueOdometerKm` REAL,
+                        `status` TEXT NOT NULL DEFAULT 'UPCOMING',
+                        `notifyDaysBefore` INTEGER NOT NULL DEFAULT 30,
+                        `createdAt` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
                     )
                     """.trimIndent()
                 )

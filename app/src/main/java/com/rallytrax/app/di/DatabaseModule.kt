@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.GasStationDao
+import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
@@ -35,6 +36,7 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_3_4,
                 RallyTraxDatabase.MIGRATION_4_5,
                 RallyTraxDatabase.MIGRATION_5_6,
+                RallyTraxDatabase.MIGRATION_6_7,
             )
             .build()
     }
@@ -72,5 +74,10 @@ object DatabaseModule {
     @Provides
     fun provideGasStationDao(database: RallyTraxDatabase): GasStationDao {
         return database.gasStationDao()
+    }
+
+    @Provides
+    fun provideMaintenanceDao(database: RallyTraxDatabase): MaintenanceDao {
+        return database.maintenanceDao()
     }
 }

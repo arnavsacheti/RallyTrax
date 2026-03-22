@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
+import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UnitSystem
@@ -65,9 +67,13 @@ fun VehicleDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val fuelLogs by viewModel.fuelLogs.collectAsStateWithLifecycle()
+    val maintenanceRecords by viewModel.maintenanceRecords.collectAsStateWithLifecycle()
+    val maintenanceSchedules by viewModel.maintenanceSchedules.collectAsStateWithLifecycle()
     val vehicle = uiState.vehicle
     var selectedTab by remember { mutableIntStateOf(0) }
     var showFillUpSheet by remember { mutableStateOf(false) }
+    var showAddServiceSheet by remember { mutableStateOf(false) }
+    var showAddScheduleSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -114,6 +120,9 @@ fun VehicleDetailScreen(
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
                         Text("Fuel", modifier = Modifier.padding(12.dp))
                     }
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
+                        Text("Maintenance", modifier = Modifier.padding(12.dp))
+                    }
                 }
 
                 when (selectedTab) {
@@ -121,6 +130,13 @@ fun VehicleDetailScreen(
                     1 -> FuelTab(vehicle, fuelLogs, uiState.lifetimeMpg, uiState.costPerMile) {
                         showFillUpSheet = true
                     }
+                    2 -> MaintenanceTab(
+                        records = maintenanceRecords,
+                        schedules = maintenanceSchedules,
+                        onAddService = { showAddServiceSheet = true },
+                        onAddSchedule = { showAddScheduleSheet = true },
+                        onCompleteSchedule = { viewModel.completeSchedule(it) },
+                    )
                 }
             }
 
@@ -130,6 +146,20 @@ fun VehicleDetailScreen(
                         showFillUpSheet = false
                         viewModel.refresh()
                     },
+                )
+            }
+            if (showAddServiceSheet && vehicle != null) {
+                com.rallytrax.app.ui.maintenance.AddServiceSheet(
+                    vehicleId = vehicle.id,
+                    onSave = { viewModel.addMaintenanceRecord(it) },
+                    onDismiss = { showAddServiceSheet = false },
+                )
+            }
+            if (showAddScheduleSheet && vehicle != null) {
+                com.rallytrax.app.ui.maintenance.AddScheduleSheet(
+                    vehicleId = vehicle.id,
+                    onSave = { viewModel.addMaintenanceSchedule(it) },
+                    onDismiss = { showAddScheduleSheet = false },
                 )
             }
         }
@@ -456,6 +486,144 @@ private fun FuelTab(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Log Fill-Up")
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun MaintenanceTab(
+    records: List<MaintenanceRecordEntity>,
+    schedules: List<MaintenanceScheduleEntity>,
+    onAddService: () -> Unit,
+    onAddSchedule: () -> Unit,
+    onCompleteSchedule: (MaintenanceScheduleEntity) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Upcoming maintenance card
+        val activeSchedules = schedules.filter { it.status != MaintenanceScheduleEntity.STATUS_COMPLETED }
+        if (activeSchedules.isNotEmpty()) {
+            Text("Upcoming", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                activeSchedules.forEach { schedule ->
+                    val statusColor = when (schedule.status) {
+                        MaintenanceScheduleEntity.STATUS_OVERDUE -> MaterialTheme.colorScheme.error
+                        MaintenanceScheduleEntity.STATUS_DUE_SOON -> androidx.compose.ui.graphics.Color(0xFFFBBC04) // amber
+                        else -> MaterialTheme.colorScheme.primary // green/upcoming
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onCompleteSchedule(schedule) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .padding(end = 0.dp)
+                                .then(
+                                    Modifier
+                                        .width(8.dp)
+                                        .height(8.dp)
+                                ),
+                        ) {
+                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                                drawCircle(color = statusColor)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(schedule.serviceType, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            val dueText = when {
+                                schedule.nextDueDate != null -> {
+                                    val daysUntil = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(
+                                        schedule.nextDueDate - System.currentTimeMillis()
+                                    )
+                                    when {
+                                        daysUntil < 0 -> "${-daysUntil} days overdue"
+                                        daysUntil == 0L -> "Due today"
+                                        else -> "Due in $daysUntil days"
+                                    }
+                                }
+                                schedule.nextDueOdometerKm != null -> "Due at ${schedule.nextDueOdometerKm.toInt()} km"
+                                else -> ""
+                            }
+                            Text(dueText, style = MaterialTheme.typography.bodySmall, color = statusColor)
+                        }
+                        Text("Done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Action buttons
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.FilledTonalButton(
+                onClick = onAddService,
+                modifier = Modifier.weight(1f),
+            ) { Text("Add Service") }
+            androidx.compose.material3.OutlinedButton(
+                onClick = onAddSchedule,
+                modifier = Modifier.weight(1f),
+            ) { Text("Add Schedule") }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Service history
+        Text(
+            text = "Service History (${records.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (records.isEmpty()) {
+            Text("No service records yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                records.forEachIndexed { index, record ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(record.serviceType, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(record.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(formatDate(record.date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (record.costTotal > 0) {
+                            Text("$${"%,.0f".format(record.costTotal)}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        if (record.isDiy) {
+                            Text("DIY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                    if (index < records.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(80.dp))

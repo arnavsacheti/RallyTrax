@@ -39,6 +39,7 @@ data class HomeDashboardState(
     val monthlyRecordingCount: Int = 0,
     val dailyDistances: List<DailyDistance> = emptyList(),
     val totalTrackCount: Int = 0,
+    val maintenanceDueCount: Int = 0,
 )
 
 @HiltViewModel
@@ -46,6 +47,7 @@ class HomeViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val maintenanceDao: com.rallytrax.app.data.local.dao.MaintenanceDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -90,6 +92,8 @@ class HomeViewModel @Inject constructor(
                 )
             }
 
+            val dueCount = try { maintenanceDao.getDueSchedules().size } catch (_: Exception) { 0 }
+
             HomeDashboardState(
                 recentTracks = tracks.take(5),
                 totalDistanceMeters = totalDistance,
@@ -99,6 +103,7 @@ class HomeViewModel @Inject constructor(
                 monthlyRecordingCount = monthlyCount,
                 dailyDistances = dailyDistances,
                 totalTrackCount = tracks.size,
+                maintenanceDueCount = dueCount,
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeDashboardState())

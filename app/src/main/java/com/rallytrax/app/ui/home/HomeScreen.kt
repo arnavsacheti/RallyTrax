@@ -207,6 +207,42 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Maintenance due warning
+                if (dashboard.maintenanceDueCount > 0) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DirectionsCar,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Maintenance Due",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                Text(
+                                    text = "${dashboard.maintenanceDueCount} service${if (dashboard.maintenanceDueCount != 1) "s" else ""} due or overdue",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 // 2. Motivational card (< 3 tracks) OR Recent Drives + Weekly Chart
                 if (dashboard.totalTrackCount < 3) {
                     MotivationalCard(onRecord = {

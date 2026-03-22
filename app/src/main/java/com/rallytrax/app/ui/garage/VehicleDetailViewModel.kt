@@ -5,10 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.fuel.MpgCalculator
 import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.entity.FuelLogEntity
+import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
+import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.repository.VehicleRepository
+import com.rallytrax.app.data.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +36,8 @@ class VehicleDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val vehicleRepository: VehicleRepository,
     private val fuelLogDao: FuelLogDao,
+    private val maintenanceDao: MaintenanceDao,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val vehicleId: String = savedStateHandle["vehicleId"]
@@ -45,6 +51,14 @@ class VehicleDetailViewModel @Inject constructor(
 
     val fuelLogs: StateFlow<List<FuelLogEntity>> = fuelLogDao.getLogsForVehicle(vehicleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val maintenanceRecords: StateFlow<List<MaintenanceRecordEntity>> =
+        maintenanceDao.getRecordsForVehicle(vehicleId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val maintenanceSchedules: StateFlow<List<MaintenanceScheduleEntity>> =
+        maintenanceDao.getSchedulesForVehicle(vehicleId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         loadVehicle()
@@ -79,6 +93,57 @@ class VehicleDetailViewModel @Inject constructor(
         viewModelScope.launch {
             vehicleRepository.updateVehicle(updated)
             loadVehicle()
+        }
+    }
+
+    fun addMaintenanceRecord(record: MaintenanceRecordEntity) {
+        viewModelScope.launch {
+            maintenanceDao.insertRecord(record)
+            syncManager.scheduleDebouncedSync()
+        }
+    }
+
+    fun addMaintenanceSchedule(schedule: MaintenanceScheduleEntity) {
+        viewModelScope.launch {
+            maintenanceDao.insertSchedule(schedule)
+            syncManager.scheduleDebouncedSync()
+        }
+    }
+
+    fun completeSchedule(schedule: MaintenanceScheduleEntity) {
+        viewModelScope.launch {
+            // Advance the next-due date/odometer
+            val now = System.currentTimeMillis()
+            val nextDueDate = if (schedule.intervalMonths != null) {
+                now + schedule.intervalMonths.toLong() * 30L * 24 * 60 * 60 * 1000
+            } else null
+            val nextDueOdometer = if (schedule.intervalKm != null) {
+                val vehicle = vehicleRepository.getVehicleById(vehicleId)
+                val currentOdometer = vehicle?.odometerKm ?: 0.0
+                currentOdometer + schedule.intervalKm
+            } else null
+
+            maintenanceDao.updateSchedule(
+                schedule.copy(
+                    lastServiceDate = now,
+                    lastServiceOdometerKm = vehicleRepository.getVehicleById(vehicleId)?.odometerKm,
+                    nextDueDate = nextDueDate,
+                    nextDueOdometerKm = nextDueOdometer,
+                    status = MaintenanceScheduleEntity.STATUS_UPCOMING,
+                )
+            )
+
+            // Also log it as a maintenance record
+            maintenanceDao.insertRecord(
+                MaintenanceRecordEntity(
+                    vehicleId = vehicleId,
+                    category = "Scheduled",
+                    serviceType = schedule.serviceType,
+                    odometerKm = vehicleRepository.getVehicleById(vehicleId)?.odometerKm,
+                )
+            )
+
+            syncManager.scheduleDebouncedSync()
         }
     }
 
