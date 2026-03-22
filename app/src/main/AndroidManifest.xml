@@ -119,6 +119,13 @@
                 <data android:mimeType="application/octet-stream" />
             </intent-filter>
 
+            <!-- Share text (Google Maps URLs, location links) -->
+            <intent-filter android:label="Open in RallyTrax">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
             <!-- Share multiple files -->
             <intent-filter android:label="Import to RallyTrax">
                 <action android:name="android.intent.action.SEND_MULTIPLE" />

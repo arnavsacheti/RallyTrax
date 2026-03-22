@@ -63,6 +63,8 @@ import org.osmdroid.util.GeoPoint
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
+    focusLat: Double? = null,
+    focusLng: Double? = null,
     onNavigateToSettings: () -> Unit = {},
     onViewDetail: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
@@ -92,9 +94,9 @@ fun ExploreScreen(
             Box(Modifier.fillMaxSize().padding(innerPadding)) {
                 // Full-screen map
                 if (MapProvider.useGoogleMaps(preferences.mapProvider)) {
-                    GoogleExploreMap(uiState, viewModel)
+                    GoogleExploreMap(uiState, viewModel, focusLat, focusLng)
                 } else {
-                    OsmExploreMap(uiState)
+                    OsmExploreMap(uiState, focusLat, focusLng)
                 }
 
                 if (uiState.trackPolylines.isEmpty()) {
@@ -160,15 +162,26 @@ fun ExploreScreen(
 // ── Google Maps ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun GoogleExploreMap(uiState: ExploreUiState, viewModel: ExploreViewModel) {
+private fun GoogleExploreMap(
+    uiState: ExploreUiState,
+    viewModel: ExploreViewModel,
+    focusLat: Double? = null,
+    focusLng: Double? = null,
+) {
     val cameraPositionState = rememberCameraPositionState()
 
-    // Fit bounds to all tracks
-    val allPoints = uiState.trackPolylines.flatMap { it.points }
-    if (allPoints.isNotEmpty()) {
-        val boundsBuilder = LatLngBounds.builder()
-        allPoints.forEach { boundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
-        cameraPositionState.position = CameraPosition.fromLatLngZoom(boundsBuilder.build().center, 12f)
+    // Center on focus coordinates if provided, otherwise fit bounds to all tracks
+    if (focusLat != null && focusLng != null) {
+        cameraPositionState.position = CameraPosition.fromLatLngZoom(
+            com.google.android.gms.maps.model.LatLng(focusLat, focusLng), 14f,
+        )
+    } else {
+        val allPoints = uiState.trackPolylines.flatMap { it.points }
+        if (allPoints.isNotEmpty()) {
+            val boundsBuilder = LatLngBounds.builder()
+            allPoints.forEach { boundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(boundsBuilder.build().center, 12f)
+        }
     }
 
     // Compute global speed range for normalization
@@ -249,10 +262,18 @@ private fun GoogleExploreMap(uiState: ExploreUiState, viewModel: ExploreViewMode
 // ── OSM Map ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun OsmExploreMap(uiState: ExploreUiState) {
+private fun OsmExploreMap(
+    uiState: ExploreUiState,
+    focusLat: Double? = null,
+    focusLng: Double? = null,
+) {
     val allPoints = uiState.trackPolylines.flatMap { it.points }
 
-    val fitBounds = if (allPoints.isNotEmpty()) {
+    val fitBounds = if (focusLat != null && focusLng != null) {
+        // Small bounding box around the focus point
+        val delta = 0.01
+        BoundingBox(focusLat + delta, focusLng + delta, focusLat - delta, focusLng - delta)
+    } else if (allPoints.isNotEmpty()) {
         val lats = allPoints.map { it.latitude }
         val lngs = allPoints.map { it.longitude }
         BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
