@@ -279,6 +279,10 @@ class AddVehicleViewModel @Inject constructor(
             !state.isSaving
     }
 
+    fun reset() {
+        _uiState.value = AddVehicleUiState()
+    }
+
     companion object {
         private const val TAG = "AddVehicleViewModel"
     }

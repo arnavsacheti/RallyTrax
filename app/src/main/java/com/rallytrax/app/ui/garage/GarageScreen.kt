@@ -187,7 +187,7 @@ fun GarageScreen(
                         VehicleCard(
                             vehicleWithStats = vehicleWithStats,
                             onClick = { onVehicleClick(vehicle.id) },
-                            onLongClick = { viewModel.setActiveVehicle(vehicle.id) },
+                            onLongClick = { viewModel.toggleActiveVehicle(vehicle.id) },
                             modifier = Modifier.animateItem(),
                         )
                     }

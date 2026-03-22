@@ -64,9 +64,15 @@ class GarageViewModel @Inject constructor(
         }
     }
 
-    fun setActiveVehicle(vehicleId: String) {
+    fun toggleActiveVehicle(vehicleId: String) {
         viewModelScope.launch {
-            vehicleRepository.setActiveVehicle(vehicleId)
+            val current = vehicleRepository.getActiveVehicle()
+            if (current?.id == vehicleId) {
+                // Already active — deactivate it
+                vehicleRepository.updateVehicle(current.copy(isActive = false))
+            } else {
+                vehicleRepository.setActiveVehicle(vehicleId)
+            }
         }
     }
 }

@@ -62,6 +62,11 @@ fun AddVehicleSheet(
     var selectedMode by remember { mutableIntStateOf(0) } // 0 = Year/Make/Model, 1 = VIN
     var showVinScanner by remember { mutableStateOf(false) }
 
+    // Reset state when sheet opens so multiple vehicles can be added in a row
+    LaunchedEffect(Unit) {
+        viewModel.reset()
+    }
+
     // Auto-dismiss after save
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) onVehicleSaved()
@@ -119,8 +124,8 @@ fun AddVehicleSheet(
                 VinEntrySection(viewModel, uiState, onScanClick = { showVinScanner = true })
             }
 
-            // Vehicle name field (visible once year/make/model are known)
-            if (uiState.name.isNotBlank()) {
+            // Vehicle name field (visible once model is selected)
+            if (uiState.selectedModel != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = uiState.name,
