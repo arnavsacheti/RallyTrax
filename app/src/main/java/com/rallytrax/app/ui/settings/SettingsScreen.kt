@@ -78,6 +78,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit = {},
+    authState: com.rallytrax.app.data.auth.AuthState = com.rallytrax.app.data.auth.AuthState.SignedOut,
     isSignedIn: Boolean = false,
     userPhotoUrl: String? = null,
     onSignIn: () -> Unit = {},
@@ -140,7 +141,7 @@ fun SettingsScreen(
 
             // Sign-in / Sync section
             if (!isSignedIn) {
-                GoogleSignInCard(onClick = onSignIn)
+                GoogleSignInCard(authState = authState, onClick = onSignIn)
             } else {
                 // Cloud Sync section
                 SettingsSectionCard(

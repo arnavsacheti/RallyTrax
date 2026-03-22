@@ -169,6 +169,7 @@ class MainActivity : ComponentActivity() {
                         } else {
                             Modifier
                         },
+                        authState = authState,
                         isSignedIn = isSignedIn,
                         userPhotoUrl = userPhotoUrl,
                         onSignIn = { authViewModel.signIn(this@MainActivity) },

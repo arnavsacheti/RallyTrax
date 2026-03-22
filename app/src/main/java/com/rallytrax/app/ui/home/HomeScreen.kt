@@ -87,6 +87,7 @@ fun HomeScreen(
     onTrackClick: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    authState: com.rallytrax.app.data.auth.AuthState = com.rallytrax.app.data.auth.AuthState.SignedOut,
     isSignedIn: Boolean = false,
     userPhotoUrl: String? = null,
     onSignIn: () -> Unit = {},
@@ -186,7 +187,7 @@ fun HomeScreen(
 
                 // Sign in card (shown when not signed in)
                 if (!isSignedIn) {
-                    GoogleSignInCard(onClick = onSignIn)
+                    GoogleSignInCard(authState = authState, onClick = onSignIn)
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 

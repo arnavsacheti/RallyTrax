@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.ui.explore.ExploreScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
@@ -21,6 +22,7 @@ fun RallyTraxNavHost(
     navController: NavHostController,
     startDestination: Any = HomeRoute,
     modifier: Modifier = Modifier,
+    authState: AuthState = AuthState.SignedOut,
     isSignedIn: Boolean = false,
     userPhotoUrl: String? = null,
     onSignIn: () -> Unit = {},
@@ -55,6 +57,7 @@ fun RallyTraxNavHost(
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
+                authState = authState,
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onSignIn = onSignIn,
@@ -113,6 +116,7 @@ fun RallyTraxNavHost(
         composable<SettingsRoute> {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                authState = authState,
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onSignIn = onSignIn,

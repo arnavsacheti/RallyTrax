@@ -4,6 +4,8 @@ import android.app.Activity
 import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
@@ -17,16 +19,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.rallytrax.app.BuildConfig
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,43 +30,50 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
     private val _authState = MutableStateFlow<AuthState>(
         firebaseAuth.currentUser?.toAuthUser()?.let { AuthState.SignedIn(it) }
             ?: AuthState.SignedOut
     )
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    init {
-        scope.launch {
-            firebaseAuthFlow().collectLatest { user ->
-                _authState.value = user?.toAuthUser()?.let { AuthState.SignedIn(it) }
-                    ?: AuthState.SignedOut
-            }
+    private val authStateListener = FirebaseAuth.AuthStateListener { auth ->
+        val user = auth.currentUser
+        val newState = user?.toAuthUser()?.let { AuthState.SignedIn(it) }
+            ?: AuthState.SignedOut
+        // Don't overwrite Loading or Error states from signInWithGoogle
+        val current = _authState.value
+        if (current !is AuthState.Loading && current !is AuthState.Error) {
+            _authState.value = newState
+        } else if (user != null) {
+            // If we were Loading and Firebase now has a user, sign-in succeeded
+            _authState.value = newState
         }
     }
 
-    private fun firebaseAuthFlow() = callbackFlow {
-        val listener = FirebaseAuth.AuthStateListener { auth ->
-            trySend(auth.currentUser)
-        }
-        firebaseAuth.addAuthStateListener(listener)
-        awaitClose { firebaseAuth.removeAuthStateListener(listener) }
+    init {
+        firebaseAuth.addAuthStateListener(authStateListener)
     }
 
     suspend fun signInWithGoogle(activity: Activity): Result<AuthUser> {
         _authState.value = AuthState.Loading
         return try {
             val idToken = getGoogleIdToken(activity)
+            Log.d(TAG, "Got Google ID token, signing in with Firebase...")
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val authResult = firebaseAuth.signInWithCredential(credential).await()
             val user = authResult.user?.toAuthUser()
-                ?: return Result.failure(Exception("Sign-in succeeded but no user returned"))
+                ?: return Result.failure<AuthUser>(Exception("Sign-in succeeded but no user returned")).also {
+                    _authState.value = AuthState.Error("No user returned from Firebase")
+                }
+            Log.d(TAG, "Firebase sign-in succeeded for ${user.email}")
             _authState.value = AuthState.SignedIn(user)
             Result.success(user)
+        } catch (e: GetCredentialCancellationException) {
+            Log.d(TAG, "Sign-in cancelled by user")
+            _authState.value = AuthState.SignedOut
+            Result.failure(e)
         } catch (e: Exception) {
-            Log.e(TAG, "Sign-in failed", e)
+            Log.e(TAG, "Sign-in failed: ${e.javaClass.simpleName}: ${e.message}", e)
             _authState.value = AuthState.Error(e.message ?: "Sign-in failed")
             Result.failure(e)
         }
@@ -88,7 +90,11 @@ class AuthRepository @Inject constructor(
             )
             return GoogleIdTokenCredential.createFrom(result.credential.data).idToken
         } catch (_: NoCredentialException) {
-            // No returning user — fall through to sign-up flow
+            Log.d(TAG, "No returning credential, trying all accounts...")
+        } catch (e: GetCredentialCancellationException) {
+            throw e // Rethrow cancellation so signInWithGoogle handles it
+        } catch (e: GetCredentialException) {
+            Log.w(TAG, "First credential attempt failed: ${e.message}, trying all accounts...")
         }
 
         // Second try: show all accounts (new sign-up)
@@ -144,6 +150,12 @@ class AuthRepository @Inject constructor(
 
     fun getCurrentUser(): AuthUser? {
         return firebaseAuth.currentUser?.toAuthUser()
+    }
+
+    fun clearError() {
+        if (_authState.value is AuthState.Error) {
+            _authState.value = AuthState.SignedOut
+        }
     }
 
     private fun FirebaseUser.toAuthUser() = AuthUser(
