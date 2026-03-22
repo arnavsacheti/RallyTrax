@@ -98,6 +98,17 @@ android {
         buildConfig = true
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE.md",
+                "META-INF/NOTICE.md",
+            )
+        }
+    }
+
     room {
         schemaDirectory("$projectDir/schemas")
     }
@@ -130,7 +141,7 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
     implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-auth")
 
     // Google Sign-In (Credential Manager)
     implementation(libs.credentials)
