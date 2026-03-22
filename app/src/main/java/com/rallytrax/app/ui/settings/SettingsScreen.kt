@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.BuildConfig
+import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.MapProviderPreference
 import com.rallytrax.app.data.preferences.ThemeMode
@@ -77,6 +78,10 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit = {},
+    isSignedIn: Boolean = false,
+    userPhotoUrl: String? = null,
+    onSignIn: () -> Unit = {},
+    onSignOut: () -> Unit = {},
     updateViewModel: UpdateViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -131,7 +136,67 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Sign-in / Sync section
+            if (!isSignedIn) {
+                GoogleSignInCard(onClick = onSignIn)
+            } else {
+                // Cloud Sync section
+                SettingsSectionCard(
+                    title = "Cloud Sync",
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                ) {
+                    // Backup tracks toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Backup Tracks",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "Back up GPX files to Google Drive",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = preferences.backupTracksEnabled,
+                            onCheckedChange = {
+                                settingsViewModel.setBackupTracksEnabled(it)
+                                // Non-functional until Stage 1.2.5
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Toggle track backup"
+                            },
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = onSignOut,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Sign out", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Theme selector
             SettingsSectionCard(title = "Appearance", icon = { Icon(Icons.Filled.Palette, contentDescription = null, modifier = Modifier.size(20.dp)) }) {

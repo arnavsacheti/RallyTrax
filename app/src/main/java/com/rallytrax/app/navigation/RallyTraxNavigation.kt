@@ -21,6 +21,11 @@ fun RallyTraxNavHost(
     navController: NavHostController,
     startDestination: Any = HomeRoute,
     modifier: Modifier = Modifier,
+    isSignedIn: Boolean = false,
+    userPhotoUrl: String? = null,
+    onSignIn: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onSignOut: () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -50,6 +55,10 @@ fun RallyTraxNavHost(
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onSignIn = onSignIn,
+                onProfileClick = onProfileClick,
             )
         }
         composable<ExploreRoute> { backStackEntry ->
@@ -66,6 +75,9 @@ fun RallyTraxNavHost(
                 onReplayTrack = { trackId ->
                     navController.navigate(ReplayHudRoute(trackId))
                 },
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onProfileClick = onProfileClick,
             )
         }
         composable<LibraryRoute> {
@@ -79,6 +91,9 @@ fun RallyTraxNavHost(
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onProfileClick = onProfileClick,
             )
         }
         composable<ReplayRoute> {
@@ -98,6 +113,10 @@ fun RallyTraxNavHost(
         composable<SettingsRoute> {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onSignIn = onSignIn,
+                onSignOut = onSignOut,
             )
         }
         composable<RecordingRoute> {

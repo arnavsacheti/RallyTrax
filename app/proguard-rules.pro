@@ -69,6 +69,28 @@
 # UpdateChecker JSON parsing
 -keep class com.rallytrax.app.update.** { *; }
 
+# Firebase Auth
+-keep class com.google.firebase.auth.** { *; }
+
+# Credential Manager
+-keep class androidx.credentials.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+
+# Google Drive API / HTTP Client
+-keep class com.google.api.services.drive.** { *; }
+-keep class com.google.api.client.** { *; }
+-keep class com.google.http.client.** { *; }
+-dontwarn com.google.api.client.**
+-dontwarn com.google.http.client.**
+-dontwarn org.apache.http.**
+
+# Coil
+-keep class coil.** { *; }
+-dontwarn coil.**
+
+# Keep sync data classes for serialization
+-keep @kotlinx.serialization.Serializable class com.rallytrax.app.data.sync.** { *; }
+
 # Remove logging in release
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);

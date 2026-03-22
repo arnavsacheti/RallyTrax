@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
@@ -83,6 +84,9 @@ fun LibraryScreen(
     onTrackClick: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    isSignedIn: Boolean = false,
+    userPhotoUrl: String? = null,
+    onProfileClick: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -184,6 +188,28 @@ fun LibraryScreen(
                         if (uiState.availableTags.isNotEmpty()) {
                             IconButton(onClick = { showTagFilter = !showTagFilter }) {
                                 Icon(Icons.Filled.FilterList, contentDescription = "Filter by tag")
+                            }
+                        }
+
+                        // Profile avatar
+                        if (isSignedIn) {
+                            IconButton(onClick = onProfileClick) {
+                                if (userPhotoUrl != null) {
+                                    coil.compose.AsyncImage(
+                                        model = userPhotoUrl,
+                                        contentDescription = "Profile",
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(androidx.compose.foundation.shape.CircleShape),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.AccountCircle,
+                                        contentDescription = "Profile",
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                }
                             }
                         }
 

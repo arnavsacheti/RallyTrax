@@ -68,6 +68,9 @@ fun ExploreScreen(
     onNavigateToSettings: () -> Unit = {},
     onViewDetail: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
+    isSignedIn: Boolean = false,
+    userPhotoUrl: String? = null,
+    onProfileClick: () -> Unit = {},
     viewModel: ExploreViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -83,6 +86,9 @@ fun ExploreScreen(
             RallyTraxTopAppBar(
                 title = "Explore",
                 onSettingsClick = onNavigateToSettings,
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onProfileClick = onProfileClick,
             )
         },
     ) { innerPadding ->

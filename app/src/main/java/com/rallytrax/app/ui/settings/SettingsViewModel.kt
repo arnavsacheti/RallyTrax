@@ -2,6 +2,8 @@ package com.rallytrax.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.auth.AuthRepository
+import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -11,6 +13,7 @@ import com.rallytrax.app.data.preferences.ThemeMode
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.data.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +36,8 @@ class SettingsViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val syncManager: SyncManager,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
@@ -41,38 +46,74 @@ class SettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    private val isSignedIn: Boolean
+        get() = authRepository.authState.value is AuthState.SignedIn
+
     init {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(trackCount = trackDao.getTrackCount())
         }
     }
 
+    private fun onPreferenceChanged() {
+        if (isSignedIn) {
+            syncManager.scheduleDebouncedSync()
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch { preferencesRepository.setThemeMode(mode) }
+        viewModelScope.launch {
+            preferencesRepository.setThemeMode(mode)
+            onPreferenceChanged()
+        }
     }
 
     fun setUnitSystem(system: UnitSystem) {
-        viewModelScope.launch { preferencesRepository.setUnitSystem(system) }
+        viewModelScope.launch {
+            preferencesRepository.setUnitSystem(system)
+            onPreferenceChanged()
+        }
     }
 
     fun setGpsAccuracy(accuracy: GpsAccuracy) {
-        viewModelScope.launch { preferencesRepository.setGpsAccuracy(accuracy) }
+        viewModelScope.launch {
+            preferencesRepository.setGpsAccuracy(accuracy)
+            onPreferenceChanged()
+        }
     }
 
     fun setMapProvider(provider: MapProviderPreference) {
-        viewModelScope.launch { preferencesRepository.setMapProvider(provider) }
+        viewModelScope.launch {
+            preferencesRepository.setMapProvider(provider)
+            onPreferenceChanged()
+        }
     }
 
     fun setTtsRate(rate: Float) {
-        viewModelScope.launch { preferencesRepository.setTtsRate(rate) }
+        viewModelScope.launch {
+            preferencesRepository.setTtsRate(rate)
+            onPreferenceChanged()
+        }
     }
 
     fun setTtsPitch(pitch: Float) {
-        viewModelScope.launch { preferencesRepository.setTtsPitch(pitch) }
+        viewModelScope.launch {
+            preferencesRepository.setTtsPitch(pitch)
+            onPreferenceChanged()
+        }
     }
 
     fun setTtsEnabled(enabled: Boolean) {
-        viewModelScope.launch { preferencesRepository.setTtsEnabled(enabled) }
+        viewModelScope.launch {
+            preferencesRepository.setTtsEnabled(enabled)
+            onPreferenceChanged()
+        }
+    }
+
+    fun setBackupTracksEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBackupTracksEnabled(enabled)
+        }
     }
 
     fun setKeepScreenOn(enabled: Boolean) {

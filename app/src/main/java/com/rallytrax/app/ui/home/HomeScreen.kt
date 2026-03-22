@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
@@ -86,6 +87,10 @@ fun HomeScreen(
     onTrackClick: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    isSignedIn: Boolean = false,
+    userPhotoUrl: String? = null,
+    onSignIn: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -131,6 +136,9 @@ fun HomeScreen(
             RallyTraxTopAppBar(
                 title = "RallyTrax",
                 onSettingsClick = onNavigateToSettings,
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onProfileClick = onProfileClick,
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -175,6 +183,12 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp),
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Sign in card (shown when not signed in)
+                if (!isSignedIn) {
+                    GoogleSignInCard(onClick = onSignIn)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 // 1. Focus Metrics Row (horizontal scroll)
                 FocusMetricsRow(

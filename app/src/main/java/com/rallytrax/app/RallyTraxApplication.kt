@@ -6,7 +6,9 @@ import androidx.work.Configuration
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.google.firebase.auth.FirebaseAuth
 import com.rallytrax.app.data.local.BackfillWorker
+import com.rallytrax.app.data.sync.SyncManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -15,6 +17,9 @@ class RallyTraxApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var syncManager: SyncManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -36,5 +41,10 @@ class RallyTraxApplication : Application(), Configuration.Provider {
             ExistingWorkPolicy.KEEP,
             backfillRequest,
         )
+
+        // Schedule periodic Drive sync if user is signed in
+        if (FirebaseAuth.getInstance().currentUser != null) {
+            syncManager.schedulePeriodicSync()
+        }
     }
 }

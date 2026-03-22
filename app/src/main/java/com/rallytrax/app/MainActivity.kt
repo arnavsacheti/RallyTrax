@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,8 +36,8 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.data.gpx.GpxParseException
-import com.rallytrax.app.data.gpx.GpxParser
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -49,6 +51,9 @@ import com.rallytrax.app.navigation.ReplayRoute
 import com.rallytrax.app.navigation.SettingsRoute
 import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.navigation.topLevelRoutes
+import com.rallytrax.app.ui.auth.AuthViewModel
+import com.rallytrax.app.ui.auth.FirstSignInSheet
+import com.rallytrax.app.ui.auth.ProfileSheet
 import com.rallytrax.app.ui.theme.RallyTraxTheme
 import com.rallytrax.app.update.UpdateViewModel
 import com.rallytrax.app.util.GoogleMapsUrlParser
@@ -68,6 +73,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
 
     private val updateViewModel: UpdateViewModel by viewModels()
+    private val authViewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +91,16 @@ class MainActivity : ComponentActivity() {
             val prefs by preferencesRepository.preferences.collectAsStateWithLifecycle(
                 initialValue = initialPrefs,
             )
+
+            val authState by authViewModel.authState.collectAsStateWithLifecycle()
+            val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
+            val showFirstSignInSheet by authViewModel.showFirstSignInSheet.collectAsStateWithLifecycle()
+
+            val isSignedIn = authState is AuthState.SignedIn
+            val userPhotoUrl = (authState as? AuthState.SignedIn)?.user?.photoUrl
+            val authUser = (authState as? AuthState.SignedIn)?.user
+
+            var showProfileSheet by remember { mutableStateOf(false) }
 
             RallyTraxTheme(themeMode = prefs.themeMode) {
                 val navController = rememberNavController()
@@ -153,6 +169,11 @@ class MainActivity : ComponentActivity() {
                         } else {
                             Modifier
                         },
+                        isSignedIn = isSignedIn,
+                        userPhotoUrl = userPhotoUrl,
+                        onSignIn = { authViewModel.signIn(this@MainActivity) },
+                        onProfileClick = { showProfileSheet = true },
+                        onSignOut = { authViewModel.signOut() },
                     )
                 }
 
@@ -242,6 +263,26 @@ class MainActivity : ComponentActivity() {
                         }
                         IntentResult.None -> { /* nothing */ }
                     }
+                }
+
+                // First sign-in bottom sheet
+                if (showFirstSignInSheet) {
+                    FirstSignInSheet(
+                        onDismiss = { authViewModel.dismissFirstSignInSheet() },
+                    )
+                }
+
+                // Profile sheet
+                if (showProfileSheet && authUser != null) {
+                    ProfileSheet(
+                        user = authUser,
+                        syncStatus = syncStatus,
+                        onSignOut = {
+                            authViewModel.signOut()
+                            showProfileSheet = false
+                        },
+                        onDismiss = { showProfileSheet = false },
+                    )
                 }
             }
         }
