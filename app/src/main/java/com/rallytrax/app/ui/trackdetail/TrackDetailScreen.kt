@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,15 +52,19 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -131,6 +136,7 @@ fun TrackDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showAddTagDialog by remember { mutableStateOf(false) }
     var isMapFullscreen by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
@@ -157,9 +163,6 @@ fun TrackDetailScreen(
                     IconButton(onClick = { viewModel.exportGpx(context) }) {
                         Icon(Icons.Filled.Share, "Export & Share")
                     }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
-                    }
                 },
             )
         },
@@ -172,8 +175,7 @@ fun TrackDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState()),
+                    .padding(innerPadding),
             ) {
                 // ── Map with Layer Toolbar ────────────────────────────
                 val points = uiState.polylinePoints
@@ -239,61 +241,42 @@ fun TrackDetailScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ── Summary Card (2-column grid) ──────────────────────
-                uiState.track?.let { track ->
-                    SummaryCard(track, uiState, preferences.unitSystem)
+                // ── View / Edit Tabs ──────────────────────────────────
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                        Text("View", modifier = Modifier.padding(12.dp))
+                    }
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                        Text("Edit", modifier = Modifier.padding(12.dp))
+                    }
                 }
 
-                // ── Vehicle Assignment ───────────────────────────────
-                if (allVehicles.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    VehicleAssignmentCard(
-                        currentVehicleId = uiState.track?.vehicleId,
-                        vehicles = allVehicles,
-                        onAssign = { viewModel.assignVehicle(it) },
-                        onClear = { viewModel.clearVehicle() },
+                // Compute vehicle name for display
+                val vehicleName = remember(uiState.track?.vehicleId, allVehicles) {
+                    uiState.track?.vehicleId?.let { vid -> allVehicles.find { it.id == vid } }
+                        ?.let { "${it.year} ${it.make} ${it.model}" }
+                }
+
+                when (selectedTab) {
+                    0 -> uiState.track?.let { track ->
+                        ViewTab(
+                            track = track,
+                            uiState = uiState,
+                            unitSystem = preferences.unitSystem,
+                            activeLayers = uiState.activeLayers,
+                            vehicleName = vehicleName,
+                        )
+                    }
+                    1 -> EditTab(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        allVehicles = allVehicles,
+                        unitSystem = preferences.unitSystem,
+                        context = context,
+                        onShowAddTagDialog = { showAddTagDialog = true },
+                        onShowDeleteDialog = { showDeleteDialog = true },
                     )
                 }
-
-                // ── Speed Profile Card ────────────────────────────────
-                if (uiState.speedProfile.size >= 2) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    SpeedProfileCard(uiState.speedProfile, preferences.unitSystem)
-                }
-
-                // ── Elevation Profile Card ────────────────────────────
-                if (uiState.elevationProfile.size >= 2) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    ElevationProfileCard(uiState.elevationProfile, uiState.paceNotes, preferences.unitSystem)
-                }
-
-                // ── Pace Notes Card ───────────────────────────────────
-                Spacer(modifier = Modifier.height(12.dp))
-                PaceNotesCard(uiState, viewModel, preferences.unitSystem)
-
-                // ── Curvature Distribution Card ───────────────────────
-                val cd = uiState.curvatureDistribution
-                if (cd.straight + cd.gentle + cd.moderate + cd.tight + cd.hairpin > 0f) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    CurvatureDistributionCard(cd)
-                }
-
-                // ── Tags Card ─────────────────────────────────────────
-                Spacer(modifier = Modifier.height(12.dp))
-                TagsCard(uiState, viewModel, onShowAddTagDialog = { showAddTagDialog = true })
-
-                // ── Export Button ─────────────────────────────────────
-                Spacer(modifier = Modifier.height(12.dp))
-                FilledTonalButton(
-                    onClick = { viewModel.exportGpx(context) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                ) {
-                    Icon(Icons.Filled.Share, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Export GPX & Share")
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -930,10 +913,10 @@ private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, m
     }
 }
 
-// ── Pace Notes Card ─────────────────────────────────────────────────────────
+// ── Pace Notes Edit Card ─────────────────────────────────────────────────────
 
 @Composable
-private fun PaceNotesCard(uiState: TrackDetailUiState, viewModel: TrackDetailViewModel, unitSystem: UnitSystem) {
+private fun PaceNotesEditCard(uiState: TrackDetailUiState, viewModel: TrackDetailViewModel, unitSystem: UnitSystem) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -1104,6 +1087,200 @@ private fun TagsCard(uiState: TrackDetailUiState, viewModel: TrackDetailViewMode
                     }
                 }
             }
+        }
+    }
+}
+
+// ── View Tab ────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ViewTab(
+    track: com.rallytrax.app.data.local.entity.TrackEntity,
+    uiState: TrackDetailUiState,
+    unitSystem: UnitSystem,
+    activeLayers: Set<MapLayer>,
+    vehicleName: String?,
+) {
+    val visible = visibleCards(activeLayers)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Always show summary
+        SummaryCard(track, uiState, unitSystem)
+
+        Spacer(modifier = Modifier.height(12.dp))
+        TrackInfoChips(track, vehicleName)
+
+        if (CardType.SPEED_PROFILE in visible && uiState.speedProfile.size >= 2) {
+            Spacer(modifier = Modifier.height(12.dp))
+            SpeedProfileCard(uiState.speedProfile, unitSystem)
+        }
+
+        if (CardType.ELEVATION_PROFILE in visible && uiState.elevationProfile.size >= 2) {
+            Spacer(modifier = Modifier.height(12.dp))
+            ElevationProfileCard(uiState.elevationProfile, uiState.paceNotes, unitSystem)
+        }
+
+        val cd = uiState.curvatureDistribution
+        if (CardType.CURVATURE in visible && cd.straight + cd.gentle + cd.moderate + cd.tight + cd.hairpin > 0f) {
+            Spacer(modifier = Modifier.height(12.dp))
+            CurvatureDistributionCard(cd)
+        }
+
+        if (CardType.PACE_NOTES in visible && uiState.paceNotes.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            PaceNotesList(uiState.paceNotes, unitSystem)
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+// ── Edit Tab ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun EditTab(
+    uiState: TrackDetailUiState,
+    viewModel: TrackDetailViewModel,
+    allVehicles: List<com.rallytrax.app.data.local.entity.VehicleEntity>,
+    unitSystem: UnitSystem,
+    context: android.content.Context,
+    onShowAddTagDialog: () -> Unit,
+    onShowDeleteDialog: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Vehicle Assignment
+        if (allVehicles.isNotEmpty()) {
+            VehicleAssignmentCard(
+                currentVehicleId = uiState.track?.vehicleId,
+                vehicles = allVehicles,
+                onAssign = { viewModel.assignVehicle(it) },
+                onClear = { viewModel.clearVehicle() },
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Tags
+        TagsCard(uiState, viewModel, onShowAddTagDialog = onShowAddTagDialog)
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Pace Notes (edit)
+        PaceNotesEditCard(uiState, viewModel, unitSystem)
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Export GPX
+        FilledTonalButton(
+            onClick = { viewModel.exportGpx(context) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        ) {
+            Icon(Icons.Filled.Share, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Export GPX & Share")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Delete Track
+        OutlinedButton(
+            onClick = onShowDeleteDialog,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+        ) {
+            Icon(Icons.Filled.Delete, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Delete Track")
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+// ── Track Info Chips ────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TrackInfoChips(track: com.rallytrax.app.data.local.entity.TrackEntity, vehicleName: String?) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        vehicleName?.let {
+            AssistChip(onClick = {}, label = { Text(it) })
+        }
+        track.routeType?.let {
+            AssistChip(onClick = {}, label = { Text(it) })
+        }
+        track.difficultyRating?.let {
+            AssistChip(onClick = {}, label = { Text(it) })
+        }
+        track.primarySurface?.let {
+            AssistChip(onClick = {}, label = { Text(it) })
+        }
+    }
+}
+
+// ── Pace Notes List (read-only) ─────────────────────────────────────────────
+
+@Composable
+private fun PaceNotesList(paceNotes: List<PaceNoteEntity>, unitSystem: UnitSystem) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Pace Notes (${paceNotes.size})",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            paceNotes.take(20).forEach { note ->
+                PaceNoteItem(note, unitSystem)
+            }
+            if (paceNotes.size > 20) {
+                Text(
+                    "+ ${paceNotes.size - 20} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 54.dp, top = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+// ── Card Type & Layer Filtering ─────────────────────────────────────────────
+
+private enum class CardType { SUMMARY, SPEED_PROFILE, ELEVATION_PROFILE, CURVATURE, PACE_NOTES }
+
+private fun visibleCards(activeLayers: Set<MapLayer>): Set<CardType> {
+    val extra = activeLayers - MapLayer.ROUTE
+    if (extra.isEmpty()) return CardType.entries.toSet()
+    return buildSet {
+        for (layer in extra) when (layer) {
+            MapLayer.SPEED -> { add(CardType.SPEED_PROFILE); add(CardType.SUMMARY) }
+            MapLayer.ACCEL -> { add(CardType.SPEED_PROFILE) }
+            MapLayer.ELEVATION -> { add(CardType.ELEVATION_PROFILE); add(CardType.SUMMARY) }
+            MapLayer.CURVATURE -> { add(CardType.CURVATURE) }
+            MapLayer.CALLOUTS -> { add(CardType.PACE_NOTES) }
+            MapLayer.SURFACE -> { add(CardType.SUMMARY) }
+            else -> {}
         }
     }
 }
