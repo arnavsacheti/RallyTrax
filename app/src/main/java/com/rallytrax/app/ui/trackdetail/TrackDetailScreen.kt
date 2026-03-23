@@ -67,8 +67,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -416,20 +419,64 @@ private fun GoogleTrackMap(
             }
         }
 
-        // Accel/Decel layer: colored dots
-        if (MapLayer.ACCEL in activeLayers) {
-            for (pt in trackPoints) {
-                val accel = pt.accelMps2 ?: continue
+        // Accel/Decel layer: colored polyline segments
+        if (MapLayer.ACCEL in activeLayers && trackPoints.size >= 2) {
+            for (i in 0 until trackPoints.size - 1) {
+                val accel = trackPoints[i].accelMps2 ?: continue
                 if (abs(accel) < 0.5) continue // noise floor
-                val color = if (accel > 0) LayerAccel else LayerDecel
+                val baseColor = if (accel > 0) LayerAccel else LayerDecel
                 val alpha = (abs(accel) / 3.0).coerceIn(0.2, 1.0).toFloat()
-                Marker(
-                    state = rememberMarkerState(position = com.google.android.gms.maps.model.LatLng(pt.lat, pt.lon)),
-                    alpha = alpha,
-                    icon = BitmapDescriptorFactory.defaultMarker(
-                        if (accel > 0) BitmapDescriptorFactory.HUE_AZURE else BitmapDescriptorFactory.HUE_ORANGE,
+                Polyline(
+                    points = listOf(
+                        com.google.android.gms.maps.model.LatLng(trackPoints[i].lat, trackPoints[i].lon),
+                        com.google.android.gms.maps.model.LatLng(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
                     ),
+                    color = baseColor.copy(alpha = alpha), width = 12f,
                 )
+            }
+        }
+
+        // Elevation layer: colored segments from green (low) to brown/red (high)
+        if (MapLayer.ELEVATION in activeLayers && trackPoints.size >= 2) {
+            val elevations = trackPoints.mapNotNull { it.elevation }
+            if (elevations.isNotEmpty()) {
+                val minEle = elevations.min()
+                val maxEle = elevations.max()
+                val eleRange = (maxEle - minEle).coerceAtLeast(1.0)
+                for (i in 0 until trackPoints.size - 1) {
+                    val ele = trackPoints[i].elevation ?: continue
+                    val fraction = ((ele - minEle) / eleRange).coerceIn(0.0, 1.0).toFloat()
+                    // Green (low) -> Brown/Red (high)
+                    val color = lerpColor(LayerSpeedLow, Color(0xFF8B4513), fraction)
+                    Polyline(
+                        points = listOf(
+                            com.google.android.gms.maps.model.LatLng(trackPoints[i].lat, trackPoints[i].lon),
+                            com.google.android.gms.maps.model.LatLng(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                        ),
+                        color = color, width = 12f,
+                    )
+                }
+            }
+        }
+
+        // Curvature layer: colored segments from green (straight) to red (tight curves)
+        if (MapLayer.CURVATURE in activeLayers && trackPoints.size >= 2) {
+            val curvatures = trackPoints.mapNotNull { it.curvatureDegPerM?.let { c -> abs(c) } }
+            if (curvatures.isNotEmpty()) {
+                val maxCurv = curvatures.max().coerceAtLeast(1.0)
+                for (i in 0 until trackPoints.size - 1) {
+                    val curv = trackPoints[i].curvatureDegPerM?.let { abs(it) } ?: continue
+                    val fraction = (curv / maxCurv).coerceIn(0.0, 1.0).toFloat()
+                    // Green (straight) -> Red (tight)
+                    val color = lerpColor(LayerSpeedLow, LayerCurvature, fraction)
+                    Polyline(
+                        points = listOf(
+                            com.google.android.gms.maps.model.LatLng(trackPoints[i].lat, trackPoints[i].lon),
+                            com.google.android.gms.maps.model.LatLng(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                        ),
+                        color = color, width = 12f,
+                    )
+                }
             }
         }
 
@@ -746,7 +793,7 @@ private fun SpeedProfileCard(speedProfile: List<SpeedPoint>, unitSystem: UnitSys
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Speed Profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
-            SpeedChart(data = speedProfile, modifier = Modifier.fillMaxWidth().height(120.dp))
+            SpeedChart(data = speedProfile, unitSystem = unitSystem, modifier = Modifier.fillMaxWidth().height(120.dp))
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatDistance(speedProfile.last().distanceFromStart, unitSystem), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -756,20 +803,47 @@ private fun SpeedProfileCard(speedProfile: List<SpeedPoint>, unitSystem: UnitSys
 }
 
 @Composable
-private fun SpeedChart(data: List<SpeedPoint>, modifier: Modifier = Modifier) {
+private fun SpeedChart(data: List<SpeedPoint>, unitSystem: UnitSystem, modifier: Modifier = Modifier) {
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelTextSize = with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toPx() }
+    val leftPadding = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
     Canvas(modifier = modifier) {
         if (data.size < 2) return@Canvas
         val maxDist = data.last().distanceFromStart
-        val maxSpeed = data.maxOf { it.speedMps }.coerceAtLeast(1.0)
+        val maxSpeedMps = data.maxOf { it.speedMps }.coerceAtLeast(1.0)
         val paddingTop = 4f
+        val chartLeft = leftPadding
+        val chartWidth = size.width - chartLeft
         val h = size.height - paddingTop
 
-        fun xFor(d: Double) = ((d / maxDist) * size.width).toFloat()
-        fun yFor(s: Double) = (paddingTop + h - (s / maxSpeed) * h).toFloat()
+        fun xFor(d: Double) = (chartLeft + (d / maxDist) * chartWidth).toFloat()
+        fun yFor(s: Double) = (paddingTop + h - (s / maxSpeedMps) * h).toFloat()
+
+        // Y-axis labels (min, mid, max)
+        val paint = android.graphics.Paint().apply {
+            color = labelColor.toArgb()
+            textSize = labelTextSize
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        val speedFactor = if (unitSystem == UnitSystem.METRIC) 3.6 else 2.23694
+        val unit = if (unitSystem == UnitSystem.METRIC) "km/h" else "mph"
+        val maxDisplay = maxSpeedMps * speedFactor
+        val midDisplay = maxDisplay / 2.0
+        val labels = listOf(
+            "0 $unit" to yFor(0.0),
+            "%.0f $unit".format(midDisplay) to yFor(maxSpeedMps / 2.0),
+            "%.0f $unit".format(maxDisplay) to yFor(maxSpeedMps),
+        )
+        drawIntoCanvas { canvas ->
+            for ((text, y) in labels) {
+                canvas.nativeCanvas.drawText(text, chartLeft - 4f, y + labelTextSize / 3f, paint)
+            }
+        }
 
         // Draw colored segments
         for (i in 0 until data.size - 1) {
-            val fraction = (data[i].speedMps / maxSpeed).toFloat()
+            val fraction = (data[i].speedMps / maxSpeedMps).toFloat()
             val color = speedColor(fraction)
             drawLine(
                 color = color,
@@ -792,7 +866,7 @@ private fun ElevationProfileCard(elevationProfile: List<ElevationPoint>, paceNot
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Elevation Profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
-            ElevationChart(data = elevationProfile, modifier = Modifier.fillMaxWidth().height(150.dp))
+            ElevationChart(data = elevationProfile, unitSystem = unitSystem, modifier = Modifier.fillMaxWidth().height(150.dp))
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("0 km", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatDistance(elevationProfile.last().distanceFromStart, unitSystem), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -802,7 +876,10 @@ private fun ElevationProfileCard(elevationProfile: List<ElevationPoint>, paceNot
 }
 
 @Composable
-private fun ElevationChart(data: List<ElevationPoint>, modifier: Modifier = Modifier) {
+private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, modifier: Modifier = Modifier) {
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelTextSize = with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toPx() }
+    val leftPadding = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
     Canvas(modifier = modifier) {
         if (data.size < 2) return@Canvas
         val maxDist = data.last().distanceFromStart
@@ -810,10 +887,33 @@ private fun ElevationChart(data: List<ElevationPoint>, modifier: Modifier = Modi
         val maxEle = data.maxOf { it.elevation }
         val eleRange = (maxEle - minEle).coerceAtLeast(1.0)
         val paddingTop = 8f
+        val chartLeft = leftPadding
+        val chartWidth = size.width - chartLeft
         val chartHeight = size.height - paddingTop
 
-        fun xFor(d: Double) = ((d / maxDist) * size.width).toFloat()
+        fun xFor(d: Double) = (chartLeft + (d / maxDist) * chartWidth).toFloat()
         fun yFor(e: Double) = (paddingTop + chartHeight - ((e - minEle) / eleRange) * chartHeight).toFloat()
+
+        // Y-axis labels (min, mid, max)
+        val paint = android.graphics.Paint().apply {
+            color = labelColor.toArgb()
+            textSize = labelTextSize
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        val eleFactor = if (unitSystem == UnitSystem.METRIC) 1.0 else 3.28084
+        val unit = if (unitSystem == UnitSystem.METRIC) "m" else "ft"
+        val midEle = (minEle + maxEle) / 2.0
+        val labels = listOf(
+            "%.0f $unit".format(minEle * eleFactor) to yFor(minEle),
+            "%.0f $unit".format(midEle * eleFactor) to yFor(midEle),
+            "%.0f $unit".format(maxEle * eleFactor) to yFor(maxEle),
+        )
+        drawIntoCanvas { canvas ->
+            for ((text, y) in labels) {
+                canvas.nativeCanvas.drawText(text, chartLeft - 4f, y + labelTextSize / 3f, paint)
+            }
+        }
 
         val fillPath = Path().apply {
             moveTo(xFor(data.first().distanceFromStart), size.height)

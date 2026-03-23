@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -61,56 +62,73 @@ class HomeViewModel @Inject constructor(
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()
 
-    val dashboardState: StateFlow<HomeDashboardState> = trackDao.getAllTracks()
-        .map { tracks ->
-            val now = Instant.now()
-            val zone = ZoneId.systemDefault()
-            val today = now.atZone(zone).toLocalDate()
+    private val _showActiveVehicleOnly = MutableStateFlow(false)
 
-            // Start of current week (Monday)
-            val startOfWeek = today.with(ChronoField.DAY_OF_WEEK, 1)
-            val weekStartMs = startOfWeek.atStartOfDay(zone).toInstant().toEpochMilli()
+    val dashboardState: StateFlow<HomeDashboardState> = combine(
+        trackDao.getAllTracks(),
+        _showActiveVehicleOnly,
+        vehicleDao.observeActiveVehicle(),
+    ) { allTracks, filterByActive, activeVehicle ->
+        val tracks = if (filterByActive && activeVehicle != null) {
+            allTracks.filter { it.vehicleId == activeVehicle.id }
+        } else {
+            allTracks
+        }
 
-            // Start of current month
-            val startOfMonth = today.withDayOfMonth(1)
-            val monthStartMs = startOfMonth.atStartOfDay(zone).toInstant().toEpochMilli()
+        val now = Instant.now()
+        val zone = ZoneId.systemDefault()
+        val today = now.atZone(zone).toLocalDate()
 
-            val weeklyTracks = tracks.filter { it.recordedAt >= weekStartMs }
-            val weeklyDistance = weeklyTracks.sumOf { it.distanceMeters }
-            val monthlyCount = tracks.count { it.recordedAt >= monthStartMs }
-            val totalDistance = tracks.sumOf { it.distanceMeters }
-            val longestRoute = tracks.maxOfOrNull { it.distanceMeters } ?: 0.0
+        // Start of current week (Monday)
+        val startOfWeek = today.with(ChronoField.DAY_OF_WEEK, 1)
+        val weekStartMs = startOfWeek.atStartOfDay(zone).toInstant().toEpochMilli()
 
-            // Daily distances for the past 7 days
-            val dayFormatter = java.time.format.DateTimeFormatter.ofPattern("EEE")
-            val dailyDistances = (6 downTo 0).map { daysAgo ->
-                val day = today.minusDays(daysAgo.toLong())
-                val dayStartMs = day.atStartOfDay(zone).toInstant().toEpochMilli()
-                val dayEndMs = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-                val distance = tracks
-                    .filter { it.recordedAt in dayStartMs until dayEndMs }
-                    .sumOf { it.distanceMeters }
-                DailyDistance(
-                    dayLabel = day.format(dayFormatter),
-                    distanceMeters = distance,
-                )
-            }
+        // Start of current month
+        val startOfMonth = today.withDayOfMonth(1)
+        val monthStartMs = startOfMonth.atStartOfDay(zone).toInstant().toEpochMilli()
 
-            val dueCount = try { maintenanceDao.getDueSchedules().size } catch (_: Exception) { 0 }
+        val weeklyTracks = tracks.filter { it.recordedAt >= weekStartMs }
+        val weeklyDistance = weeklyTracks.sumOf { it.distanceMeters }
+        val monthlyCount = tracks.count { it.recordedAt >= monthStartMs }
+        val totalDistance = tracks.sumOf { it.distanceMeters }
+        val longestRoute = tracks.maxOfOrNull { it.distanceMeters } ?: 0.0
 
-            HomeDashboardState(
-                recentTracks = tracks.take(5),
-                totalDistanceMeters = totalDistance,
-                tracksThisWeek = weeklyTracks.size,
-                longestRouteMeters = longestRoute,
-                weeklyDistanceMeters = weeklyDistance,
-                monthlyRecordingCount = monthlyCount,
-                dailyDistances = dailyDistances,
-                totalTrackCount = tracks.size,
-                maintenanceDueCount = dueCount,
+        // Daily distances for the past 7 days
+        val dayFormatter = java.time.format.DateTimeFormatter.ofPattern("EEE")
+        val dailyDistances = (6 downTo 0).map { daysAgo ->
+            val day = today.minusDays(daysAgo.toLong())
+            val dayStartMs = day.atStartOfDay(zone).toInstant().toEpochMilli()
+            val dayEndMs = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val distance = tracks
+                .filter { it.recordedAt in dayStartMs until dayEndMs }
+                .sumOf { it.distanceMeters }
+            DailyDistance(
+                dayLabel = day.format(dayFormatter),
+                distanceMeters = distance,
             )
         }
+
+        val dueCount = try { maintenanceDao.getDueSchedules().size } catch (_: Exception) { 0 }
+
+        HomeDashboardState(
+            recentTracks = tracks.take(5),
+            totalDistanceMeters = totalDistance,
+            tracksThisWeek = weeklyTracks.size,
+            longestRouteMeters = longestRoute,
+            weeklyDistanceMeters = weeklyDistance,
+            monthlyRecordingCount = monthlyCount,
+            dailyDistances = dailyDistances,
+            totalTrackCount = tracks.size,
+            maintenanceDueCount = dueCount,
+            showActiveVehicleOnly = filterByActive,
+            activeVehicleName = activeVehicle?.name,
+        )
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeDashboardState())
+
+    fun toggleVehicleFilter() {
+        _showActiveVehicleOnly.value = !_showActiveVehicleOnly.value
+    }
 
     fun importGpx(context: Context, uri: Uri): String? {
         var importedTrackId: String? = null
@@ -133,11 +151,5 @@ class HomeViewModel @Inject constructor(
             }
         }
         return importedTrackId
-    }
-
-    private val _showActiveVehicleOnly = MutableStateFlow(false)
-
-    fun toggleVehicleFilter() {
-        _showActiveVehicleOnly.value = !_showActiveVehicleOnly.value
     }
 }

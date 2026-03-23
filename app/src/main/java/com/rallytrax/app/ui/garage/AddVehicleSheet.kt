@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -134,6 +135,26 @@ fun AddVehicleSheet(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+
+            // Fuel type selector
+            if (uiState.selectedModel != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Fuel Type", style = MaterialTheme.typography.labelLarge)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val fuelTypes = listOf("Gasoline", "Diesel", "Electric", "Hybrid", "E85")
+                    fuelTypes.forEach { type ->
+                        FilterChip(
+                            selected = uiState.fuelType == type,
+                            onClick = { viewModel.updateFuelType(type) },
+                            label = { Text(type, style = MaterialTheme.typography.labelSmall) },
+                        )
+                    }
+                }
             }
 
             // EPA trim selector (if multiple trims available)

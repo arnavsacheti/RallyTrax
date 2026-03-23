@@ -23,6 +23,9 @@ interface VehicleDao {
     @Query("SELECT * FROM vehicles WHERE isActive = 1 AND isArchived = 0 LIMIT 1")
     suspend fun getActiveVehicle(): VehicleEntity?
 
+    @Query("SELECT * FROM vehicles WHERE isActive = 1 AND isArchived = 0 LIMIT 1")
+    fun observeActiveVehicle(): Flow<VehicleEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: VehicleEntity)
 

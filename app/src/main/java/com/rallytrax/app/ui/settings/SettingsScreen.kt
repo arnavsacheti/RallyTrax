@@ -505,6 +505,50 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .semantics { contentDescription = "Pitch slider" },
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Default Pace Note Sensitivity
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "Default Pace Note Sensitivity",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = "${preferences.paceNoteSensitivity.toInt()}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "Low",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "High",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Slider(
+                        value = preferences.paceNoteSensitivity,
+                        onValueChange = { settingsViewModel.setPaceNoteSensitivity(it) },
+                        valueRange = 1f..10f,
+                        steps = 8,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { contentDescription = "Default pace note sensitivity slider" },
+                    )
                 }
             }
 

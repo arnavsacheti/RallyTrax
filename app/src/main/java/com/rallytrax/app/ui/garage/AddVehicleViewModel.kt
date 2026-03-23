@@ -171,6 +171,10 @@ class AddVehicleViewModel @Inject constructor(
         _uiState.update { it.copy(name = name) }
     }
 
+    fun updateFuelType(fuelType: String) {
+        _uiState.update { it.copy(fuelType = fuelType) }
+    }
+
     fun updateVinInput(vin: String) {
         _uiState.update { it.copy(vinInput = vin.uppercase().filter { c -> c.isLetterOrDigit() }.take(17)) }
     }

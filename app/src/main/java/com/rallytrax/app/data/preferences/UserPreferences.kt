@@ -41,6 +41,7 @@ data class UserPreferencesData(
     val ttsRate: Float = 1.25f,
     val ttsPitch: Float = 1.15f,
     val ttsEnabled: Boolean = true,
+    val paceNoteSensitivity: Float = 5f,
     val onboardingCompleted: Boolean = false,
     val keepScreenOn: Boolean = false,
     // Sync-related
@@ -60,6 +61,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
         val MAP_PROVIDER = stringPreferencesKey("map_provider")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
+        val PACE_NOTE_SENSITIVITY = floatPreferencesKey("pace_note_sensitivity")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         // Sync
@@ -94,6 +96,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             ttsRate = prefs[Keys.TTS_RATE] ?: 1.25f,
             ttsPitch = prefs[Keys.TTS_PITCH] ?: 1.15f,
             ttsEnabled = prefs[Keys.TTS_ENABLED] ?: true,
+            paceNoteSensitivity = prefs[Keys.PACE_NOTE_SENSITIVITY] ?: 5f,
             onboardingCompleted = prefs[Keys.ONBOARDING_COMPLETED] ?: false,
             keepScreenOn = prefs[Keys.KEEP_SCREEN_ON] ?: false,
             lastSyncTime = prefs[Keys.LAST_SYNC_TIME] ?: 0L,
@@ -150,6 +153,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             it[Keys.TTS_ENABLED] = enabled
             it[Keys.TTS_ENABLED_MODIFIED_AT] = System.currentTimeMillis()
         }
+    }
+
+    suspend fun setPaceNoteSensitivity(sensitivity: Float) {
+        dataStore.edit { it[Keys.PACE_NOTE_SENSITIVITY] = sensitivity }
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {

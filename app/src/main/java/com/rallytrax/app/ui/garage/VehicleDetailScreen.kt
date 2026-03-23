@@ -57,6 +57,8 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatDate
+import com.rallytrax.app.util.formatSpeed
+import com.rallytrax.app.util.speedUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -194,7 +196,9 @@ private fun OverviewTab(
                     ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
@@ -682,7 +686,7 @@ private fun AnalyticsTab(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "${"%.0f".format(analytics.avgSpeedMps * 3.6)} km/h",
+                            text = "${formatSpeed(analytics.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -691,7 +695,7 @@ private fun AnalyticsTab(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "${"%.0f".format(analytics.topSpeedMps * 3.6)} km/h",
+                            text = "${formatSpeed(analytics.topSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,

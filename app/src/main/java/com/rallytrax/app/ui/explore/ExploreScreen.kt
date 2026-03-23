@@ -143,7 +143,7 @@ fun ExploreScreen(
                     ExploreLayerToolbar(
                         activeLayer = uiState.activeLayer,
                         onLayerSelected = viewModel::setActiveLayer,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
 

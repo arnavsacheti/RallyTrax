@@ -178,7 +178,7 @@ fun GarageScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.errorContainer)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                     .padding(horizontal = 20.dp),
                                 contentAlignment = Alignment.CenterEnd,
                             ) {

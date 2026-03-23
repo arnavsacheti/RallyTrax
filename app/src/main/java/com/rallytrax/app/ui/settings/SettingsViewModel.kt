@@ -113,6 +113,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setPaceNoteSensitivity(sensitivity: Float) {
+        viewModelScope.launch {
+            preferencesRepository.setPaceNoteSensitivity(sensitivity)
+        }
+    }
+
     fun setBackupTracksEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setBackupTracksEnabled(enabled)
