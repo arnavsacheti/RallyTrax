@@ -46,4 +46,24 @@ interface TrackDao {
 
     @Query("SELECT COUNT(*) FROM tracks WHERE vehicleId = :vehicleId")
     suspend fun getTrackCountForVehicle(vehicleId: String): Int
+
+    // --- Aggregation queries for four-phase activity lifecycle ---
+
+    @Query("SELECT * FROM tracks WHERE name = :routeName ORDER BY recordedAt DESC")
+    suspend fun getTracksForRoute(routeName: String): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE recordedAt BETWEEN :startMs AND :endMs ORDER BY recordedAt DESC")
+    suspend fun getTracksBetween(startMs: Long, endMs: Long): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE recordedAt BETWEEN :startMs AND :endMs ORDER BY recordedAt ASC")
+    fun observeTracksBetween(startMs: Long, endMs: Long): Flow<List<TrackEntity>>
+
+    @Query("SELECT MIN(durationMs) FROM tracks WHERE name = :routeName AND durationMs > 0")
+    suspend fun getPersonalBestForRoute(routeName: String): Long?
+
+    @Query("SELECT COALESCE(SUM(distanceMeters), 0.0) FROM tracks")
+    suspend fun getTotalDistanceAllTime(): Double
+
+    @Query("SELECT COUNT(DISTINCT date(recordedAt / 1000, 'unixepoch', 'localtime')) FROM tracks WHERE recordedAt >= :sinceMs")
+    suspend fun getActiveDaysSince(sinceMs: Long): Int
 }

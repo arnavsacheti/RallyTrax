@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.rallytrax.app.data.local.dao.AchievementDao
 import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
@@ -12,6 +13,7 @@ import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.GasStationDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.VehicleDao
+import com.rallytrax.app.data.local.entity.AchievementEntity
 import com.rallytrax.app.data.local.entity.FuelLogEntity
 import com.rallytrax.app.data.local.entity.GasStationEntity
 import com.rallytrax.app.data.local.entity.GridCellEntity
@@ -33,8 +35,9 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         GasStationEntity::class,
         MaintenanceRecordEntity::class,
         MaintenanceScheduleEntity::class,
+        AchievementEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -46,6 +49,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun fuelLogDao(): FuelLogDao
     abstract fun gasStationDao(): GasStationDao
     abstract fun maintenanceDao(): MaintenanceDao
+    abstract fun achievementDao(): AchievementDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -239,6 +243,29 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE tracks ADD COLUMN surfaceBreakdown TEXT DEFAULT NULL")
                 // Add surface type to track points
                 db.execSQL("ALTER TABLE track_points ADD COLUMN surfaceType TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create achievements table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `achievements` (
+                        `id` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `unlockedAt` INTEGER DEFAULT NULL,
+                        `progress` REAL NOT NULL DEFAULT 0.0,
+                        `targetValue` REAL NOT NULL DEFAULT 0.0,
+                        `currentValue` REAL NOT NULL DEFAULT 0.0,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                // Add segment marker to track points
+                db.execSQL("ALTER TABLE track_points ADD COLUMN segmentMarker TEXT DEFAULT NULL")
             }
         }
     }

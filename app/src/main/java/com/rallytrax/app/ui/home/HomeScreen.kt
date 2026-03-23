@@ -81,6 +81,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import com.rallytrax.app.ui.components.CalendarHeatmap
+import com.rallytrax.app.ui.components.GoalRing
+import com.rallytrax.app.ui.components.Sparkline
 import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDate
@@ -234,6 +237,7 @@ fun HomeScreen(
                     totalDistance = formatDistance(dashboard.totalDistanceMeters, preferences.unitSystem),
                     tracksThisWeek = dashboard.tracksThisWeek,
                     longestRoute = formatDistance(dashboard.longestRouteMeters, preferences.unitSystem),
+                    sparklineData = dashboard.sparklineData,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -324,6 +328,25 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
+                // 5. Calendar Heatmap (Phase 4)
+                if (dashboard.calendarHeatmap.isNotEmpty()) {
+                    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Activity",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            CalendarHeatmap(
+                                dailyDistances = dashboard.calendarHeatmap,
+                                currentStreak = dashboard.currentStreak,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
             }
 
@@ -361,6 +384,7 @@ private fun FocusMetricsRow(
     totalDistance: String,
     tracksThisWeek: Int,
     longestRoute: String,
+    sparklineData: List<Float> = emptyList(),
 ) {
     Row(
         modifier = Modifier
@@ -372,6 +396,7 @@ private fun FocusMetricsRow(
             icon = Icons.Filled.Route,
             label = "Total Distance",
             value = totalDistance,
+            sparklineData = sparklineData,
         )
         FocusMetricCard(
             icon = Icons.Filled.Speed,
@@ -391,6 +416,7 @@ private fun FocusMetricCard(
     icon: ImageVector,
     label: String,
     value: String,
+    sparklineData: List<Float>? = null,
 ) {
     Card(
         modifier = Modifier.width(160.dp),
@@ -421,6 +447,14 @@ private fun FocusMetricCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
             )
+            if (sparklineData != null && sparklineData.size >= 2 && sparklineData.any { it > 0f }) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Sparkline(
+                    data = sparklineData,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fillAlpha = 0.15f,
+                )
+            }
         }
     }
 }

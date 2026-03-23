@@ -70,6 +70,10 @@ import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.GpsNotFixed
+import androidx.compose.material.icons.filled.GpsOff
 
 @Composable
 fun RecordingScreen(
@@ -171,31 +175,60 @@ fun RecordingScreen(
             )
         }
 
-        // Pulsing recording indicator (top-center)
-        if (isRecording && !isPaused) {
-            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-            val pulseAlpha by infiniteTransition.animateFloat(
-                initialValue = 1f, targetValue = 0.3f,
-                animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
-                label = "pulse_alpha",
-            )
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 56.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .alpha(pulseAlpha)
-                        .background(Color.Red, CircleShape),
+        // Top bar: Recording indicator + GPS quality badge
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 56.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Pulsing recording indicator
+            if (isRecording && !isPaused && !data.isAutoPaused) {
+                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                val pulseAlpha by infiniteTransition.animateFloat(
+                    initialValue = 1f, targetValue = 0.3f,
+                    animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
+                    label = "pulse_alpha",
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("REC", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .alpha(pulseAlpha)
+                            .background(Color.Red, CircleShape),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("REC", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+            } else if (data.isAutoPaused) {
+                Row(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(Color(0xFFFBBC04), CircleShape),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("AUTO-PAUSED", color = Color(0xFFFBBC04), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Spacer(modifier = Modifier.width(1.dp))
             }
+
+            // GPS quality indicator
+            GpsQualityBadge(accuracy = data.gpsAccuracy)
         }
 
         // GPS lock loading indicator
@@ -220,10 +253,11 @@ fun RecordingScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.8f))
+                .background(Color.Black.copy(alpha = 0.85f))
                 .padding(top = 16.dp, bottom = 32.dp, start = 16.dp, end = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // === PRIMARY METRICS (always visible, largest) ===
             // Speed (Display Large)
             Text(
                 text = formatSpeed(data.currentSpeed, preferences.unitSystem),
@@ -239,7 +273,7 @@ fun RecordingScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Time and distance
+            // Time and distance (primary row)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -248,13 +282,42 @@ fun RecordingScreen(
                 RecStatItem("Distance", formatDistance(data.distanceMeters, preferences.unitSystem))
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // === SECONDARY METRICS (medium, glanceable) ===
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                RecStatItem("Avg Speed", "${formatSpeed(data.avgSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}")
+                RecStatItem("Max Speed", "${formatSpeed(data.maxSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}")
+                if (data.currentElevation != null) {
+                    RecStatItem("Elevation", "${data.currentElevation!!.toInt()} m")
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Controls with animated FAB
+            // Controls row
             Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Segment marker button
+                FilledIconButton(
+                    onClick = { viewModel.markSegment(context) },
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF2C2C2C)),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Flag,
+                        contentDescription = "Mark Segment",
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White,
+                    )
+                }
+
                 // Pause/Resume
                 FilledIconButton(
                     onClick = {
@@ -337,5 +400,49 @@ private fun RecStatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
         Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+    }
+}
+
+@Composable
+private fun GpsQualityBadge(accuracy: Float?) {
+    val gpsColor = when {
+        accuracy == null -> Color.Gray
+        accuracy < 10f -> Color(0xFF34A853)  // Green: excellent
+        accuracy < 25f -> Color(0xFFFBBC04)  // Yellow: acceptable
+        else -> Color(0xFFEA4335)            // Red: poor
+    }
+    val gpsIcon = when {
+        accuracy == null -> Icons.Filled.GpsOff
+        accuracy < 25f -> Icons.Filled.GpsFixed
+        else -> Icons.Filled.GpsNotFixed
+    }
+    val gpsLabel = when {
+        accuracy == null -> "No GPS"
+        else -> "${accuracy.toInt()}m"
+    }
+
+    Row(
+        modifier = Modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(gpsColor, CircleShape),
+        )
+        Icon(
+            imageVector = gpsIcon,
+            contentDescription = "GPS quality",
+            modifier = Modifier.size(14.dp),
+            tint = Color.White,
+        )
+        Text(
+            text = gpsLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+        )
     }
 }

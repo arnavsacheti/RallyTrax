@@ -13,6 +13,7 @@ import com.rallytrax.app.ui.garage.VehicleDetailScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
 import com.rallytrax.app.ui.onboarding.OnboardingScreen
+import com.rallytrax.app.ui.recording.ActivitySummaryScreen
 import com.rallytrax.app.ui.recording.RecordingScreen
 import com.rallytrax.app.ui.replay.ReplayScreen
 import com.rallytrax.app.ui.replay.ReplayHudScreen
@@ -149,8 +150,22 @@ fun RallyTraxNavHost(
         composable<RecordingRoute> {
             RecordingScreen(
                 onTrackSaved = { trackId ->
-                    navController.navigate(TrackDetailRoute(trackId)) {
+                    navController.navigate(ActivitySummaryRoute(trackId)) {
                         popUpTo<RecordingRoute> { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable<ActivitySummaryRoute> {
+            ActivitySummaryScreen(
+                onNavigateToDetail = { trackId ->
+                    navController.navigate(TrackDetailRoute(trackId)) {
+                        popUpTo<ActivitySummaryRoute> { inclusive = true }
+                    }
+                },
+                onNavigateBack = {
+                    navController.navigate(HomeRoute) {
+                        popUpTo<ActivitySummaryRoute> { inclusive = true }
                     }
                 },
             )

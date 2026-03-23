@@ -5,7 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -44,6 +46,10 @@ data class UserPreferencesData(
     val paceNoteSensitivity: Float = 5f,
     val onboardingCompleted: Boolean = false,
     val keepScreenOn: Boolean = false,
+    // Activity lifecycle preferences
+    val autoPauseEnabled: Boolean = true,
+    val autoPauseDelaySeconds: Int = 30,
+    val weeklyDistanceGoalKm: Double? = null,
     // Sync-related
     val lastSyncTime: Long = 0L,
     val backupTracksEnabled: Boolean = false,
@@ -64,6 +70,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val PACE_NOTE_SENSITIVITY = floatPreferencesKey("pace_note_sensitivity")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        // Activity lifecycle
+        val AUTO_PAUSE_ENABLED = booleanPreferencesKey("auto_pause_enabled")
+        val AUTO_PAUSE_DELAY_SECONDS = intPreferencesKey("auto_pause_delay_seconds")
+        val WEEKLY_DISTANCE_GOAL_KM = doublePreferencesKey("weekly_distance_goal_km")
         // Sync
         val LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
         val BACKUP_TRACKS_ENABLED = booleanPreferencesKey("backup_tracks_enabled")
@@ -99,6 +109,9 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             paceNoteSensitivity = prefs[Keys.PACE_NOTE_SENSITIVITY] ?: 5f,
             onboardingCompleted = prefs[Keys.ONBOARDING_COMPLETED] ?: false,
             keepScreenOn = prefs[Keys.KEEP_SCREEN_ON] ?: false,
+            autoPauseEnabled = prefs[Keys.AUTO_PAUSE_ENABLED] ?: true,
+            autoPauseDelaySeconds = prefs[Keys.AUTO_PAUSE_DELAY_SECONDS] ?: 30,
+            weeklyDistanceGoalKm = prefs[Keys.WEEKLY_DISTANCE_GOAL_KM],
             lastSyncTime = prefs[Keys.LAST_SYNC_TIME] ?: 0L,
             backupTracksEnabled = prefs[Keys.BACKUP_TRACKS_ENABLED] ?: false,
             drivePageToken = prefs[Keys.DRIVE_PAGE_TOKEN],
@@ -258,6 +271,24 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             if (settings.ttsEnabledModifiedAt > currentTtsEnabledModified) {
                 prefs[Keys.TTS_ENABLED] = settings.ttsEnabled
                 prefs[Keys.TTS_ENABLED_MODIFIED_AT] = settings.ttsEnabledModifiedAt
+            }
+        }
+    }
+
+    suspend fun setAutoPauseEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.AUTO_PAUSE_ENABLED] = enabled }
+    }
+
+    suspend fun setAutoPauseDelaySeconds(seconds: Int) {
+        dataStore.edit { it[Keys.AUTO_PAUSE_DELAY_SECONDS] = seconds }
+    }
+
+    suspend fun setWeeklyDistanceGoalKm(goalKm: Double?) {
+        dataStore.edit {
+            if (goalKm != null) {
+                it[Keys.WEEKLY_DISTANCE_GOAL_KM] = goalKm
+            } else {
+                it.remove(Keys.WEEKLY_DISTANCE_GOAL_KM)
             }
         }
     }

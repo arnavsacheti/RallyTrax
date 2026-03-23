@@ -169,6 +169,14 @@ class RecordingViewModel @Inject constructor(
         context.startService(intent)
     }
 
+    fun markSegment(context: Context, segmentType: String = "break") {
+        val intent = Intent(context, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_MARK_SEGMENT
+            putExtra(TrackingService.EXTRA_SEGMENT_TYPE, segmentType)
+        }
+        context.startService(intent)
+    }
+
     companion object {
         private const val TAG = "RecordingViewModel"
     }

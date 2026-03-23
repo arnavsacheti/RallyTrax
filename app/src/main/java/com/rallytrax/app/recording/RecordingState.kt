@@ -21,6 +21,10 @@ data class RecordingData(
     val elevationGainM: Double = 0.0,
     val currentLatLng: LatLng? = null,
     val pointCount: Int = 0,
+    val gpsAccuracy: Float? = null,
+    val avgSpeedMps: Double = 0.0,
+    val currentElevation: Double? = null,
+    val isAutoPaused: Boolean = false,
 ) {
     companion object {
         val EMPTY = RecordingData()

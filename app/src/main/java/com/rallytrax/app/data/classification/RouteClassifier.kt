@@ -1,6 +1,7 @@
 package com.rallytrax.app.data.classification
 
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.data.local.entity.VehicleEntity
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -197,6 +198,30 @@ object RouteClassifier {
             curviness < 1500 -> DIFFICULTY_MODERATE
             curviness < 5000 -> DIFFICULTY_SPIRITED
             else -> DIFFICULTY_EXPERT
+        }
+    }
+
+    /**
+     * Suggest the best vehicle for a given route type.
+     * Off-road → prefer AWD/4WD, Highway → prefer fuel-efficient, default → active vehicle.
+     */
+    fun suggestVehicle(routeType: String, vehicles: List<VehicleEntity>): VehicleEntity? {
+        if (vehicles.isEmpty()) return null
+        val active = vehicles.firstOrNull { it.isActive }
+
+        return when (routeType) {
+            TYPE_OFF_ROAD -> {
+                // Prefer AWD/4WD drivetrain
+                vehicles.firstOrNull {
+                    val dt = it.drivetrain?.uppercase() ?: ""
+                    dt.contains("AWD") || dt.contains("4WD") || dt.contains("4X4")
+                } ?: active ?: vehicles.first()
+            }
+            TYPE_HIGHWAY, TYPE_SCENIC_BYWAY -> {
+                // Prefer most fuel-efficient (highest EPA combined MPG)
+                vehicles.maxByOrNull { it.epaCombinedMpg ?: 0.0 } ?: active ?: vehicles.first()
+            }
+            else -> active ?: vehicles.first()
         }
     }
 

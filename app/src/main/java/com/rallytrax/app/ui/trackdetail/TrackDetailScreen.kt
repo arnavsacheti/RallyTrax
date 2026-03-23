@@ -1137,7 +1137,109 @@ private fun ViewTab(
             PaceNotesList(uiState.paceNotes, unitSystem)
         }
 
+        // Route History / Previous Attempts (Phase 1)
+        if (uiState.routeCompletionCount >= 2) {
+            Spacer(modifier = Modifier.height(12.dp))
+            RouteHistoryCard(
+                completionCount = uiState.routeCompletionCount,
+                personalBestMs = uiState.personalBestMs,
+                averageTimeMs = uiState.averageTimeMs,
+                currentTimeMs = track.durationMs,
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun RouteHistoryCard(
+    completionCount: Int,
+    personalBestMs: Long?,
+    averageTimeMs: Long?,
+    currentTimeMs: Long,
+) {
+    androidx.compose.material3.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Your History",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$completionCount",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    Text(
+                        text = "Completions",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                    )
+                }
+                if (personalBestMs != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = com.rallytrax.app.util.formatElapsedTime(personalBestMs),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                        Text(
+                            text = "Personal Best",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+                if (averageTimeMs != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = com.rallytrax.app.util.formatElapsedTime(averageTimeMs),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                        Text(
+                            text = "Average",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+            }
+            if (personalBestMs != null && currentTimeMs > 0 && currentTimeMs <= personalBestMs) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "This is your personal best!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            } else if (personalBestMs != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Your best: ${com.rallytrax.app.util.formatElapsedTime(personalBestMs)} — beat your record?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                )
+            }
+        }
     }
 }
 

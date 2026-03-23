@@ -23,13 +23,22 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoField
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 data class DailyDistance(
     val dayLabel: String, // e.g. "Mon", "Tue"
     val distanceMeters: Double,
+)
+
+enum class DashboardPeriod { WEEK, MONTH, YEAR }
+
+data class PeriodBar(
+    val label: String,
+    val value: Double,
 )
 
 data class HomeDashboardState(
@@ -44,6 +53,13 @@ data class HomeDashboardState(
     val maintenanceDueCount: Int = 0,
     val showActiveVehicleOnly: Boolean = false,
     val activeVehicleName: String? = null,
+    // Phase 4: Historical trends
+    val sparklineData: List<Float> = emptyList(),
+    val calendarHeatmap: Map<LocalDate, Double> = emptyMap(),
+    val currentStreak: Int = 0,
+    val weeklyGoalProgress: Float? = null,
+    val periodBars: List<PeriodBar> = emptyList(),
+    val selectedPeriod: DashboardPeriod = DashboardPeriod.WEEK,
 )
 
 @HiltViewModel
@@ -110,6 +126,41 @@ class HomeViewModel @Inject constructor(
 
         val dueCount = try { maintenanceDao.getDueSchedules().size } catch (_: Exception) { 0 }
 
+        // Sparkline: 7-day distance trend
+        val sparklineData = (6 downTo 0).map { daysAgo ->
+            val day = today.minusDays(daysAgo.toLong())
+            val dayStartMs = day.atStartOfDay(zone).toInstant().toEpochMilli()
+            val dayEndMs = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            tracks.filter { it.recordedAt in dayStartMs until dayEndMs }
+                .sumOf { it.distanceMeters }.toFloat()
+        }
+
+        // Calendar heatmap: past 365 days
+        val calendarHeatmap = mutableMapOf<LocalDate, Double>()
+        val yearAgoMs = today.minusDays(364).atStartOfDay(zone).toInstant().toEpochMilli()
+        tracks.filter { it.recordedAt >= yearAgoMs }.forEach { track ->
+            val date = Instant.ofEpochMilli(track.recordedAt).atZone(zone).toLocalDate()
+            calendarHeatmap[date] = (calendarHeatmap[date] ?: 0.0) + track.distanceMeters
+        }
+
+        // Streak calculation
+        val drivingDays = tracks
+            .map { Instant.ofEpochMilli(it.recordedAt).atZone(zone).toLocalDate() }
+            .distinct()
+            .sortedDescending()
+        val currentStreak = if (drivingDays.isEmpty()) 0 else {
+            val firstDay = drivingDays.first()
+            if (ChronoUnit.DAYS.between(firstDay, today) > 1) 0
+            else {
+                var streak = 1
+                for (i in 0 until drivingDays.size - 1) {
+                    if (ChronoUnit.DAYS.between(drivingDays[i + 1], drivingDays[i]) == 1L) streak++
+                    else break
+                }
+                streak
+            }
+        }
+
         HomeDashboardState(
             recentTracks = tracks.take(5),
             totalDistanceMeters = totalDistance,
@@ -122,6 +173,9 @@ class HomeViewModel @Inject constructor(
             maintenanceDueCount = dueCount,
             showActiveVehicleOnly = filterByActive,
             activeVehicleName = activeVehicle?.name,
+            sparklineData = sparklineData,
+            calendarHeatmap = calendarHeatmap,
+            currentStreak = currentStreak,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeDashboardState())

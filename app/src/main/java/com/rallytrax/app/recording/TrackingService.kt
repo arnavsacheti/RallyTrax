@@ -85,6 +85,12 @@ class TrackingService : LifecycleService() {
     private var pauseLocation: Location? = null
     private var pauseAlerted: Boolean = false
 
+    // Auto-pause state
+    private var stationaryStartMs: Long? = null
+    private var isAutoPaused: Boolean = false
+    private var lastGpsAccuracy: Float? = null
+    private var lastElevation: Double? = null
+
     private var pendingFlushJob: Job? = null
     private val pointBuffer = mutableListOf<TrackPointEntity>()
     private val pathSegments = mutableListOf<MutableList<LatLng>>()
@@ -108,6 +114,8 @@ class TrackingService : LifecycleService() {
         const val ACTION_PAUSE = "ACTION_PAUSE"
         const val ACTION_RESUME = "ACTION_RESUME"
         const val ACTION_STOP = "ACTION_STOP"
+        const val ACTION_MARK_SEGMENT = "ACTION_MARK_SEGMENT"
+        const val EXTRA_SEGMENT_TYPE = "EXTRA_SEGMENT_TYPE"
 
         private val _recordingStatus = MutableStateFlow(RecordingStatus.IDLE)
         val recordingStatus = _recordingStatus.asStateFlow()
@@ -142,6 +150,7 @@ class TrackingService : LifecycleService() {
             ACTION_PAUSE -> pauseRecording()
             ACTION_RESUME -> resumeRecording()
             ACTION_STOP -> stopRecording()
+            ACTION_MARK_SEGMENT -> markSegment(intent?.getStringExtra(EXTRA_SEGMENT_TYPE) ?: "break")
         }
         return START_STICKY
     }
@@ -390,9 +399,13 @@ class TrackingService : LifecycleService() {
         // Gas station pause detection (use raw for accuracy)
         detectGasStationPause(location, speed)
 
+        // Track GPS accuracy for UI indicator
+        lastGpsAccuracy = accuracy
+
         // Elevation
         if (location.hasAltitude()) {
             val elevation = location.altitude
+            lastElevation = elevation
             previousElevation?.let { prev ->
                 val delta = elevation - prev
                 if (delta > 2.0) { // Threshold to filter GPS noise
@@ -401,6 +414,9 @@ class TrackingService : LifecycleService() {
             }
             previousElevation = elevation
         }
+
+        // Auto-pause detection
+        checkAutoPause(speed, now)
 
         // Add filtered position to the visible path segment
         pathSegments.lastOrNull()?.add(filteredLatLng)
@@ -432,6 +448,7 @@ class TrackingService : LifecycleService() {
 
     private fun emitRecordingData(speed: Double, latLng: LatLng) {
         val elapsed = accumulatedTimeMs + (System.currentTimeMillis() - timerStartMs)
+        val avgSpeed = if (speedCount > 0) speedSum / speedCount else 0.0
         _recordingData.value = RecordingData(
             pathSegments = pathSegments.map { it.toList() },
             currentSpeed = speed,
@@ -441,7 +458,61 @@ class TrackingService : LifecycleService() {
             elevationGainM = elevationGain,
             currentLatLng = latLng,
             pointCount = pointIndex,
+            gpsAccuracy = lastGpsAccuracy,
+            avgSpeedMps = avgSpeed,
+            currentElevation = lastElevation,
+            isAutoPaused = isAutoPaused,
         )
+    }
+
+    private fun markSegment(segmentType: String) {
+        val location = lastLocation ?: return
+        val point = TrackPointEntity(
+            trackId = trackId,
+            index = pointIndex++,
+            lat = location.latitude,
+            lon = location.longitude,
+            elevation = if (location.hasAltitude()) location.altitude else null,
+            timestamp = System.currentTimeMillis(),
+            speed = if (location.hasSpeed()) location.speed.toDouble() else null,
+            bearing = if (location.hasBearing()) location.bearing.toDouble() else null,
+            accuracy = if (location.hasAccuracy()) location.accuracy else null,
+            segmentMarker = segmentType,
+        )
+        pointBuffer.add(point)
+    }
+
+    private fun checkAutoPause(speed: Double, now: Long) {
+        // Read auto-pause preference (cached at start, check periodically)
+        val prefs = kotlinx.coroutines.runBlocking {
+            preferencesRepository.preferences.first()
+        }
+        if (!prefs.autoPauseEnabled) {
+            stationaryStartMs = null
+            return
+        }
+
+        val delayMs = prefs.autoPauseDelaySeconds * 1000L
+
+        if (speed < PAUSE_SPEED_THRESHOLD_MPS) {
+            if (stationaryStartMs == null) {
+                stationaryStartMs = now
+            } else if (!isAutoPaused && (now - stationaryStartMs!!) >= delayMs) {
+                // Auto-pause: pause the timer but keep GPS running so we can detect resume
+                isAutoPaused = true
+                pauseTimer()
+                updateNotification(isPaused = true)
+            }
+        } else if (speed > RESUME_SPEED_THRESHOLD_MPS && isAutoPaused) {
+            // Auto-resume
+            isAutoPaused = false
+            stationaryStartMs = null
+            pathSegments.add(mutableListOf())
+            startTimer()
+            updateNotification(isPaused = false)
+        } else if (speed > RESUME_SPEED_THRESHOLD_MPS) {
+            stationaryStartMs = null
+        }
     }
 
     private fun detectGasStationPause(location: Location, speed: Double) {

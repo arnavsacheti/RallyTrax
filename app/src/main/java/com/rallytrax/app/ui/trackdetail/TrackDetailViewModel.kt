@@ -62,6 +62,10 @@ data class TrackDetailUiState(
     val isGeneratingNotes: Boolean = false,
     val selectedSensitivity: Int = 1, // 0=LOW, 1=MEDIUM, 2=HIGH
     val activeLayers: Set<MapLayer> = setOf(MapLayer.ROUTE),
+    // Route history (Phase 1: previous attempts)
+    val routeCompletionCount: Int = 0,
+    val personalBestMs: Long? = null,
+    val averageTimeMs: Long? = null,
 )
 
 enum class MapLayer {
@@ -114,6 +118,17 @@ class TrackDetailViewModel @Inject constructor(
 
             val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
 
+            // Route history (previous attempts)
+            val routeTracks = if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()
+            val completionCount = routeTracks.size
+            val personalBest = if (completionCount >= 2) {
+                routeTracks.filter { it.durationMs > 0 }.minOfOrNull { it.durationMs }
+            } else null
+            val averageTime = if (completionCount >= 2) {
+                val validTimes = routeTracks.filter { it.durationMs > 0 }.map { it.durationMs }
+                if (validTimes.isNotEmpty()) validTimes.average().toLong() else null
+            } else null
+
             _uiState.value = TrackDetailUiState(
                 track = track,
                 trackPoints = points,
@@ -124,6 +139,9 @@ class TrackDetailViewModel @Inject constructor(
                 tags = tags,
                 paceNotes = paceNotes,
                 isLoading = false,
+                routeCompletionCount = completionCount,
+                personalBestMs = personalBest,
+                averageTimeMs = averageTime,
             )
         }
     }
