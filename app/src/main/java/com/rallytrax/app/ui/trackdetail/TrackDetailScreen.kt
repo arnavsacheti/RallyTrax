@@ -637,18 +637,26 @@ private fun StatItem(label: String, value: String) {
 // ── Speed Profile Card ──────────────────────────────────────────────────────
 
 @Composable
-private fun SpeedProfileCard(speedProfile: List<SpeedPoint>, unitSystem: UnitSystem) {
+private fun SpeedProfileCard(speedProfile: List<SpeedPoint>, unitSystem: UnitSystem, track: com.rallytrax.app.data.local.entity.TrackEntity? = null) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Speed Profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Speed", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
-            SpeedChart(data = speedProfile, unitSystem = unitSystem, modifier = Modifier.fillMaxWidth().height(120.dp))
+            SpeedChart(data = speedProfile, unitSystem = unitSystem, modifier = Modifier.fillMaxWidth().height(200.dp))
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatDistance(speedProfile.last().distanceFromStart, unitSystem), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            // Hero stats below chart (Strava-style)
+            if (track != null) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    StatItem("Avg Speed", "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}")
+                    StatItem("Max Speed", "${formatSpeed(track.maxSpeedMps, unitSystem)} ${speedUnit(unitSystem)}")
+                }
             }
         }
     }
@@ -710,18 +718,27 @@ private fun SpeedChart(data: List<SpeedPoint>, unitSystem: UnitSystem, modifier:
 // ── Elevation Profile Card ──────────────────────────────────────────────────
 
 @Composable
-private fun ElevationProfileCard(elevationProfile: List<ElevationPoint>, paceNotes: List<PaceNoteEntity>, unitSystem: UnitSystem) {
+private fun ElevationProfileCard(elevationProfile: List<ElevationPoint>, paceNotes: List<PaceNoteEntity>, unitSystem: UnitSystem, track: com.rallytrax.app.data.local.entity.TrackEntity? = null) {
+    val minEle = elevationProfile.minOfOrNull { it.elevation } ?: 0.0
+    val maxEle = elevationProfile.maxOfOrNull { it.elevation } ?: 0.0
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Elevation Profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Elevation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
-            ElevationChart(data = elevationProfile, unitSystem = unitSystem, modifier = Modifier.fillMaxWidth().height(150.dp))
+            ElevationChart(data = elevationProfile, unitSystem = unitSystem, modifier = Modifier.fillMaxWidth().height(200.dp))
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("0 km", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatDistance(elevationProfile.last().distanceFromStart, unitSystem), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            // Hero stats below chart
+            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                StatItem("Elevation Gain", formatElevation(track?.elevationGainM ?: 0.0, unitSystem))
+                StatItem("Min", formatElevation(minEle, unitSystem))
+                StatItem("Max", formatElevation(maxEle, unitSystem))
             }
         }
     }
@@ -868,6 +885,98 @@ private fun CurvatureBar(label: String, fraction: Float, color: Color) {
     }
 }
 
+// ── Surface Breakdown Card ──────────────────────────────────────────────────
+
+@Composable
+private fun SurfaceBreakdownCard(track: com.rallytrax.app.data.local.entity.TrackEntity) {
+    val breakdown = track.surfaceBreakdown ?: return
+    if (breakdown.isBlank()) return
+
+    val segments = breakdown.split(",").mapNotNull { segment ->
+        val parts = segment.trim().split(":")
+        if (parts.size == 2) {
+            val type = parts[0].trim()
+            val pct = parts[1].trim().toDoubleOrNull() ?: return@mapNotNull null
+            type to pct
+        } else null
+    }
+    if (segments.isEmpty()) return
+
+    val totalPct = segments.sumOf { it.second }.coerceAtLeast(1.0)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Surface", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            track.primarySurface?.let {
+                Text("Primary: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Stacked bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(12.dp)),
+            ) {
+                segments.forEach { (type, pct) ->
+                    val color = surfaceTypeColor(type)
+                    val fraction = (pct / totalPct).toFloat()
+                    Box(
+                        modifier = Modifier
+                            .weight(fraction.coerceAtLeast(0.01f))
+                            .height(24.dp)
+                            .background(color, RoundedCornerShape(if (segments.indexOf(type to pct) == 0) 12.dp else 0.dp)),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Legend with percentages
+            segments.forEach { (type, pct) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(surfaceTypeColor(type), RoundedCornerShape(3.dp)),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = type,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${pct.toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun surfaceTypeColor(type: String): Color {
+    return when (type.lowercase()) {
+        "paved", "tarmac" -> Color(0xFF607D8B)
+        "gravel" -> Color(0xFFD4A574)
+        "dirt" -> Color(0xFF8B6914)
+        "cobblestone" -> Color(0xFF9E9E9E)
+        "mixed" -> Color(0xFF795548)
+        else -> Color(0xFFBDBDBD)
+    }
+}
+
 // ── View Tab ────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -887,36 +996,46 @@ private fun ViewTab(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Always show summary
+        // Summary: key stats + info chips
         SummaryCard(track, uiState, unitSystem)
 
         Spacer(modifier = Modifier.height(12.dp))
         TrackInfoChips(track, vehicleName)
 
+        // Speed chart with inline hero stats
         if (CardType.SPEED_PROFILE in visible && uiState.speedProfile.size >= 2) {
-            Spacer(modifier = Modifier.height(12.dp))
-            SpeedProfileCard(uiState.speedProfile, unitSystem)
+            Spacer(modifier = Modifier.height(16.dp))
+            SpeedProfileCard(uiState.speedProfile, unitSystem, track)
         }
 
+        // Elevation chart with inline hero stats
         if (CardType.ELEVATION_PROFILE in visible && uiState.elevationProfile.size >= 2) {
-            Spacer(modifier = Modifier.height(12.dp))
-            ElevationProfileCard(uiState.elevationProfile, uiState.paceNotes, unitSystem)
+            Spacer(modifier = Modifier.height(16.dp))
+            ElevationProfileCard(uiState.elevationProfile, uiState.paceNotes, unitSystem, track)
         }
 
+        // Surface breakdown
+        if (track.surfaceBreakdown?.isNotBlank() == true) {
+            Spacer(modifier = Modifier.height(16.dp))
+            SurfaceBreakdownCard(track)
+        }
+
+        // Curvature distribution
         val cd = uiState.curvatureDistribution
         if (CardType.CURVATURE in visible && cd.straight + cd.gentle + cd.moderate + cd.tight + cd.hairpin > 0f) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             CurvatureDistributionCard(cd)
         }
 
+        // Pace notes
         if (CardType.PACE_NOTES in visible && uiState.paceNotes.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             PaceNotesList(uiState.paceNotes, unitSystem)
         }
 
-        // Route History / Previous Attempts (Phase 1)
+        // Route History / Previous Attempts
         if (uiState.routeCompletionCount >= 2) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             RouteHistoryCard(
                 completionCount = uiState.routeCompletionCount,
                 personalBestMs = uiState.personalBestMs,
