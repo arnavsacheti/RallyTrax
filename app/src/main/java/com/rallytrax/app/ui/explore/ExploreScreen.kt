@@ -29,16 +29,22 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.StrokeStyle
+import com.google.android.gms.maps.model.StyleSpan
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
@@ -77,7 +83,7 @@ fun ExploreScreen(
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
 
     // Refresh data each time the screen is shown (e.g. after deleting tracks in Library)
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         viewModel.refresh()
     }
 
@@ -176,87 +182,136 @@ private fun GoogleExploreMap(
 ) {
     val cameraPositionState = rememberCameraPositionState()
 
-    // Center on focus coordinates if provided, otherwise fit bounds to all tracks
-    if (focusLat != null && focusLng != null) {
-        cameraPositionState.position = CameraPosition.fromLatLngZoom(
-            com.google.android.gms.maps.model.LatLng(focusLat, focusLng), 14f,
-        )
-    } else {
-        val allPoints = uiState.trackPolylines.flatMap { it.points }
-        if (allPoints.isNotEmpty()) {
-            val boundsBuilder = LatLngBounds.builder()
-            allPoints.forEach { boundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(boundsBuilder.build().center, 12f)
+    // Set camera position only once on initial load — not on every recomposition.
+    // This prevents fighting with user pan/zoom gestures.
+    val polylines = uiState.trackPolylines
+    LaunchedEffect(focusLat, focusLng, polylines) {
+        if (focusLat != null && focusLng != null) {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(
+                    com.google.android.gms.maps.model.LatLng(focusLat, focusLng), 14f,
+                ),
+            )
+        } else {
+            val allPoints = polylines.flatMap { it.points }
+            if (allPoints.isNotEmpty()) {
+                val boundsBuilder = LatLngBounds.builder()
+                allPoints.forEach { boundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 64),
+                )
+            }
         }
     }
 
-    // Compute global speed range for normalization
-    val globalMaxSpeed = uiState.trackPolylines.flatMap { it.speeds }.maxOrNull() ?: 1.0
-    val oldestTime = uiState.trackPolylines.minOfOrNull { it.recordedAt } ?: 0L
-    val newestTime = uiState.trackPolylines.maxOfOrNull { it.recordedAt } ?: 1L
-    val timeRange = (newestTime - oldestTime).coerceAtLeast(1L)
+    // Pre-compute GMS points list per track — stable across layer switches
+    val gmsPointsByTrack = remember(polylines) {
+        polylines.map { track ->
+            track.points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
+        }
+    }
+
+    // Pre-compute global stats for layer coloring
+    val globalMaxSpeed = remember(polylines) {
+        polylines.flatMap { it.speeds }.maxOrNull() ?: 1.0
+    }
+    val oldestTime = remember(polylines) {
+        polylines.minOfOrNull { it.recordedAt } ?: 0L
+    }
+    val newestTime = remember(polylines) {
+        polylines.maxOfOrNull { it.recordedAt } ?: 1L
+    }
+    val timeRange = remember(oldestTime, newestTime) {
+        (newestTime - oldestTime).coerceAtLeast(1L)
+    }
+
+    // Pre-compute StyleSpans for speed layer — one list of spans per track
+    val speedSpans = remember(polylines, globalMaxSpeed) {
+        polylines.map { track ->
+            if (track.speeds.size >= 2) {
+                val segmentCount = (track.points.size - 1).coerceAtMost(track.speeds.size - 1)
+                (0 until segmentCount).map { i ->
+                    val fraction = (track.speeds[i] / globalMaxSpeed).coerceIn(0.0, 1.0).toFloat()
+                    StyleSpan(StrokeStyle.colorBuilder(speedColor(fraction).toArgb()).build())
+                }
+            } else {
+                emptyList()
+            }
+        }
+    }
+
+    // Pre-compute StyleSpans for elevation layer
+    val elevationSpans = remember(polylines) {
+        polylines.map { track ->
+            if (track.elevations.size >= 2) {
+                val minEle = track.elevations.min()
+                val maxEle = track.elevations.max()
+                val range = (maxEle - minEle).coerceAtLeast(1.0)
+                val segmentCount = (track.points.size - 1).coerceAtMost(track.elevations.size - 1)
+                (0 until segmentCount).map { i ->
+                    val fraction = ((track.elevations[i] - minEle) / range).coerceIn(0.0, 1.0).toFloat()
+                    StyleSpan(StrokeStyle.colorBuilder(lerpColor(Color(0xFFCE93D8), Color(0xFF4A148C), fraction).toArgb()).build())
+                }
+            } else {
+                emptyList()
+            }
+        }
+    }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     GoogleMap(
         modifier = Modifier.fillMaxSize(),
         cameraPositionState = cameraPositionState,
         uiSettings = MapUiSettings(zoomControlsEnabled = false, scrollGesturesEnabled = true, zoomGesturesEnabled = true),
     ) {
-        uiState.trackPolylines.forEach { track ->
-            val gmsPoints = track.points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
+        polylines.forEachIndexed { index, track ->
+            val gmsPoints = gmsPointsByTrack[index]
 
             when (uiState.activeLayer) {
                 ExploreLayer.DEFAULT -> {
                     Polyline(
                         points = gmsPoints,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                        color = primaryColor.copy(alpha = 0.6f),
                         width = 6f,
                         clickable = true,
                         onClick = { viewModel.selectTrack(track.trackId) },
                     )
                 }
                 ExploreLayer.SPEED -> {
-                    // Per-segment coloring by speed
-                    if (track.speeds.size >= 2) {
-                        for (i in 0 until (gmsPoints.size - 1).coerceAtMost(track.speeds.size - 1)) {
-                            val fraction = (track.speeds[i] / globalMaxSpeed).coerceIn(0.0, 1.0).toFloat()
-                            Polyline(
-                                points = listOf(gmsPoints[i], gmsPoints[i + 1]),
-                                color = speedColor(fraction),
-                                width = 10f,
-                            )
-                        }
+                    val spans = speedSpans[index]
+                    if (spans.isNotEmpty()) {
+                        Polyline(
+                            points = gmsPoints,
+                            spans = spans,
+                            width = 10f,
+                        )
                     }
                 }
                 ExploreLayer.ELEVATION -> {
-                    if (track.elevations.size >= 2) {
-                        val minEle = track.elevations.min()
-                        val maxEle = track.elevations.max()
-                        val range = (maxEle - minEle).coerceAtLeast(1.0)
-                        for (i in 0 until (gmsPoints.size - 1).coerceAtMost(track.elevations.size - 1)) {
-                            val fraction = ((track.elevations[i] - minEle) / range).coerceIn(0.0, 1.0).toFloat()
-                            Polyline(
-                                points = listOf(gmsPoints[i], gmsPoints[i + 1]),
-                                color = lerpColor(Color(0xFFCE93D8), Color(0xFF4A148C), fraction),
-                                width = 10f,
-                            )
-                        }
+                    val spans = elevationSpans[index]
+                    if (spans.isNotEmpty()) {
+                        Polyline(
+                            points = gmsPoints,
+                            spans = spans,
+                            width = 10f,
+                        )
                     }
                 }
                 ExploreLayer.RECENCY -> {
                     val recencyFraction = ((track.recordedAt - oldestTime).toFloat() / timeRange).coerceIn(0f, 1f)
                     Polyline(
                         points = gmsPoints,
-                        color = lerpColor(Color.Gray, MaterialTheme.colorScheme.primary, recencyFraction),
+                        color = lerpColor(Color.Gray, primaryColor, recencyFraction),
                         width = 8f,
                         clickable = true,
                         onClick = { viewModel.selectTrack(track.trackId) },
                     )
                 }
                 ExploreLayer.HEATMAP -> {
-                    // For heatmap, still draw thin polylines; the heat is represented by overlapping
                     Polyline(
                         points = gmsPoints,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                        color = primaryColor.copy(alpha = 0.3f),
                         width = 8f,
                     )
                 }
@@ -273,32 +328,38 @@ private fun OsmExploreMap(
     focusLat: Double? = null,
     focusLng: Double? = null,
 ) {
-    val allPoints = uiState.trackPolylines.flatMap { it.points }
+    val polylines = uiState.trackPolylines
 
-    val fitBounds = if (focusLat != null && focusLng != null) {
-        // Small bounding box around the focus point
-        val delta = 0.01
-        BoundingBox(focusLat + delta, focusLng + delta, focusLat - delta, focusLng - delta)
-    } else if (allPoints.isNotEmpty()) {
-        val lats = allPoints.map { it.latitude }
-        val lngs = allPoints.map { it.longitude }
-        BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
-    } else {
-        null
+    val fitBounds = remember(focusLat, focusLng, polylines) {
+        if (focusLat != null && focusLng != null) {
+            val delta = 0.01
+            BoundingBox(focusLat + delta, focusLng + delta, focusLat - delta, focusLng - delta)
+        } else {
+            val allPoints = polylines.flatMap { it.points }
+            if (allPoints.isNotEmpty()) {
+                val lats = allPoints.map { it.latitude }
+                val lngs = allPoints.map { it.longitude }
+                BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
+            } else {
+                null
+            }
+        }
     }
 
-    val polylines = uiState.trackPolylines.map { track ->
-        OsmPolylineData(
-            points = track.points.map { GeoPoint(it.latitude, it.longitude) },
-            width = 6f,
-            color = Color(0xFF1A73E8).copy(alpha = 0.6f),
-        )
+    val osmPolylines = remember(polylines) {
+        polylines.map { track ->
+            OsmPolylineData(
+                points = track.points.map { GeoPoint(it.latitude, it.longitude) },
+                width = 6f,
+                color = Color(0xFF1A73E8).copy(alpha = 0.6f),
+            )
+        }
     }
 
     OsmMapView(
         modifier = Modifier.fillMaxSize(),
         fitBounds = fitBounds,
-        polylines = polylines,
+        polylines = osmPolylines,
         zoomControlsEnabled = false,
         scrollEnabled = true,
     )
