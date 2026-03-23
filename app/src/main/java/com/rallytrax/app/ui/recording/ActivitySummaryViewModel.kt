@@ -3,8 +3,11 @@ package com.rallytrax.app.ui.recording
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.rallytrax.app.data.achievements.AchievementTracker
 import com.rallytrax.app.data.classification.RouteClassifier
+import com.rallytrax.app.data.classification.SurfaceFusion
+import com.rallytrax.app.data.classification.ValhallaSurfaceClient
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.dao.VehicleDao
@@ -44,6 +47,7 @@ class ActivitySummaryViewModel @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val vehicleDao: VehicleDao,
     private val achievementTracker: AchievementTracker,
+    private val valhallaSurfaceClient: ValhallaSurfaceClient,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -76,6 +80,32 @@ class ActivitySummaryViewModel @Inject constructor(
         val classification = if (points.size >= 10) {
             RouteClassifier.classify(points)
         } else null
+
+        // Run Valhalla surface detection in background (non-blocking)
+        if (points.size >= 10) {
+            viewModelScope.launch {
+                try {
+                    val mapSurfaces = valhallaSurfaceClient.getTraceAttributes(points)
+                    if (mapSurfaces.isNotEmpty()) {
+                        val classifiedPoints = SurfaceFusion.applyClassifications(points, mapSurfaces)
+                        trackPointDao.insertPoints(classifiedPoints)
+                        val breakdown = SurfaceFusion.computeSurfaceBreakdown(classifiedPoints)
+                        val primary = SurfaceFusion.primarySurface(classifiedPoints)
+                        val currentTrack = trackDao.getTrackById(trackId)
+                        if (currentTrack != null) {
+                            trackDao.updateTrack(
+                                currentTrack.copy(
+                                    primarySurface = primary,
+                                    surfaceBreakdown = breakdown,
+                                )
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("ActivitySummaryVM", "Surface detection failed", e)
+                }
+            }
+        }
 
         _state.value = ActivitySummaryState(
             track = track,

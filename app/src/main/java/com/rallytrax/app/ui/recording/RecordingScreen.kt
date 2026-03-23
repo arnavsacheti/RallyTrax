@@ -109,20 +109,6 @@ fun RecordingScreen(
         }
     }
 
-    // Post-recording classification sheet
-    val classificationPending by viewModel.classificationPending.collectAsStateWithLifecycle()
-    classificationPending?.let { pending ->
-        PostRecordingSheet(
-            suggestedRouteType = pending.result.suggestedRouteType,
-            curvinessScore = pending.result.curvinessScore,
-            difficultyRating = pending.result.difficultyRating,
-            onAccept = { routeType, difficulty, tags ->
-                viewModel.acceptClassification(routeType, difficulty, tags)
-            },
-            onDismiss = { viewModel.skipClassification() },
-        )
-    }
-
     BackHandler(enabled = status == RecordingStatus.RECORDING || status == RecordingStatus.PAUSED) {
         showStopDialog = true
     }
