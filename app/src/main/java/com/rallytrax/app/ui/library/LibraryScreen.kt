@@ -53,7 +53,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,6 +100,8 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
 
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
@@ -129,6 +133,7 @@ fun LibraryScreen(
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -136,9 +141,10 @@ fun LibraryScreen(
                     if (uiState.isMultiSelectMode) {
                         Text("${uiState.selectedTrackIds.size} selected")
                     } else {
-                        Text("Library")
+                        Text("Routes")
                     }
                 },
+                scrollBehavior = scrollBehavior,
                 actions = {
                     if (uiState.isMultiSelectMode) {
                         IconButton(onClick = { viewModel.deleteSelectedTracks() }) {
@@ -234,7 +240,7 @@ fun LibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Search tracks...") },
+                placeholder = { Text("Search routes...") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
@@ -282,7 +288,7 @@ fun LibraryScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = if (uiState.searchQuery.isNotEmpty()) "No tracks found" else "No tracks yet",
+                            text = if (uiState.searchQuery.isNotEmpty()) "No routes found" else "No routes yet",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -411,14 +417,14 @@ private fun TrackListItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -480,9 +486,9 @@ private fun TrackListItem(
                             modifier = Modifier
                                 .background(
                                     MaterialTheme.colorScheme.primaryContainer,
-                                    RoundedCornerShape(4.dp),
+                                    MaterialTheme.shapes.small,
                                 )
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
                         )
                     }
                 }

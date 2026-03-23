@@ -11,3 +11,9 @@ val RallyTraxShapes = Shapes(
     large = RoundedCornerShape(16.dp),
     extraLarge = RoundedCornerShape(24.dp),
 )
+
+// ── M3 Expressive: Extended shape tokens ───────────────────────────────────
+val ShapeLargeIncreased = RoundedCornerShape(20.dp)
+val ShapeExtraLargeIncreased = RoundedCornerShape(32.dp)
+val ShapeExtraExtraLarge = RoundedCornerShape(48.dp)
+val ShapeFullRound = RoundedCornerShape(50)

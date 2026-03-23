@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
@@ -30,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
@@ -43,8 +43,10 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTooltipState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,8 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
-import com.rallytrax.app.ui.theme.WarningAmber
-import com.rallytrax.app.ui.theme.WarningRed
+import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.data.preferences.UserPreferencesData
 
@@ -82,6 +83,8 @@ fun GarageScreen(
 
     var showAddVehicleSheet by remember { mutableStateOf(false) }
 
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     // Undo archive snackbar
     val latestPending = pendingArchive
     LaunchedEffect(latestPending?.id) {
@@ -100,10 +103,12 @@ fun GarageScreen(
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             RallyTraxTopAppBar(
                 title = "Garage",
                 onSettingsClick = onNavigateToSettings,
+                scrollBehavior = scrollBehavior,
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onProfileClick = onProfileClick,
@@ -113,12 +118,16 @@ fun GarageScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddVehicleSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 6.dp,
+                ),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = "Add vehicle",
-                    tint = MaterialTheme.colorScheme.onPrimary,
                 )
             }
         },
@@ -229,13 +238,13 @@ private fun VehicleCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Box {
             Column(
@@ -331,15 +340,16 @@ private fun StatItem(value: String, label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WarningLight(warning: VehicleWarning) {
+    val rtColors = MaterialTheme.rallyTraxColors
     val (icon, color, description) = when (warning) {
-        VehicleWarning.MISSING_VIN -> Triple(Icons.Filled.ErrorOutline, WarningAmber, "No VIN")
-        VehicleWarning.NO_TRACKS -> Triple(Icons.Filled.ErrorOutline, WarningAmber, "No tracks")
-        VehicleWarning.INCOMPLETE_SPECS -> Triple(Icons.Filled.Warning, WarningAmber, "Incomplete specs")
-        VehicleWarning.MAINTENANCE_DUE -> Triple(Icons.Filled.Build, WarningRed, "Maintenance due")
+        VehicleWarning.MISSING_VIN -> Triple(Icons.Filled.ErrorOutline, rtColors.maintenanceWarning, "No VIN")
+        VehicleWarning.NO_TRACKS -> Triple(Icons.Filled.ErrorOutline, rtColors.maintenanceWarning, "No tracks")
+        VehicleWarning.INCOMPLETE_SPECS -> Triple(Icons.Filled.Warning, rtColors.maintenanceWarning, "Incomplete specs")
+        VehicleWarning.MAINTENANCE_DUE -> Triple(Icons.Filled.Build, rtColors.maintenanceDue, "Maintenance due")
     }
 
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text(description) } },
         state = rememberTooltipState(),
     ) {

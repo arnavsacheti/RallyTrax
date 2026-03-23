@@ -3,12 +3,12 @@ package com.rallytrax.app.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Route
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 
@@ -48,9 +48,9 @@ val topLevelRoutes = listOf(
         route = ExploreRoute(),
     ),
     TopLevelRoute(
-        label = "Library",
-        selectedIcon = Icons.Filled.Folder,
-        unselectedIcon = Icons.Outlined.Folder,
+        label = "Routes",
+        selectedIcon = Icons.Filled.Route,
+        unselectedIcon = Icons.Outlined.Route,
         route = LibraryRoute,
     ),
     TopLevelRoute(

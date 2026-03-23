@@ -59,6 +59,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -79,6 +81,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import com.rallytrax.app.ui.theme.RallyTraxMotion
+import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -130,6 +134,8 @@ fun HomeScreen(
     var showReplaySheet by remember { mutableStateOf(false) }
     var showFillUpSheet by remember { mutableStateOf(false) }
 
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
             snackbarHostState.showSnackbar(message)
@@ -137,10 +143,12 @@ fun HomeScreen(
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             RallyTraxTopAppBar(
                 title = "RallyTrax",
                 onSettingsClick = onNavigateToSettings,
+                scrollBehavior = scrollBehavior,
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onProfileClick = onProfileClick,
@@ -239,15 +247,16 @@ fun HomeScreen(
                         ),
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // Warning light indicator
+                            val maintenanceColor = MaterialTheme.rallyTraxColors.maintenanceDue
                             Box(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(
-                                        com.rallytrax.app.ui.theme.WarningRed.copy(alpha = 0.15f),
+                                        maintenanceColor.copy(alpha = 0.15f),
                                         androidx.compose.foundation.shape.CircleShape,
                                     ),
                                 contentAlignment = Alignment.Center,
@@ -256,7 +265,7 @@ fun HomeScreen(
                                     imageVector = Icons.Filled.Build,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = com.rallytrax.app.ui.theme.WarningRed,
+                                    tint = maintenanceColor,
                                 )
                             }
                             Spacer(modifier = Modifier.width(12.dp))
@@ -401,7 +410,7 @@ private fun FocusMetricCard(
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -641,10 +650,7 @@ private fun RallyTraxFabMenu(
 ) {
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 45f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = RallyTraxMotion.fastSpatial(),
         label = "fab_rotation",
     )
 
@@ -654,12 +660,12 @@ private fun RallyTraxFabMenu(
     ) {
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn(spring(stiffness = Spring.StiffnessMedium)) +
-                slideInVertically(spring(stiffness = Spring.StiffnessMedium)) { it / 2 } +
-                scaleIn(spring(stiffness = Spring.StiffnessMedium), initialScale = 0.8f),
-            exit = fadeOut(spring(stiffness = Spring.StiffnessHigh)) +
-                slideOutVertically(spring(stiffness = Spring.StiffnessHigh)) { it / 2 } +
-                scaleOut(spring(stiffness = Spring.StiffnessHigh), targetScale = 0.8f),
+            enter = fadeIn(RallyTraxMotion.fastEffects()) +
+                slideInVertically(RallyTraxMotion.fastSpatial()) { it / 2 } +
+                scaleIn(RallyTraxMotion.fastSpatial(), initialScale = 0.8f),
+            exit = fadeOut(RallyTraxMotion.fastEffects()) +
+                slideOutVertically(RallyTraxMotion.fastSpatial()) { it / 2 } +
+                scaleOut(RallyTraxMotion.fastSpatial(), targetScale = 0.8f),
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -690,13 +696,17 @@ private fun RallyTraxFabMenu(
 
         FloatingActionButton(
             onClick = onToggle,
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 6.dp,
+            ),
         ) {
             Icon(
                 imageVector = if (expanded) Icons.Filled.Close else Icons.Filled.Add,
                 contentDescription = if (expanded) "Close menu" else "Open menu",
                 modifier = Modifier.rotate(rotation),
-                tint = MaterialTheme.colorScheme.onPrimary,
             )
         }
     }
