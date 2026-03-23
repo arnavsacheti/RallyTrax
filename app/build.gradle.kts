@@ -19,6 +19,38 @@ val localProperties = Properties().apply {
     }
 }
 
+// Inject Firebase API key into google-services.json for local builds.
+// CI does this via sed in the workflow; locally we read from local.properties or env.
+// The replacement happens before the google-services plugin processes the file,
+// and is restored afterward so the placeholder stays in version control.
+afterEvaluate {
+    val firebaseApiKey = localProperties.getProperty("FIREBASE_API_KEY")
+        ?: System.getenv("FIREBASE_API_KEY")
+    if (firebaseApiKey != null) {
+        val gsFile = file("google-services.json")
+        listOf("Debug", "Release").forEach { variant ->
+            tasks.findByName("process${variant}GoogleServices")?.let { task ->
+                task.doFirst {
+                    if (gsFile.exists()) {
+                        val content = gsFile.readText()
+                        if (content.contains("FIREBASE_API_KEY_PLACEHOLDER")) {
+                            gsFile.writeText(content.replace("FIREBASE_API_KEY_PLACEHOLDER", firebaseApiKey))
+                        }
+                    }
+                }
+                task.doLast {
+                    if (gsFile.exists()) {
+                        val content = gsFile.readText()
+                        if (content.contains(firebaseApiKey)) {
+                            gsFile.writeText(content.replace(firebaseApiKey, "FIREBASE_API_KEY_PLACEHOLDER"))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 android {
     namespace = "com.rallytrax.app"
     compileSdk = 35
