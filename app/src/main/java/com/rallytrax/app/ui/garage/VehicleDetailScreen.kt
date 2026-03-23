@@ -66,6 +66,7 @@ fun VehicleDetailScreen(
     viewModel: VehicleDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val fuelLogs by viewModel.fuelLogs.collectAsStateWithLifecycle()
     val maintenanceRecords by viewModel.maintenanceRecords.collectAsStateWithLifecycle()
@@ -130,7 +131,7 @@ fun VehicleDetailScreen(
                 }
 
                 when (selectedTab) {
-                    0 -> OverviewTab(vehicle, uiState.totalDistanceM, tracks, onTrackClick)
+                    0 -> OverviewTab(vehicle, uiState.totalDistanceM, tracks, onTrackClick, preferences.unitSystem)
                     1 -> FuelTab(vehicle, fuelLogs, uiState.lifetimeMpg, uiState.costPerMile) {
                         showFillUpSheet = true
                     }
@@ -141,7 +142,7 @@ fun VehicleDetailScreen(
                         onAddSchedule = { showAddScheduleSheet = true },
                         onCompleteSchedule = { viewModel.completeSchedule(it) },
                     )
-                    3 -> AnalyticsTab(analytics = uiState.analytics, unitSystem = UnitSystem.METRIC)
+                    3 -> AnalyticsTab(analytics = uiState.analytics, unitSystem = preferences.unitSystem)
                 }
             }
 
@@ -177,6 +178,7 @@ private fun OverviewTab(
     totalDistanceM: Double,
     tracks: List<TrackEntity>,
     onTrackClick: (String) -> Unit,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
 ) {
             Column(
                 modifier = Modifier
@@ -235,7 +237,7 @@ private fun OverviewTab(
                     ),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        SpecsGrid(vehicle, totalDistanceM)
+                        SpecsGrid(vehicle, totalDistanceM, unitSystem)
                     }
                 }
 
@@ -295,7 +297,7 @@ private fun OverviewTab(
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                         Text(
-                                            text = formatDistance(track.distanceMeters, UnitSystem.METRIC),
+                                            text = formatDistance(track.distanceMeters, unitSystem),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -790,7 +792,7 @@ private fun BreakdownCard(data: Map<String, Int>) {
 }
 
 @Composable
-private fun SpecsGrid(vehicle: VehicleEntity, totalDistanceM: Double) {
+private fun SpecsGrid(vehicle: VehicleEntity, totalDistanceM: Double, unitSystem: UnitSystem = UnitSystem.METRIC) {
     val specs = buildList {
         add("Year" to vehicle.year.toString())
         add("Make" to vehicle.make)
@@ -809,9 +811,9 @@ private fun SpecsGrid(vehicle: VehicleEntity, totalDistanceM: Double) {
         vehicle.epaCombinedMpg?.let { add("EPA Combined" to "${it.toInt()} mpg") }
         vehicle.curbWeightKg?.let { add("Weight" to "${it.toInt()} kg") }
         vehicle.tireSize?.let { add("Tires" to it) }
-        add("Odometer" to formatDistance(vehicle.odometerKm * 1000, UnitSystem.METRIC))
+        add("Odometer" to formatDistance(vehicle.odometerKm * 1000, unitSystem))
         if (totalDistanceM > 0) {
-            add("RallyTrax Distance" to formatDistance(totalDistanceM, UnitSystem.METRIC))
+            add("RallyTrax Distance" to formatDistance(totalDistanceM, unitSystem))
         }
         vehicle.vin?.let { add("VIN" to it) }
     }

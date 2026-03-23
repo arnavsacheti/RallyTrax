@@ -63,11 +63,7 @@ import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.theme.WarningAmber
 import com.rallytrax.app.ui.theme.WarningRed
 import com.rallytrax.app.util.formatDistance
-import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.data.preferences.UserPreferencesData
-import com.rallytrax.app.data.preferences.UserPreferencesRepository
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.stateIn
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -80,6 +76,7 @@ fun GarageScreen(
     viewModel: GarageViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val pendingArchive by viewModel.pendingArchive.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -196,6 +193,7 @@ fun GarageScreen(
                     ) {
                         VehicleCard(
                             vehicleWithStats = vehicleWithStats,
+                            unitSystem = preferences.unitSystem,
                             onClick = { onVehicleClick(vehicle.id) },
                             onLongClick = { viewModel.toggleActiveVehicle(vehicle.id) },
                             modifier = Modifier.animateItem(),
@@ -220,6 +218,7 @@ fun GarageScreen(
 @Composable
 private fun VehicleCard(
     vehicleWithStats: VehicleWithStats,
+    unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -284,7 +283,7 @@ private fun VehicleCard(
                         label = "tracks",
                     )
                     StatItem(
-                        value = formatDistance(vehicleWithStats.totalDistanceM, UnitSystem.METRIC),
+                        value = formatDistance(vehicleWithStats.totalDistanceM, unitSystem),
                         label = "distance",
                     )
                     vehicle.epaCombinedMpg?.let { mpg ->

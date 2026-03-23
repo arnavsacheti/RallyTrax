@@ -24,6 +24,7 @@ import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.GpsIntervalConfig
+import com.rallytrax.app.data.preferences.UnitSystem
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -73,6 +74,7 @@ class TrackingService : LifecycleService() {
     private var minLon: Double = Double.MAX_VALUE
     private var maxLon: Double = -Double.MAX_VALUE
     private var isNewSegment: Boolean = true
+    private var cachedUnitSystem: UnitSystem = UnitSystem.METRIC
 
     // Kalman filter for smooth, high-rate position tracking
     private val kalmanFilter = GpsKalmanFilter()
@@ -157,6 +159,9 @@ class TrackingService : LifecycleService() {
         lastLocation = null
         previousElevation = null
         isNewSegment = true
+        cachedUnitSystem = kotlinx.coroutines.runBlocking {
+            preferencesRepository.preferences.first()
+        }.unitSystem
         kalmanFilter.reset()
         minLat = Double.MAX_VALUE
         maxLat = -Double.MAX_VALUE
@@ -167,7 +172,7 @@ class TrackingService : LifecycleService() {
         pathSegments.add(mutableListOf())
 
         // Start foreground immediately (doesn't need DB)
-        val notification = notificationManager.createNotification("00:00", "0 m")
+        val notification = notificationManager.createNotification("00:00", formatDistance(0.0, cachedUnitSystem))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 TrackingNotificationManager.NOTIFICATION_ID,
@@ -548,7 +553,7 @@ class TrackingService : LifecycleService() {
         }
         val notification = notificationManager.createNotification(
             elapsedTime = formatElapsedTime(elapsed),
-            distance = formatDistance(totalDistance),
+            distance = formatDistance(totalDistance, cachedUnitSystem),
             isPaused = isPaused,
         )
         val manager = getSystemService(NotificationManager::class.java)

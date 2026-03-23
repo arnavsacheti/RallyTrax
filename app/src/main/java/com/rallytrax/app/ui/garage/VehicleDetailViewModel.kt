@@ -11,6 +11,8 @@ import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.VehicleRepository
 import com.rallytrax.app.data.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,10 +53,14 @@ class VehicleDetailViewModel @Inject constructor(
     private val fuelLogDao: FuelLogDao,
     private val maintenanceDao: MaintenanceDao,
     private val syncManager: SyncManager,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val vehicleId: String = savedStateHandle["vehicleId"]
         ?: throw IllegalArgumentException("vehicleId required")
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     private val _uiState = MutableStateFlow(VehicleDetailUiState())
     val uiState: StateFlow<VehicleDetailUiState> = _uiState.asStateFlow()

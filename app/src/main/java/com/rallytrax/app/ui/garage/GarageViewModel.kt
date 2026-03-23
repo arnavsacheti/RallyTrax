@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.entity.VehicleEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.VehicleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +40,11 @@ data class GarageUiState(
 class GarageViewModel @Inject constructor(
     private val vehicleRepository: VehicleRepository,
     private val maintenanceDao: MaintenanceDao,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     val uiState: StateFlow<GarageUiState> = vehicleRepository.getAllVehicles()
         .map { vehicles ->
