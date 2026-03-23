@@ -81,7 +81,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
-import com.rallytrax.app.ui.components.CalendarHeatmap
 import com.rallytrax.app.ui.components.GoalRing
 import com.rallytrax.app.ui.components.Sparkline
 import com.rallytrax.app.ui.theme.RallyTraxMotion
@@ -325,25 +324,6 @@ fun HomeScreen(
                         dailyDistances = dashboard.dailyDistances,
                         unitSystem = preferences.unitSystem,
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // 5. Calendar Heatmap (Phase 4)
-                if (dashboard.calendarHeatmap.isNotEmpty()) {
-                    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Activity",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            CalendarHeatmap(
-                                dailyDistances = dashboard.calendarHeatmap,
-                                currentStreak = dashboard.currentStreak,
-                            )
-                        }
-                    }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 

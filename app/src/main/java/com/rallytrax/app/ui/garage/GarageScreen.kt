@@ -71,6 +71,7 @@ import com.rallytrax.app.data.preferences.UserPreferencesData
 fun GarageScreen(
     onVehicleClick: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     isSignedIn: Boolean = false,
     userPhotoUrl: String? = null,
     onProfileClick: () -> Unit = {},
@@ -112,6 +113,7 @@ fun GarageScreen(
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onProfileClick = onProfileClick,
+                onBack = onBack,
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },

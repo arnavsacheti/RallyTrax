@@ -119,7 +119,8 @@ class MainActivity : ComponentActivity() {
                         !dest.hasRoute(ReplayHudRoute::class) &&
                         !dest.hasRoute(OnboardingRoute::class) &&
                         !dest.hasRoute(SettingsRoute::class) &&
-                        !dest.hasRoute(ReplayRoute::class)
+                        !dest.hasRoute(ReplayRoute::class) &&
+                        !dest.hasRoute(com.rallytrax.app.navigation.GarageRoute::class)
                 } ?: true
 
                 Scaffold(

@@ -3,6 +3,7 @@ package com.rallytrax.app.ui.components
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -28,12 +29,23 @@ fun RallyTraxTopAppBar(
     isSignedIn: Boolean = false,
     userPhotoUrl: String? = null,
     onProfileClick: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     actions: @Composable () -> Unit = {},
 ) {
     CenterAlignedTopAppBar(
         title = { Text(title) },
         modifier = modifier,
         scrollBehavior = scrollBehavior,
+        navigationIcon = {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                    )
+                }
+            }
+        },
         actions = {
             actions()
             if (isSignedIn) {

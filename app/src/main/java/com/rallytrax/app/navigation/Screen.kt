@@ -4,10 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Route
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
@@ -26,6 +28,7 @@ data class TopLevelRoute(
 )
 @Serializable data object LibraryRoute
 @Serializable data object GarageRoute
+@Serializable data object ProfileRoute
 @Serializable data object ReplayRoute
 @Serializable data object SettingsRoute
 @Serializable data object OnboardingRoute
@@ -57,9 +60,9 @@ val topLevelRoutes = listOf(
         route = LibraryRoute,
     ),
     TopLevelRoute(
-        label = "Garage",
-        selectedIcon = Icons.Filled.DirectionsCar,
-        unselectedIcon = Icons.Outlined.DirectionsCar,
-        route = GarageRoute,
+        label = "Profile",
+        selectedIcon = Icons.Filled.Person,
+        unselectedIcon = Icons.Outlined.Person,
+        route = ProfileRoute,
     ),
 )
