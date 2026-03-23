@@ -931,6 +931,123 @@ a {
   opacity: 0.6;
 }
 
+/* -- Explore Screen -- */
+.mock-explore {
+  display: flex;
+  flex-direction: column;
+}
+
+.mock-explore-map {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.mock-explore-layers {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mock-explore-layers .mock-chip {
+  font-size: 9px;
+  padding: 3px 10px;
+}
+
+/* -- Garage Screen -- */
+.mock-garage {
+  display: flex;
+  flex-direction: column;
+}
+
+.mock-garage-header {
+  padding: 12px 16px 8px;
+}
+
+.mock-garage-list {
+  flex: 1;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.mock-vehicle-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+
+.mock-vehicle-card.active-vehicle {
+  border-color: rgba(26, 115, 232, 0.3);
+  background: rgba(26, 115, 232, 0.06);
+}
+
+.mock-vehicle-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mock-vehicle-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-vehicle-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-vehicle-meta {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.mock-vehicle-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.mock-vehicle-tags .mock-tag {
+  font-size: 8px;
+  padding: 1px 6px;
+}
+
+.mock-vehicle-tags .mock-tag.accent {
+  background: rgba(26, 115, 232, 0.15);
+  color: var(--accent);
+  border-color: rgba(26, 115, 232, 0.3);
+}
+
+.mock-vehicle-warning {
+  flex-shrink: 0;
+  animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* ---- Feature Sections ---- */
 .feature-section {
   padding: 80px 24px;
@@ -1134,7 +1251,7 @@ a {
 
 .specs-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 24px;
   text-align: center;
 }
