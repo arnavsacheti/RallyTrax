@@ -31,40 +31,36 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.ButtonDefaults
+// ButtonDefaults removed — moved to EditTrackScreen
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
-import androidx.compose.material3.InputChipDefaults
+// InputChip removed — moved to EditTrackScreen
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedButton
+// OutlinedTextField/OutlinedButton removed — moved to EditTrackScreen
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -126,6 +122,7 @@ import kotlin.math.abs
 fun TrackDetailScreen(
     onBack: () -> Unit,
     onReplay: (String) -> Unit = {},
+    onEdit: (String) -> Unit = {},
     viewModel: TrackDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -133,10 +130,8 @@ fun TrackDetailScreen(
     val allVehicles by viewModel.allVehicles.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var showAddTagDialog by remember { mutableStateOf(false) }
     var isMapFullscreen by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
@@ -160,8 +155,32 @@ fun TrackDetailScreen(
                             Icon(Icons.Filled.PlayArrow, "Replay", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
-                    IconButton(onClick = { viewModel.exportGpx(context) }) {
-                        Icon(Icons.Filled.Share, "Export & Share")
+                    // Three-dot overflow menu
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, "More options")
+                        }
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false },
+                        ) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    uiState.track?.let { onEdit(it.id) }
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Edit, null) },
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Export GPX") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.exportGpx(context)
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Share, null) },
+                            )
+                        }
                     }
                 },
             )
@@ -241,82 +260,23 @@ fun TrackDetailScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ── View / Edit Tabs ──────────────────────────────────
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                        Text("View", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                        Text("Edit", modifier = Modifier.padding(12.dp))
-                    }
-                }
-
                 // Compute vehicle name for display
                 val vehicleName = remember(uiState.track?.vehicleId, allVehicles) {
                     uiState.track?.vehicleId?.let { vid -> allVehicles.find { it.id == vid } }
                         ?.let { "${it.year} ${it.make} ${it.model}" }
                 }
 
-                when (selectedTab) {
-                    0 -> uiState.track?.let { track ->
-                        ViewTab(
-                            track = track,
-                            uiState = uiState,
-                            unitSystem = preferences.unitSystem,
-                            activeLayers = uiState.activeLayers,
-                            vehicleName = vehicleName,
-                        )
-                    }
-                    1 -> EditTab(
+                uiState.track?.let { track ->
+                    ViewTab(
+                        track = track,
                         uiState = uiState,
-                        viewModel = viewModel,
-                        allVehicles = allVehicles,
                         unitSystem = preferences.unitSystem,
-                        context = context,
-                        onShowAddTagDialog = { showAddTagDialog = true },
-                        onShowDeleteDialog = { showDeleteDialog = true },
+                        activeLayers = uiState.activeLayers,
+                        vehicleName = vehicleName,
                     )
                 }
             }
         }
-    }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Track?") },
-            text = { Text("This will permanently delete this track and all its data.") },
-            confirmButton = {
-                TextButton(onClick = { showDeleteDialog = false; viewModel.deleteTrack { onBack() } }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
-        )
-    }
-
-    if (showAddTagDialog) {
-        var tagText by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showAddTagDialog = false },
-            title = { Text("Add Tag") },
-            text = {
-                OutlinedTextField(
-                    value = tagText, onValueChange = { tagText = it },
-                    label = { Text("Tag name") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = {
-                        if (tagText.isNotBlank()) { viewModel.addTag(tagText); showAddTagDialog = false }
-                    }),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (tagText.isNotBlank()) { viewModel.addTag(tagText); showAddTagDialog = false }
-                }) { Text("Add") }
-            },
-            dismissButton = { TextButton(onClick = { showAddTagDialog = false }) { Text("Cancel") } },
-        )
     }
 
     // Fullscreen map overlay
@@ -633,97 +593,6 @@ private fun GradientLegend(title: String, startColor: Color, midColor: Color, en
     }
 }
 
-// ── Vehicle Assignment Card ──────────────────────────────────────────────────
-
-@Composable
-private fun VehicleAssignmentCard(
-    currentVehicleId: String?,
-    vehicles: List<com.rallytrax.app.data.local.entity.VehicleEntity>,
-    onAssign: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    val currentVehicle = vehicles.find { it.id == currentVehicleId }
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Vehicle", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (currentVehicle != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${currentVehicle.year} ${currentVehicle.make} ${currentVehicle.model}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        currentVehicle.trim?.let {
-                            Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    IconButton(onClick = onClear) {
-                        Icon(Icons.Filled.Close, "Remove vehicle", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            // Change / assign button
-            TextButton(onClick = { expanded = !expanded }) {
-                Text(if (currentVehicle != null) "Change Vehicle" else "Assign Vehicle")
-            }
-
-            if (expanded) {
-                vehicles.forEach { vehicle ->
-                    val isSelected = vehicle.id == currentVehicleId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent,
-                                RoundedCornerShape(8.dp),
-                            )
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .then(
-                                if (!isSelected) Modifier.background(Color.Transparent) else Modifier,
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${vehicle.year} ${vehicle.make} ${vehicle.model}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            )
-                        }
-                        if (!isSelected) {
-                            TextButton(onClick = { onAssign(vehicle.id); expanded = false }) {
-                                Text("Select")
-                            }
-                        } else {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = "Selected",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ── Summary Card ────────────────────────────────────────────────────────────
 
 @Composable
@@ -913,61 +782,6 @@ private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, m
     }
 }
 
-// ── Pace Notes Edit Card ─────────────────────────────────────────────────────
-
-@Composable
-private fun PaceNotesEditCard(uiState: TrackDetailUiState, viewModel: TrackDetailViewModel, unitSystem: UnitSystem) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Pace Notes${if (uiState.paceNotes.isNotEmpty()) " (${uiState.paceNotes.size})" else ""}",
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                )
-                IconButton(
-                    onClick = { viewModel.regeneratePaceNotes(uiState.selectedSensitivity) },
-                    enabled = !uiState.isGeneratingNotes,
-                ) {
-                    if (uiState.isGeneratingNotes) CircularProgressIndicator(Modifier.size(20.dp))
-                    else Icon(Icons.Filled.Refresh, "Regenerate")
-                }
-            }
-
-            // Sensitivity chips
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Low", "Medium", "High").forEachIndexed { i, label ->
-                    FilterChip(
-                        selected = uiState.selectedSensitivity == i,
-                        onClick = { viewModel.regeneratePaceNotes(i) },
-                        label = { Text(label) },
-                        enabled = !uiState.isGeneratingNotes,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (uiState.paceNotes.isEmpty()) {
-                Text("No pace notes yet — select a sensitivity to generate",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                // Show up to 10 notes inline, scrollable
-                uiState.paceNotes.take(20).forEach { note ->
-                    PaceNoteItem(note, unitSystem)
-                }
-                if (uiState.paceNotes.size > 20) {
-                    Text("+ ${uiState.paceNotes.size - 20} more",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 54.dp, top = 4.dp))
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun PaceNoteItem(note: PaceNoteEntity, unitSystem: UnitSystem) {
     val iconColor = when (note.noteType) {
@@ -1051,43 +865,6 @@ private fun CurvatureBar(label: String, fraction: Float, color: Color) {
         }
         Text("${(fraction * 100).toInt()}%", style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.width(36.dp).padding(start = 4.dp))
-    }
-}
-
-// ── Tags Card ───────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TagsCard(uiState: TrackDetailUiState, viewModel: TrackDetailViewModel, onShowAddTagDialog: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Tags", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                AssistChip(onClick = onShowAddTagDialog, label = { Text("Add") },
-                    leadingIcon = { Icon(Icons.Filled.Add, null, Modifier.size(16.dp)) })
-            }
-            if (uiState.tags.isEmpty()) {
-                Text("No tags yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-            } else {
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    uiState.tags.forEach { tag ->
-                        InputChip(
-                            selected = false, onClick = { }, label = { Text(tag) },
-                            trailingIcon = {
-                                IconButton(onClick = { viewModel.removeTag(tag) }, modifier = Modifier.size(16.dp)) {
-                                    Icon(Icons.Filled.Close, "Remove tag", Modifier.size(14.dp))
-                                }
-                            },
-                            colors = InputChipDefaults.inputChipColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -1240,75 +1017,6 @@ private fun RouteHistoryCard(
                 )
             }
         }
-    }
-}
-
-// ── Edit Tab ────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EditTab(
-    uiState: TrackDetailUiState,
-    viewModel: TrackDetailViewModel,
-    allVehicles: List<com.rallytrax.app.data.local.entity.VehicleEntity>,
-    unitSystem: UnitSystem,
-    context: android.content.Context,
-    onShowAddTagDialog: () -> Unit,
-    onShowDeleteDialog: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Vehicle Assignment
-        if (allVehicles.isNotEmpty()) {
-            VehicleAssignmentCard(
-                currentVehicleId = uiState.track?.vehicleId,
-                vehicles = allVehicles,
-                onAssign = { viewModel.assignVehicle(it) },
-                onClear = { viewModel.clearVehicle() },
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Tags
-        TagsCard(uiState, viewModel, onShowAddTagDialog = onShowAddTagDialog)
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Pace Notes (edit)
-        PaceNotesEditCard(uiState, viewModel, unitSystem)
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Export GPX
-        FilledTonalButton(
-            onClick = { viewModel.exportGpx(context) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        ) {
-            Icon(Icons.Filled.Share, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Export GPX & Share")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Delete Track
-        OutlinedButton(
-            onClick = onShowDeleteDialog,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error,
-            ),
-        ) {
-            Icon(Icons.Filled.Delete, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Delete Track")
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

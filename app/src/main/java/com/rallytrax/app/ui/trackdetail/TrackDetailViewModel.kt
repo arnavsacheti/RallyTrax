@@ -254,6 +254,17 @@ class TrackDetailViewModel @Inject constructor(
         }
     }
 
+    fun updateTrackName(name: String) {
+        val track = _uiState.value.track ?: return
+        val trimmed = name.trim()
+        if (trimmed.isBlank() || trimmed == track.name) return
+        val updated = track.copy(name = trimmed)
+        viewModelScope.launch {
+            trackDao.updateTrack(updated)
+            _uiState.value = _uiState.value.copy(track = updated)
+        }
+    }
+
     fun addTag(tag: String) {
         val cleanTag = tag.trim()
         if (cleanTag.isBlank()) return

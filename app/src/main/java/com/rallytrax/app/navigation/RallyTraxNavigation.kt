@@ -15,6 +15,7 @@ import com.rallytrax.app.ui.library.LibraryScreen
 import com.rallytrax.app.ui.onboarding.OnboardingScreen
 import com.rallytrax.app.ui.recording.ActivitySummaryScreen
 import com.rallytrax.app.ui.recording.RecordingScreen
+import com.rallytrax.app.ui.trackdetail.EditTrackScreen
 import com.rallytrax.app.ui.replay.ReplayScreen
 import com.rallytrax.app.ui.replay.ReplayHudScreen
 import com.rallytrax.app.ui.settings.SettingsScreen
@@ -177,6 +178,21 @@ fun RallyTraxNavHost(
                 },
                 onReplay = { trackId ->
                     navController.navigate(ReplayHudRoute(trackId))
+                },
+                onEdit = { trackId ->
+                    navController.navigate(EditTrackRoute(trackId))
+                },
+            )
+        }
+        composable<EditTrackRoute> {
+            EditTrackScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onDeleted = {
+                    navController.navigate(HomeRoute) {
+                        popUpTo<HomeRoute> { inclusive = false }
+                    }
                 },
             )
         }
