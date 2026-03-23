@@ -12,6 +12,7 @@ import com.rallytrax.app.ui.garage.GarageScreen
 import com.rallytrax.app.ui.garage.VehicleDetailScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
+import com.rallytrax.app.ui.profile.ProfileScreen
 import com.rallytrax.app.ui.onboarding.OnboardingScreen
 import com.rallytrax.app.ui.recording.ActivitySummaryScreen
 import com.rallytrax.app.ui.recording.RecordingScreen
@@ -103,6 +104,21 @@ fun RallyTraxNavHost(
                 onProfileClick = onProfileClick,
             )
         }
+        composable<ProfileRoute> {
+            ProfileScreen(
+                onNavigateToGarage = {
+                    navController.navigate(GarageRoute)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(SettingsRoute)
+                },
+                authState = authState,
+                isSignedIn = isSignedIn,
+                userPhotoUrl = userPhotoUrl,
+                onSignIn = onSignIn,
+                onProfileClick = onProfileClick,
+            )
+        }
         composable<GarageRoute> {
             GarageScreen(
                 onVehicleClick = { vehicleId ->
@@ -111,6 +127,7 @@ fun RallyTraxNavHost(
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
+                onBack = { navController.popBackStack() },
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
                 onProfileClick = onProfileClick,

@@ -26,7 +26,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoField
-import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 data class DailyDistance(
@@ -55,8 +54,6 @@ data class HomeDashboardState(
     val activeVehicleName: String? = null,
     // Phase 4: Historical trends
     val sparklineData: List<Float> = emptyList(),
-    val calendarHeatmap: Map<LocalDate, Double> = emptyMap(),
-    val currentStreak: Int = 0,
     val weeklyGoalProgress: Float? = null,
     val periodBars: List<PeriodBar> = emptyList(),
     val selectedPeriod: DashboardPeriod = DashboardPeriod.WEEK,
@@ -135,32 +132,6 @@ class HomeViewModel @Inject constructor(
                 .sumOf { it.distanceMeters }.toFloat()
         }
 
-        // Calendar heatmap: past 365 days
-        val calendarHeatmap = mutableMapOf<LocalDate, Double>()
-        val yearAgoMs = today.minusDays(364).atStartOfDay(zone).toInstant().toEpochMilli()
-        tracks.filter { it.recordedAt >= yearAgoMs }.forEach { track ->
-            val date = Instant.ofEpochMilli(track.recordedAt).atZone(zone).toLocalDate()
-            calendarHeatmap[date] = (calendarHeatmap[date] ?: 0.0) + track.distanceMeters
-        }
-
-        // Streak calculation
-        val drivingDays = tracks
-            .map { Instant.ofEpochMilli(it.recordedAt).atZone(zone).toLocalDate() }
-            .distinct()
-            .sortedDescending()
-        val currentStreak = if (drivingDays.isEmpty()) 0 else {
-            val firstDay = drivingDays.first()
-            if (ChronoUnit.DAYS.between(firstDay, today) > 1) 0
-            else {
-                var streak = 1
-                for (i in 0 until drivingDays.size - 1) {
-                    if (ChronoUnit.DAYS.between(drivingDays[i + 1], drivingDays[i]) == 1L) streak++
-                    else break
-                }
-                streak
-            }
-        }
-
         HomeDashboardState(
             recentTracks = tracks.take(5),
             totalDistanceMeters = totalDistance,
@@ -174,8 +145,6 @@ class HomeViewModel @Inject constructor(
             showActiveVehicleOnly = filterByActive,
             activeVehicleName = activeVehicle?.name,
             sparklineData = sparklineData,
-            calendarHeatmap = calendarHeatmap,
-            currentStreak = currentStreak,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeDashboardState())
