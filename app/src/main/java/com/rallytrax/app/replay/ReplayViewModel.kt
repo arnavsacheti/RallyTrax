@@ -2,6 +2,7 @@ package com.rallytrax.app.replay
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Intent
 import android.location.Location
 import android.os.Looper
 import androidx.lifecycle.SavedStateHandle
@@ -24,6 +25,7 @@ import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.recording.GpsKalmanFilter
 import com.rallytrax.app.recording.LatLng
+import com.rallytrax.app.recording.TrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -176,6 +178,12 @@ class ReplayViewModel @Inject constructor(
         replayKalmanFilter.reset()
         startReplayPredictionJob()
 
+        // Start TrackingService to record a new stint from the live GPS
+        val startIntent = Intent(application, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_START
+        }
+        application.startForegroundService(startIntent)
+
         _uiState.value = _uiState.value.copy(
             isActive = true,
             isFinished = false,
@@ -217,6 +225,7 @@ class ReplayViewModel @Inject constructor(
         if (result.isFinished && !_uiState.value.isFinished) {
             audio.speakFinish()
             stopLocationUpdates()
+            stopTrackingService()
         }
 
         _uiState.value = _uiState.value.copy(
@@ -256,6 +265,9 @@ class ReplayViewModel @Inject constructor(
         audioManager?.shutdown()
         audioManager = null
 
+        // Stop TrackingService to finalize the recorded stint
+        stopTrackingService()
+
         _uiState.value = _uiState.value.copy(
             isActive = false,
         )
@@ -270,6 +282,13 @@ class ReplayViewModel @Inject constructor(
     fun setVolume(vol: Float) {
         _uiState.value = _uiState.value.copy(volume = vol)
         audioManager?.setVolume(vol)
+    }
+
+    private fun stopTrackingService() {
+        val stopIntent = Intent(application, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_STOP
+        }
+        application.startService(stopIntent)
     }
 
     private fun stopLocationUpdates() {
