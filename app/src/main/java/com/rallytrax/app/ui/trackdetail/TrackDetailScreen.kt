@@ -4,6 +4,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +45,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -123,6 +125,8 @@ fun TrackDetailScreen(
     onBack: () -> Unit,
     onReplay: (String) -> Unit = {},
     onEdit: (String) -> Unit = {},
+    onViewAllSegments: () -> Unit = {},
+    onSegmentClick: (String) -> Unit = {},
     viewModel: TrackDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -1044,6 +1048,18 @@ private fun ViewTab(
             PaceNotesList(uiState.paceNotes, unitSystem)
         }
 
+        // Segments
+        Spacer(modifier = Modifier.height(16.dp))
+        SegmentsCard(
+            segments = uiState.segments,
+            isDetecting = uiState.isDetectingSegments,
+            suggestedCount = uiState.suggestedSegments.size,
+            onDetectSegments = { viewModel.detectNewSegments() },
+            onSegmentClick = onSegmentClick,
+            onViewAllSegments = onViewAllSegments,
+            unitSystem = unitSystem,
+        )
+
         // Route History / Previous Attempts
         if (uiState.routeCompletionCount >= 2) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -1056,6 +1072,132 @@ private fun ViewTab(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun SegmentsCard(
+    segments: List<TrackSegmentUi>,
+    isDetecting: Boolean,
+    suggestedCount: Int,
+    onDetectSegments: () -> Unit,
+    onSegmentClick: (String) -> Unit,
+    onViewAllSegments: () -> Unit,
+    unitSystem: UnitSystem,
+) {
+    androidx.compose.material3.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Segments (${segments.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                )
+                if (segments.isNotEmpty()) {
+                    TextButton(onClick = onViewAllSegments) {
+                        Text("View All")
+                    }
+                }
+            }
+
+            if (segments.isEmpty() && !isDetecting) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "No segments detected yet. Detect shared road sections across your stints.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Segment list (show first 5)
+            for (segment in segments.take(5)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSegmentClick(segment.segmentId) }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (segment.isFavorite) {
+                                Text(
+                                    text = "\u2605 ",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            Text(
+                                text = segment.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            )
+                        }
+                        Text(
+                            text = "${formatDistance(segment.distanceMeters, unitSystem)} \u2022 ${segment.runCount} run${if (segment.runCount != 1) "s" else ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = formatElapsedTime(segment.thisRunDurationMs),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        segment.bestTimeMs?.let { best ->
+                            Text(
+                                text = "Best: ${formatElapsedTime(best)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (segment.thisRunDurationMs <= best) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            if (segments.size > 5) {
+                Text(
+                    text = "+ ${segments.size - 5} more",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable { onViewAllSegments() },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    onClick = onDetectSegments,
+                    enabled = !isDetecting,
+                ) {
+                    Text(if (isDetecting) "Detecting..." else "Detect Segments")
+                }
+                if (isDetecting) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
 

@@ -214,6 +214,28 @@ fun RallyTraxNavHost(
                 onEdit = { trackId ->
                     navController.navigate(EditTrackRoute(trackId))
                 },
+                onViewAllSegments = {
+                    navController.navigate(SegmentsListRoute)
+                },
+                onSegmentClick = { segmentId ->
+                    navController.navigate(SegmentDetailRoute(segmentId))
+                },
+            )
+        }
+        composable<SegmentsListRoute> {
+            com.rallytrax.app.ui.segments.SegmentsListScreen(
+                onSegmentClick = { segmentId ->
+                    navController.navigate(SegmentDetailRoute(segmentId))
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<SegmentDetailRoute> {
+            com.rallytrax.app.ui.segments.SegmentDetailScreen(
+                onBack = { navController.popBackStack() },
+                onTrackClick = { trackId ->
+                    navController.navigate(TrackDetailRoute(trackId))
+                },
             )
         }
         composable<EditTrackRoute> {

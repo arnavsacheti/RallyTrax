@@ -86,4 +86,21 @@ interface TrackDao {
 
     @Query("SELECT COUNT(DISTINCT date(recordedAt / 1000, 'unixepoch', 'localtime')) FROM tracks WHERE recordedAt >= :sinceMs")
     suspend fun getActiveDaysSince(sinceMs: Long): Int
+
+    /** Find tracks whose bounding box overlaps the given bounds (for segment detection). */
+    @Query("""
+        SELECT * FROM tracks
+        WHERE id != :excludeTrackId
+          AND boundingBoxSouthLat <= :northLat
+          AND boundingBoxNorthLat >= :southLat
+          AND boundingBoxWestLon <= :eastLon
+          AND boundingBoxEastLon >= :westLon
+    """)
+    suspend fun getTracksOverlappingBounds(
+        excludeTrackId: String,
+        northLat: Double,
+        southLat: Double,
+        eastLon: Double,
+        westLon: Double,
+    ): List<TrackEntity>
 }

@@ -17,7 +17,10 @@ import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.data.repository.SegmentRepository
+import com.rallytrax.app.data.repository.TrackSegmentMatch
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
+import com.rallytrax.app.pacenotes.SegmentMatcher
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -49,6 +52,16 @@ data class CurvatureDistribution(
     val hairpin: Float = 0f,   // > 10.0
 )
 
+data class TrackSegmentUi(
+    val segmentId: String,
+    val name: String,
+    val distanceMeters: Double,
+    val thisRunDurationMs: Long,
+    val bestTimeMs: Long?,
+    val runCount: Int,
+    val isFavorite: Boolean,
+)
+
 data class TrackDetailUiState(
     val track: TrackEntity? = null,
     val trackPoints: List<TrackPointEntity> = emptyList(),
@@ -65,6 +78,10 @@ data class TrackDetailUiState(
     val routeCompletionCount: Int = 0,
     val personalBestMs: Long? = null,
     val averageTimeMs: Long? = null,
+    // Segments
+    val segments: List<TrackSegmentUi> = emptyList(),
+    val isDetectingSegments: Boolean = false,
+    val suggestedSegments: List<SegmentMatcher.OverlapCandidate> = emptyList(),
 )
 
 enum class MapLayer {
@@ -78,6 +95,7 @@ class TrackDetailViewModel @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
+    private val segmentRepository: SegmentRepository,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -128,6 +146,23 @@ class TrackDetailViewModel @Inject constructor(
                 if (validTimes.isNotEmpty()) validTimes.average().toLong() else null
             } else null
 
+            // Detect segments that appear in this track
+            val segmentMatches = try {
+                segmentRepository.detectSegmentsForTrack(trackId)
+            } catch (_: Exception) { emptyList() }
+
+            val segmentUi = segmentMatches.map { match ->
+                TrackSegmentUi(
+                    segmentId = match.segment.id,
+                    name = match.segment.name,
+                    distanceMeters = match.segment.distanceMeters,
+                    thisRunDurationMs = match.durationMs,
+                    bestTimeMs = match.stats.bestTimeMs,
+                    runCount = match.stats.runCount,
+                    isFavorite = match.stats.isFavorite,
+                )
+            }
+
             _uiState.value = TrackDetailUiState(
                 track = track,
                 trackPoints = points,
@@ -141,9 +176,77 @@ class TrackDetailViewModel @Inject constructor(
                 routeCompletionCount = completionCount,
                 personalBestMs = personalBest,
                 averageTimeMs = averageTime,
+                segments = segmentUi,
             )
         }
     }
+
+    fun detectNewSegments() {
+        _uiState.value = _uiState.value.copy(isDetectingSegments = true)
+        viewModelScope.launch {
+            try {
+                val candidates = segmentRepository.findNewSegmentCandidates(trackId)
+                _uiState.value = _uiState.value.copy(
+                    isDetectingSegments = false,
+                    suggestedSegments = candidates,
+                )
+                if (candidates.isEmpty()) {
+                    _snackbarMessage.tryEmit("No new segments detected")
+                } else {
+                    _snackbarMessage.tryEmit("Found ${candidates.size} potential segment(s)")
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isDetectingSegments = false)
+                _snackbarMessage.tryEmit("Segment detection failed: ${e.message}")
+            }
+        }
+    }
+
+    fun saveSegmentSuggestion(candidate: SegmentMatcher.OverlapCandidate, name: String) {
+        viewModelScope.launch {
+            try {
+                segmentRepository.saveOverlapAsSegment(name, candidate, trackId)
+                // Remove from suggestions and reload segments
+                val remaining = _uiState.value.suggestedSegments - candidate
+                _uiState.value = _uiState.value.copy(suggestedSegments = remaining)
+                reloadSegments()
+                _snackbarMessage.tryEmit("Segment '$name' saved")
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Failed to save segment: ${e.message}")
+            }
+        }
+    }
+
+    fun createUserSegment(name: String, startIndex: Int, endIndex: Int) {
+        viewModelScope.launch {
+            try {
+                segmentRepository.createUserSegment(name, trackId, startIndex, endIndex)
+                reloadSegments()
+                _snackbarMessage.tryEmit("Segment '$name' created")
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Failed to create segment: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun reloadSegments() {
+        val matches = try {
+            segmentRepository.detectSegmentsForTrack(trackId)
+        } catch (_: Exception) { emptyList() }
+
+        _uiState.value = _uiState.value.copy(
+            segments = matches.map { match ->
+                TrackSegmentUi(
+                    segmentId = match.segment.id,
+                    name = match.segment.name,
+                    distanceMeters = match.segment.distanceMeters,
+                    thisRunDurationMs = match.durationMs,
+                    bestTimeMs = match.stats.bestTimeMs,
+                    runCount = match.stats.runCount,
+                    isFavorite = match.stats.isFavorite,
+                )
+            },
+        )
 
     fun toggleLayer(layer: MapLayer) {
         val current = _uiState.value.activeLayers.toMutableSet()

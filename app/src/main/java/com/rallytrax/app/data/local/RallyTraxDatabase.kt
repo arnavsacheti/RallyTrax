@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.rallytrax.app.data.local.dao.AchievementDao
 import com.rallytrax.app.data.local.dao.DriverProfileDao
+import com.rallytrax.app.data.local.dao.SegmentDao
 import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
@@ -24,6 +25,8 @@ import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
+import com.rallytrax.app.data.local.entity.SegmentEntity
+import com.rallytrax.app.data.local.entity.SegmentRunEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 
 @Database(
@@ -39,8 +42,10 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         MaintenanceScheduleEntity::class,
         AchievementEntity::class,
         DriverProfileEntity::class,
+        SegmentEntity::class,
+        SegmentRunEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -54,6 +59,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun achievementDao(): AchievementDao
     abstract fun driverProfileDao(): DriverProfileDao
+    abstract fun segmentDao(): SegmentDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -305,6 +311,53 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `segments` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `description` TEXT,
+                        `startLat` REAL NOT NULL,
+                        `startLon` REAL NOT NULL,
+                        `endLat` REAL NOT NULL,
+                        `endLon` REAL NOT NULL,
+                        `distanceMeters` REAL NOT NULL,
+                        `isFavorite` INTEGER NOT NULL DEFAULT 0,
+                        `isUserDefined` INTEGER NOT NULL DEFAULT 0,
+                        `createdAt` INTEGER NOT NULL DEFAULT 0,
+                        `boundingBoxNorthLat` REAL NOT NULL DEFAULT 0.0,
+                        `boundingBoxSouthLat` REAL NOT NULL DEFAULT 0.0,
+                        `boundingBoxEastLon` REAL NOT NULL DEFAULT 0.0,
+                        `boundingBoxWestLon` REAL NOT NULL DEFAULT 0.0,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `segment_runs` (
+                        `id` TEXT NOT NULL,
+                        `segmentId` TEXT NOT NULL,
+                        `trackId` TEXT NOT NULL,
+                        `startPointIndex` INTEGER NOT NULL,
+                        `endPointIndex` INTEGER NOT NULL,
+                        `durationMs` INTEGER NOT NULL,
+                        `avgSpeedMps` REAL NOT NULL,
+                        `maxSpeedMps` REAL NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`segmentId`) REFERENCES `segments`(`id`) ON DELETE CASCADE,
+                        FOREIGN KEY(`trackId`) REFERENCES `tracks`(`id`) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_segment_runs_segmentId` ON `segment_runs` (`segmentId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_segment_runs_trackId` ON `segment_runs` (`trackId`)")
             }
         }
     }

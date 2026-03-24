@@ -6,6 +6,7 @@ import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.AchievementDao
 import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.dao.SegmentDao
 import com.rallytrax.app.data.local.dao.GasStationDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.GridCellDao
@@ -43,6 +44,7 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_8_9,
                 RallyTraxDatabase.MIGRATION_9_10,
                 RallyTraxDatabase.MIGRATION_10_11,
+                RallyTraxDatabase.MIGRATION_11_12,
             )
             .build()
     }
@@ -95,5 +97,10 @@ object DatabaseModule {
     @Provides
     fun provideDriverProfileDao(database: RallyTraxDatabase): DriverProfileDao {
         return database.driverProfileDao()
+    }
+
+    @Provides
+    fun provideSegmentDao(database: RallyTraxDatabase): SegmentDao {
+        return database.segmentDao()
     }
 }

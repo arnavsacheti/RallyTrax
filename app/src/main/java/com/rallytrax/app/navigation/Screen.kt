@@ -40,6 +40,8 @@ data class TopLevelRoute(
 @Serializable data class EditTrackRoute(val trackId: String)
 @Serializable data object StintsRoute
 @Serializable data object AchievementsRoute
+@Serializable data object SegmentsListRoute
+@Serializable data class SegmentDetailRoute(val segmentId: String)
 
 val topLevelRoutes = listOf(
     TopLevelRoute(
