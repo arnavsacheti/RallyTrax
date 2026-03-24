@@ -356,7 +356,9 @@ class MainActivity : ComponentActivity() {
             // Try fetching actual driving route from Valhalla
             val routeResult = valhallaRouteClient.fetchRoute(waypoints)
 
-            val routePoints = routeResult?.points ?: waypoints
+            val routePointsRaw = routeResult?.points ?: waypoints
+            // Fetch elevation data from Valhalla /height endpoint
+            val routePoints = valhallaRouteClient.fetchHeight(routePointsRaw)
             val totalDistance = routeResult?.distanceMeters
                 ?: if (waypoints.size >= 2) {
                     var d = 0.0
@@ -402,6 +404,7 @@ class MainActivity : ComponentActivity() {
                     index = index,
                     lat = pt.latitude,
                     lon = pt.longitude,
+                    elevation = pt.elevation,
                     timestamp = now + index * 1000L,
                 )
             }
@@ -418,6 +421,18 @@ class MainActivity : ComponentActivity() {
                 paceNoteDao.insertNotes(paceNotes)
             }
 
+            // Compute cumulative elevation gain from enriched points
+            var elevationGain = 0.0
+            var prevElevation: Double? = null
+            for (pt in enrichedPoints) {
+                val ele = pt.elevation ?: continue
+                prevElevation?.let { prev ->
+                    val delta = ele - prev
+                    if (delta > 2.0) elevationGain += delta
+                }
+                prevElevation = ele
+            }
+
             // Classify route (curviness, difficulty, type)
             if (enrichedPoints.size >= 10) {
                 val classification = com.rallytrax.app.data.classification.RouteClassifier.classify(enrichedPoints)
@@ -425,9 +440,11 @@ class MainActivity : ComponentActivity() {
                     curvinessScore = classification.curvinessScore,
                     routeType = classification.suggestedRouteType,
                     difficultyRating = classification.difficultyRating,
-                    elevationGainM = classification.maxElevationChangeM,
+                    elevationGainM = elevationGain,
                 )
                 trackDao.updateTrack(classifiedTrack)
+            } else if (elevationGain > 0.0) {
+                trackDao.updateTrack(track.copy(elevationGainM = elevationGain))
             }
 
             trackId
