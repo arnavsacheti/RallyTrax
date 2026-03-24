@@ -66,7 +66,7 @@ class ExploreViewModel @Inject constructor(
 
     private fun loadData() {
         viewModelScope.launch {
-            val tracks = trackDao.getAllTracksOnce()
+            val tracks = trackDao.getStintsOnce()
             val polylines = tracks.map { track ->
                 val points = trackPointDao.getPointsForTrackOnce(track.id)
                 TrackPolyline(

@@ -37,7 +37,7 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         MaintenanceScheduleEntity::class,
         AchievementEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -266,6 +266,12 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                 )
                 // Add segment marker to track points
                 db.execSQL("ALTER TABLE track_points ADD COLUMN segmentMarker TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tracks ADD COLUMN trackCategory TEXT NOT NULL DEFAULT 'stint'")
             }
         }
     }

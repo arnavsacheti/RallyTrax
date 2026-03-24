@@ -1,8 +1,5 @@
-package com.rallytrax.app.ui.library
+package com.rallytrax.app.ui.stints
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -18,21 +15,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -55,7 +49,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,7 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -74,6 +67,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.ui.library.SortOption
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -82,44 +76,32 @@ import com.rallytrax.app.util.speedUnit
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun LibraryScreen(
+fun StintsScreen(
     onTrackClick: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
-    onNavigateToSettings: () -> Unit = {},
-    isSignedIn: Boolean = false,
-    userPhotoUrl: String? = null,
-    onProfileClick: () -> Unit = {},
-    viewModel: LibraryViewModel = hiltViewModel(),
+    onBack: () -> Unit = {},
+    viewModel: StintsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val pendingDeletes by viewModel.pendingDeletes.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
 
     var showSortMenu by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri: Uri? ->
-        uri?.let { viewModel.importGpx(context, it) }
-    }
-
-    // Snackbar messages
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
             snackbarHostState.showSnackbar(message)
         }
     }
 
-    // Undo delete snackbar — item disappears immediately, deletion on snackbar expiry
     val latestPending = pendingDeletes.lastOrNull()
     LaunchedEffect(latestPending?.id) {
         latestPending?.let { track ->
-            snackbarHostState.currentSnackbarData?.dismiss() // dismiss any prior snackbar
+            snackbarHostState.currentSnackbarData?.dismiss()
             val result = snackbarHostState.showSnackbar(
                 message = "${track.name} deleted",
                 actionLabel = "Undo",
@@ -141,7 +123,14 @@ fun LibraryScreen(
                     if (uiState.isMultiSelectMode) {
                         Text("${uiState.selectedTrackIds.size} selected")
                     } else {
-                        Text("Routes")
+                        Text("My Stints")
+                    }
+                },
+                navigationIcon = {
+                    if (!uiState.isMultiSelectMode) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -154,13 +143,6 @@ fun LibraryScreen(
                             Icon(Icons.Filled.Close, contentDescription = "Cancel selection")
                         }
                     } else {
-                        IconButton(onClick = {
-                            importLauncher.launch(arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*"))
-                        }) {
-                            Icon(Icons.Filled.FileOpen, contentDescription = "Import GPX")
-                        }
-
-                        // Sort button
                         Box {
                             IconButton(onClick = { showSortMenu = true }) {
                                 Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
@@ -190,38 +172,10 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Tag filter button
                         if (uiState.availableTags.isNotEmpty()) {
                             IconButton(onClick = { showTagFilter = !showTagFilter }) {
                                 Icon(Icons.Filled.FilterList, contentDescription = "Filter by tag")
                             }
-                        }
-
-                        // Profile avatar
-                        if (isSignedIn) {
-                            IconButton(onClick = onProfileClick) {
-                                if (userPhotoUrl != null) {
-                                    coil.compose.AsyncImage(
-                                        model = userPhotoUrl,
-                                        contentDescription = "Profile",
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(androidx.compose.foundation.shape.CircleShape),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Filled.AccountCircle,
-                                        contentDescription = "Profile",
-                                        modifier = Modifier.size(28.dp),
-                                    )
-                                }
-                            }
-                        }
-
-                        // Settings gear icon
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                     }
                 },
@@ -233,14 +187,13 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // Search bar
             TextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.updateSearchQuery(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Search routes...") },
+                placeholder = { Text("Search stints...") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
@@ -257,7 +210,6 @@ fun LibraryScreen(
                 ),
             )
 
-            // Tag filter chips
             if (showTagFilter && uiState.availableTags.isNotEmpty()) {
                 FlowRow(
                     modifier = Modifier
@@ -281,14 +233,13 @@ fun LibraryScreen(
             }
 
             if (visibleTracks.isEmpty()) {
-                // Empty state
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = if (uiState.searchQuery.isNotEmpty()) "No routes found" else "No routes yet",
+                            text = if (uiState.searchQuery.isNotEmpty()) "No stints found" else "No stints yet",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -297,7 +248,7 @@ fun LibraryScreen(
                             text = if (uiState.searchQuery.isNotEmpty()) {
                                 "Try a different search"
                             } else {
-                                "Import a GPX or KML file to add a route"
+                                "Record your first drive to create a stint"
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -346,7 +297,6 @@ fun LibraryScreen(
                                             .fillMaxSize()
                                             .background(bgColor),
                                     ) {
-                                        // Replay icon (swipe right)
                                         Icon(
                                             Icons.Filled.PlayArrow,
                                             contentDescription = "Replay",
@@ -355,7 +305,6 @@ fun LibraryScreen(
                                                 .align(Alignment.CenterStart)
                                                 .padding(start = 24.dp),
                                         )
-                                        // Delete icon (swipe left)
                                         Icon(
                                             Icons.Filled.Delete,
                                             contentDescription = "Delete",
@@ -369,7 +318,7 @@ fun LibraryScreen(
                                 enableDismissFromStartToEnd = true,
                                 modifier = Modifier.animateItem(),
                             ) {
-                                TrackListItem(
+                                StintListItem(
                                     track = track,
                                     isSelected = track.id in uiState.selectedTrackIds,
                                     isMultiSelectMode = false,
@@ -379,7 +328,7 @@ fun LibraryScreen(
                                 )
                             }
                         } else {
-                            TrackListItem(
+                            StintListItem(
                                 track = track,
                                 isSelected = track.id in uiState.selectedTrackIds,
                                 isMultiSelectMode = true,
@@ -398,7 +347,7 @@ fun LibraryScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TrackListItem(
+private fun StintListItem(
     track: TrackEntity,
     isSelected: Boolean,
     isMultiSelectMode: Boolean,
@@ -429,7 +378,6 @@ private fun TrackListItem(
         Column(
             modifier = Modifier.padding(16.dp),
         ) {
-            // Name and date
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -453,28 +401,26 @@ private fun TrackListItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Stats row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                TrackStatChip(
+                StintStatChip(
                     label = "Distance",
                     value = formatDistance(track.distanceMeters, unitSystem),
                 )
-                TrackStatChip(
+                StintStatChip(
                     label = "Duration",
                     value = formatElapsedTime(track.durationMs),
                 )
                 if (track.avgSpeedMps > 0) {
-                    TrackStatChip(
+                    StintStatChip(
                         label = "Avg",
                         value = "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                     )
                 }
             }
 
-            // Tags
             if (track.tags.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -498,7 +444,7 @@ private fun TrackListItem(
 }
 
 @Composable
-private fun TrackStatChip(label: String, value: String) {
+private fun StintStatChip(label: String, value: String) {
     Column {
         Text(
             text = value,
@@ -512,4 +458,3 @@ private fun TrackStatChip(label: String, value: String) {
         )
     }
 }
-

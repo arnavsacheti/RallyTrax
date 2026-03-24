@@ -35,6 +35,26 @@ interface TrackDao {
     @Query("SELECT COUNT(*) FROM tracks")
     suspend fun getTrackCount(): Int
 
+    // --- Route / Stint category queries ---
+
+    @Query("SELECT * FROM tracks WHERE trackCategory = 'route' ORDER BY recordedAt DESC")
+    fun getRoutes(): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM tracks WHERE trackCategory = 'stint' ORDER BY recordedAt DESC")
+    fun getStints(): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM tracks WHERE trackCategory = 'stint' ORDER BY recordedAt DESC")
+    suspend fun getStintsOnce(): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE trackCategory = 'route' AND name LIKE '%' || :query || '%' ORDER BY recordedAt DESC")
+    fun searchRoutes(query: String): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM tracks WHERE trackCategory = 'stint' AND name LIKE '%' || :query || '%' ORDER BY recordedAt DESC")
+    fun searchStints(query: String): Flow<List<TrackEntity>>
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE trackCategory = 'stint'")
+    fun observeStintCount(): Flow<Int>
+
     @Query("SELECT * FROM tracks WHERE name LIKE '%' || :query || '%' ORDER BY recordedAt DESC")
     fun searchTracks(query: String): Flow<List<TrackEntity>>
 

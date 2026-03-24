@@ -27,6 +27,7 @@ data class ProfileState(
     val avgDriveLengthMeters: Double = 0.0,
     val longestDriveMeters: Double = 0.0,
     val vehicleCount: Int = 0,
+    val stintCount: Int = 0,
     // Yearly stats
     val yearlyDrives: Int = 0,
     val yearlyDistanceMeters: Double = 0.0,
@@ -43,23 +44,23 @@ class ProfileViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     val profileState: StateFlow<ProfileState> = combine(
-        trackDao.getAllTracks(),
+        trackDao.getStints(),
         vehicleDao.getAllVehicles(),
-    ) { allTracks, allVehicles ->
+    ) { stints, allVehicles ->
         val zone = ZoneId.systemDefault()
         val today = Instant.now().atZone(zone).toLocalDate()
         val yearMonth = YearMonth.from(today)
 
-        // Active days this month
+        // Active days this month (stints only)
         val monthStart = yearMonth.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val monthEnd = yearMonth.atEndOfMonth().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val activeDaysThisMonth = allTracks
+        val activeDaysThisMonth = stints
             .filter { it.recordedAt in monthStart until monthEnd }
             .map { Instant.ofEpochMilli(it.recordedAt).atZone(zone).toLocalDate() }
             .toSet()
 
-        // Streak calculation (same logic as HomeViewModel)
-        val drivingDays = allTracks
+        // Streak calculation (stints only)
+        val drivingDays = stints
             .map { Instant.ofEpochMilli(it.recordedAt).atZone(zone).toLocalDate() }
             .distinct()
             .sortedDescending()
@@ -76,16 +77,16 @@ class ProfileViewModel @Inject constructor(
             }
         }
 
-        // Lifetime stats
-        val totalDrives = allTracks.size
-        val totalDistance = allTracks.sumOf { it.distanceMeters }
+        // Lifetime stats (stints only)
+        val totalDrives = stints.size
+        val totalDistance = stints.sumOf { it.distanceMeters }
         val avgDriveLength = if (totalDrives > 0) totalDistance / totalDrives else 0.0
-        val longestDrive = allTracks.maxOfOrNull { it.distanceMeters } ?: 0.0
+        val longestDrive = stints.maxOfOrNull { it.distanceMeters } ?: 0.0
         val vehicleCount = allVehicles.count { !it.isArchived }
 
-        // Yearly stats
+        // Yearly stats (stints only)
         val yearStart = LocalDate.of(today.year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val yearlyTracks = allTracks.filter { it.recordedAt >= yearStart }
+        val yearlyTracks = stints.filter { it.recordedAt >= yearStart }
 
         ProfileState(
             currentStreak = currentStreak,
@@ -95,6 +96,7 @@ class ProfileViewModel @Inject constructor(
             avgDriveLengthMeters = avgDriveLength,
             longestDriveMeters = longestDrive,
             vehicleCount = vehicleCount,
+            stintCount = stints.size,
             yearlyDrives = yearlyTracks.size,
             yearlyDistanceMeters = yearlyTracks.sumOf { it.distanceMeters },
         )

@@ -31,4 +31,5 @@ data class TrackEntity(
     val curvinessScore: Double? = null,
     val primarySurface: String? = null,
     val surfaceBreakdown: String? = null,
+    val trackCategory: String = "stint", // "route" or "stint"
 )
