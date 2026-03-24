@@ -247,6 +247,7 @@ class TrackDetailViewModel @Inject constructor(
                 )
             },
         )
+    }
 
     fun toggleLayer(layer: MapLayer) {
         val current = _uiState.value.activeLayers.toMutableSet()

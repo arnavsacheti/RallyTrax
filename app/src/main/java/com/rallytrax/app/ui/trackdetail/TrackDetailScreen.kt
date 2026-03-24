@@ -278,6 +278,9 @@ fun TrackDetailScreen(
                         unitSystem = preferences.unitSystem,
                         activeLayers = uiState.activeLayers,
                         vehicleName = vehicleName,
+                        onDetectSegments = { viewModel.detectNewSegments() },
+                        onSegmentClick = onSegmentClick,
+                        onViewAllSegments = onViewAllSegments,
                     )
                 }
             }
@@ -1038,6 +1041,9 @@ private fun ViewTab(
     unitSystem: UnitSystem,
     activeLayers: Set<MapLayer>,
     vehicleName: String?,
+    onDetectSegments: () -> Unit = {},
+    onSegmentClick: (String) -> Unit = {},
+    onViewAllSegments: () -> Unit = {},
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1090,7 +1096,7 @@ private fun ViewTab(
             segments = uiState.segments,
             isDetecting = uiState.isDetectingSegments,
             suggestedCount = uiState.suggestedSegments.size,
-            onDetectSegments = { viewModel.detectNewSegments() },
+            onDetectSegments = onDetectSegments,
             onSegmentClick = onSegmentClick,
             onViewAllSegments = onViewAllSegments,
             unitSystem = unitSystem,
