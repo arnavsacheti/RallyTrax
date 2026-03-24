@@ -254,6 +254,7 @@ fun TrackDetailScreen(
                     LayerToolbar(
                         activeLayers = uiState.activeLayers,
                         onToggle = viewModel::toggleLayer,
+                        isRoute = uiState.track?.trackCategory == "route",
                     )
 
                 }
@@ -535,7 +536,7 @@ private fun FullscreenMapDialog(
 // ── Layer Toolbar ───────────────────────────────────────────────────────────
 
 @Composable
-private fun LayerToolbar(activeLayers: Set<MapLayer>, onToggle: (MapLayer) -> Unit) {
+private fun LayerToolbar(activeLayers: Set<MapLayer>, onToggle: (MapLayer) -> Unit, isRoute: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -544,8 +545,10 @@ private fun LayerToolbar(activeLayers: Set<MapLayer>, onToggle: (MapLayer) -> Un
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LayerChip("Route", MapLayer.ROUTE, activeLayers, onToggle, enabled = false)
-        LayerChip("Speed", MapLayer.SPEED, activeLayers, onToggle)
-        LayerChip("Accel", MapLayer.ACCEL, activeLayers, onToggle)
+        if (!isRoute) {
+            LayerChip("Speed", MapLayer.SPEED, activeLayers, onToggle)
+            LayerChip("Accel", MapLayer.ACCEL, activeLayers, onToggle)
+        }
         LayerChip("Elevation", MapLayer.ELEVATION, activeLayers, onToggle)
         LayerChip("Curve", MapLayer.CURVATURE, activeLayers, onToggle)
         LayerChip("Callouts", MapLayer.CALLOUTS, activeLayers, onToggle)
@@ -608,14 +611,17 @@ private fun SummaryCard(track: com.rallytrax.app.data.local.entity.TrackEntity, 
             Spacer(modifier = Modifier.height(12.dp))
 
             // 2-column grid of stats
+            val isRoute = track.trackCategory == "route"
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 StatItem("Distance", formatDistance(track.distanceMeters, unitSystem))
                 StatItem("Duration", formatElapsedTime(track.durationMs))
             }
-            HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                StatItem("Avg Speed", "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}")
-                StatItem("Max Speed", "${formatSpeed(track.maxSpeedMps, unitSystem)} ${speedUnit(unitSystem)}")
+            if (!isRoute) {
+                HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    StatItem("Avg Speed", "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}")
+                    StatItem("Max Speed", "${formatSpeed(track.maxSpeedMps, unitSystem)} ${speedUnit(unitSystem)}")
+                }
             }
             HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1002,8 +1008,8 @@ private fun ViewTab(
         Spacer(modifier = Modifier.height(12.dp))
         TrackInfoChips(track, vehicleName)
 
-        // Speed chart with inline hero stats
-        if (CardType.SPEED_PROFILE in visible && uiState.speedProfile.size >= 2) {
+        // Speed chart with inline hero stats (hidden for routes)
+        if (CardType.SPEED_PROFILE in visible && uiState.speedProfile.size >= 2 && track.trackCategory != "route") {
             Spacer(modifier = Modifier.height(16.dp))
             SpeedProfileCard(uiState.speedProfile, unitSystem, track)
         }

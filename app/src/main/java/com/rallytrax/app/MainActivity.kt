@@ -264,7 +264,6 @@ class MainActivity : ComponentActivity() {
                                     name = parseResult.name,
                                 )
                                 if (trackId != null) {
-                                    snackbarHostState.showSnackbar("Imported route: ${parseResult.name ?: "Shared Route"}")
                                     navController.navigate(TrackDetailRoute(trackId))
                                 } else {
                                     snackbarHostState.showSnackbar("Failed to save shared route")
@@ -397,7 +396,7 @@ class MainActivity : ComponentActivity() {
             )
             trackDao.insertTrack(track)
 
-            val points = routePoints.mapIndexed { index, pt ->
+            val rawPoints = routePoints.mapIndexed { index, pt ->
                 com.rallytrax.app.data.local.entity.TrackPointEntity(
                     trackId = trackId,
                     index = index,
@@ -406,7 +405,30 @@ class MainActivity : ComponentActivity() {
                     timestamp = now + index * 1000L,
                 )
             }
-            trackPointDao.insertPoints(points)
+
+            // Compute curvature and acceleration fields from geometry
+            val enrichedPoints = com.rallytrax.app.pacenotes.TrackPointComputer.computeFields(rawPoints)
+            trackPointDao.insertPoints(enrichedPoints)
+
+            // Generate pace notes from route geometry
+            val paceNotes = com.rallytrax.app.pacenotes.PaceNoteGenerator.generate(
+                trackId, enrichedPoints, com.rallytrax.app.pacenotes.PaceNoteGenerator.Sensitivity.MEDIUM,
+            )
+            if (paceNotes.isNotEmpty()) {
+                paceNoteDao.insertNotes(paceNotes)
+            }
+
+            // Classify route (curviness, difficulty, type)
+            if (enrichedPoints.size >= 10) {
+                val classification = com.rallytrax.app.data.classification.RouteClassifier.classify(enrichedPoints)
+                val classifiedTrack = track.copy(
+                    curvinessScore = classification.curvinessScore,
+                    routeType = classification.suggestedRouteType,
+                    difficultyRating = classification.difficultyRating,
+                    elevationGainM = classification.maxElevationChangeM,
+                )
+                trackDao.updateTrack(classifiedTrack)
+            }
 
             trackId
         } catch (e: Exception) {
