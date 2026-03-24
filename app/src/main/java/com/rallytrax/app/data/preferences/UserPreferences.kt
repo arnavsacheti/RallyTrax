@@ -43,7 +43,9 @@ data class UserPreferencesData(
     val ttsRate: Float = 1.25f,
     val ttsPitch: Float = 1.15f,
     val ttsEnabled: Boolean = true,
-    val paceNoteSensitivity: Float = 5f,
+    val paceNoteSensitivity: Float = 5f, // deprecated — kept for backward compat
+    val callTimingSeconds: Float = 6f, // lookahead time for pace note calls (3-12s)
+    val halfStepSeverityEnabled: Boolean = false, // opt-in +/- severity (16 graduations)
     val onboardingCompleted: Boolean = false,
     val keepScreenOn: Boolean = false,
     // Activity lifecycle preferences
@@ -68,6 +70,8 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val MAP_PROVIDER = stringPreferencesKey("map_provider")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val PACE_NOTE_SENSITIVITY = floatPreferencesKey("pace_note_sensitivity")
+        val CALL_TIMING_SECONDS = floatPreferencesKey("call_timing_seconds")
+        val HALF_STEP_SEVERITY_ENABLED = booleanPreferencesKey("half_step_severity_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         // Activity lifecycle
@@ -107,6 +111,8 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             ttsPitch = prefs[Keys.TTS_PITCH] ?: 1.15f,
             ttsEnabled = prefs[Keys.TTS_ENABLED] ?: true,
             paceNoteSensitivity = prefs[Keys.PACE_NOTE_SENSITIVITY] ?: 5f,
+            callTimingSeconds = prefs[Keys.CALL_TIMING_SECONDS] ?: 6f,
+            halfStepSeverityEnabled = prefs[Keys.HALF_STEP_SEVERITY_ENABLED] ?: false,
             onboardingCompleted = prefs[Keys.ONBOARDING_COMPLETED] ?: false,
             keepScreenOn = prefs[Keys.KEEP_SCREEN_ON] ?: false,
             autoPauseEnabled = prefs[Keys.AUTO_PAUSE_ENABLED] ?: true,
@@ -170,6 +176,14 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setPaceNoteSensitivity(sensitivity: Float) {
         dataStore.edit { it[Keys.PACE_NOTE_SENSITIVITY] = sensitivity }
+    }
+
+    suspend fun setCallTimingSeconds(seconds: Float) {
+        dataStore.edit { it[Keys.CALL_TIMING_SECONDS] = seconds.coerceIn(3f, 12f) }
+    }
+
+    suspend fun setHalfStepSeverityEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.HALF_STEP_SEVERITY_ENABLED] = enabled }
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {

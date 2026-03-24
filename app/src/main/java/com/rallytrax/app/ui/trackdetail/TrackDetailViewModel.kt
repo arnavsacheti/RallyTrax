@@ -60,7 +60,6 @@ data class TrackDetailUiState(
     val paceNotes: List<PaceNoteEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isGeneratingNotes: Boolean = false,
-    val selectedSensitivity: Int = 1, // 0=LOW, 1=MEDIUM, 2=HIGH
     val activeLayers: Set<MapLayer> = setOf(MapLayer.ROUTE),
     // Route history (Phase 1: previous attempts)
     val routeCompletionCount: Int = 0,
@@ -214,27 +213,26 @@ class TrackDetailViewModel @Inject constructor(
         )
     }
 
-    fun regeneratePaceNotes(sensitivityIndex: Int) {
+    fun regeneratePaceNotes() {
         val points = cachedPoints
         if (points.isEmpty()) {
             _snackbarMessage.tryEmit("No track points available")
             return
         }
 
-        _uiState.value = _uiState.value.copy(
-            isGeneratingNotes = true,
-            selectedSensitivity = sensitivityIndex,
-        )
+        _uiState.value = _uiState.value.copy(isGeneratingNotes = true)
 
         viewModelScope.launch {
             try {
-                val sensitivity = when (sensitivityIndex) {
-                    0 -> PaceNoteGenerator.Sensitivity.LOW
-                    2 -> PaceNoteGenerator.Sensitivity.HIGH
-                    else -> PaceNoteGenerator.Sensitivity.MEDIUM
-                }
+                val prefs = preferences.value
+                val hasSpeedData = points.any { (it.speed ?: 0.0) > 0.0 }
 
-                val notes = PaceNoteGenerator.generate(trackId, points, sensitivity)
+                val notes = PaceNoteGenerator.generate(
+                    trackId = trackId,
+                    points = points,
+                    halfStepEnabled = prefs.halfStepSeverityEnabled,
+                    useSpeedCalibration = hasSpeedData,
+                )
 
                 paceNoteDao.deleteNotesForTrack(trackId)
                 if (notes.isNotEmpty()) {

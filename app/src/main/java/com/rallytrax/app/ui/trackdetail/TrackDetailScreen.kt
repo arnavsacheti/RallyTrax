@@ -434,8 +434,9 @@ private fun GoogleTrackMap(
                         NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
                         NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
                         NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                        NoteType.CREST -> BitmapDescriptorFactory.HUE_YELLOW
-                        NoteType.DIP -> BitmapDescriptorFactory.HUE_ORANGE
+                        NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> BitmapDescriptorFactory.HUE_RED
+                        NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> BitmapDescriptorFactory.HUE_YELLOW
+                        NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> BitmapDescriptorFactory.HUE_ORANGE
                         NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
                     }
                     Marker(
@@ -811,14 +812,18 @@ private fun PaceNoteItem(note: PaceNoteEntity, unitSystem: UnitSystem) {
         NoteType.LEFT -> Color(0xFF1A73E8)
         NoteType.RIGHT -> Color(0xFF34A853)
         NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> Color(0xFFEA4335)
-        NoteType.CREST -> Color(0xFFFBBC04)
-        NoteType.DIP -> Color(0xFFFF6D00)
+        NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> Color(0xFFEA4335)
+        NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> Color(0xFFFBBC04)
+        NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> Color(0xFFFF6D00)
         NoteType.STRAIGHT -> Color(0xFF9C27B0)
     }
     val typeIcon = when (note.noteType) {
         NoteType.LEFT -> "L"; NoteType.RIGHT -> "R"
         NoteType.HAIRPIN_LEFT -> "HL"; NoteType.HAIRPIN_RIGHT -> "HR"
-        NoteType.CREST -> "CR"; NoteType.DIP -> "DP"; NoteType.STRAIGHT -> "ST"
+        NoteType.SQUARE_LEFT -> "SL"; NoteType.SQUARE_RIGHT -> "SR"
+        NoteType.CREST -> "CR"; NoteType.SMALL_CREST -> "sC"; NoteType.BIG_CREST -> "BC"
+        NoteType.DIP -> "DP"; NoteType.SMALL_DIP -> "sD"; NoteType.BIG_DIP -> "BD"
+        NoteType.STRAIGHT -> "ST"
     }
 
     Row(

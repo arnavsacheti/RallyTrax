@@ -14,6 +14,12 @@ enum class NoteType {
     DIP,
     HAIRPIN_LEFT,
     HAIRPIN_RIGHT,
+    SQUARE_LEFT,
+    SQUARE_RIGHT,
+    SMALL_CREST,
+    SMALL_DIP,
+    BIG_CREST,
+    BIG_DIP,
 }
 
 enum class NoteModifier {
@@ -25,6 +31,20 @@ enum class NoteModifier {
     OVER,
     DONT_CUT,
     KEEP_IN,
+    SHORT,
+    VERY_LONG,
+}
+
+enum class SeverityHalf {
+    MINUS,
+    NONE,
+    PLUS,
+}
+
+enum class Conjunction {
+    INTO,
+    AND,
+    DISTANCE,
 }
 
 @Entity(
@@ -50,4 +70,7 @@ data class PaceNoteEntity(
     val modifier: NoteModifier = NoteModifier.NONE,
     val callText: String,
     val callDistanceM: Double = 0.0, // distance to next note
+    val severityHalf: SeverityHalf = SeverityHalf.NONE, // +/- half-step
+    val conjunction: Conjunction = Conjunction.DISTANCE, // into/and/distance
+    val turnRadiusM: Double? = null, // computed radius for calibration
 )

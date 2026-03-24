@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.rallytrax.app.data.local.dao.AchievementDao
+import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.GridCellDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
@@ -14,6 +15,7 @@ import com.rallytrax.app.data.local.dao.GasStationDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.entity.AchievementEntity
+import com.rallytrax.app.data.local.entity.DriverProfileEntity
 import com.rallytrax.app.data.local.entity.FuelLogEntity
 import com.rallytrax.app.data.local.entity.GasStationEntity
 import com.rallytrax.app.data.local.entity.GridCellEntity
@@ -36,8 +38,9 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         MaintenanceRecordEntity::class,
         MaintenanceScheduleEntity::class,
         AchievementEntity::class,
+        DriverProfileEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -50,6 +53,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun gasStationDao(): GasStationDao
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun achievementDao(): AchievementDao
+    abstract fun driverProfileDao(): DriverProfileDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -272,6 +276,35 @@ abstract class RallyTraxDatabase : RoomDatabase() {
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tracks ADD COLUMN trackCategory TEXT NOT NULL DEFAULT 'stint'")
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // PaceNoteEntity: add +/- severity, conjunction, and turn radius
+                db.execSQL("ALTER TABLE pace_notes ADD COLUMN severityHalf TEXT NOT NULL DEFAULT 'NONE'")
+                db.execSQL("ALTER TABLE pace_notes ADD COLUMN conjunction TEXT NOT NULL DEFAULT 'DISTANCE'")
+                db.execSQL("ALTER TABLE pace_notes ADD COLUMN turnRadiusM REAL DEFAULT NULL")
+
+                // TrackPointEntity: add phone sensor fields
+                db.execSQL("ALTER TABLE track_points ADD COLUMN lateralAccelMps2 REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE track_points ADD COLUMN verticalAccelMps2 REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE track_points ADD COLUMN yawRateDegPerS REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE track_points ADD COLUMN barometerAltitudeM REAL DEFAULT NULL")
+
+                // DriverProfileEntity: persistent driver skill profile
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `driver_profile_entries` (
+                        `id` TEXT NOT NULL,
+                        `radiusBucketM` INTEGER NOT NULL,
+                        `avgSpeedMps` REAL NOT NULL,
+                        `sampleCount` INTEGER NOT NULL,
+                        `lastUpdated` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.AchievementDao
+import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.GasStationDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
@@ -41,6 +42,7 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_7_8,
                 RallyTraxDatabase.MIGRATION_8_9,
                 RallyTraxDatabase.MIGRATION_9_10,
+                RallyTraxDatabase.MIGRATION_10_11,
             )
             .build()
     }
@@ -88,5 +90,10 @@ object DatabaseModule {
     @Provides
     fun provideAchievementDao(database: RallyTraxDatabase): AchievementDao {
         return database.achievementDao()
+    }
+
+    @Provides
+    fun provideDriverProfileDao(database: RallyTraxDatabase): DriverProfileDao {
+        return database.driverProfileDao()
     }
 }

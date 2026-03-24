@@ -52,6 +52,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var preferencesRepository: com.rallytrax.app.data.preferences.UserPreferencesRepository
     @Inject lateinit var vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao
     @Inject lateinit var gasStationDetector: com.rallytrax.app.data.fuel.GasStationDetector
+    @Inject lateinit var driverProfileDao: com.rallytrax.app.data.local.dao.DriverProfileDao
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -79,6 +80,9 @@ class TrackingService : LifecycleService() {
     // Kalman filter for smooth, high-rate position tracking
     private val kalmanFilter = GpsKalmanFilter()
     private var predictionJob: Job? = null
+
+    // Phone sensor collector for Jemba-style inertial data
+    private var sensorCollector: SensorCollector? = null
 
     // Gas station pause detection
     private var pauseStartTime: Long? = null
@@ -179,6 +183,9 @@ class TrackingService : LifecycleService() {
         pointBuffer.clear()
         pathSegments.clear()
         pathSegments.add(mutableListOf())
+
+        // Start phone sensor collection (accelerometer, gyroscope, barometer)
+        sensorCollector = SensorCollector(this).also { it.start() }
 
         // Start foreground immediately (doesn't need DB)
         val notification = notificationManager.createNotification("00:00", formatDistance(0.0, cachedUnitSystem))
@@ -282,6 +289,8 @@ class TrackingService : LifecycleService() {
         pauseTimer()
         predictionJob?.cancel()
         flushJob?.cancel()
+        sensorCollector?.stop()
+        sensorCollector = null
 
         _recordingStatus.value = RecordingStatus.STOPPED
 
@@ -327,12 +336,26 @@ class TrackingService : LifecycleService() {
                 // Non-critical; continue with un-enriched points
             }
 
-            // Generate pace notes in background
+            // Generate pace notes with speed calibration from driver profile
             try {
-                val paceNotes = PaceNoteGenerator.generate(savedId, allPoints)
+                val driverProfile = com.rallytrax.app.pacenotes.DriverProfileUpdater.loadProfile(driverProfileDao)
+                val hasSpeedData = allPoints.any { (it.speed ?: 0.0) > 0.0 }
+                val paceNotes = PaceNoteGenerator.generate(
+                    trackId = savedId,
+                    points = allPoints,
+                    useSpeedCalibration = hasSpeedData,
+                    driverProfile = driverProfile.ifEmpty { null },
+                )
                 if (paceNotes.isNotEmpty()) {
                     paceNoteDao.deleteNotesForTrack(savedId)
                     paceNoteDao.insertNotes(paceNotes)
+
+                    // Update persistent driver profile with this stint's speed data
+                    if (hasSpeedData) {
+                        com.rallytrax.app.pacenotes.DriverProfileUpdater.updateFromStint(
+                            paceNotes, allPoints, driverProfileDao,
+                        )
+                    }
                 }
             } catch (_: Exception) {
                 // Pace note generation is non-critical; don't block save
@@ -423,6 +446,9 @@ class TrackingService : LifecycleService() {
         isNewSegment = false
         lastLocation = location
 
+        // Snapshot phone sensor data alongside GPS fix
+        val sensorSnapshot = sensorCollector?.snapshot()
+
         // Store raw GPS in database (preserves ground-truth data for post-processing)
         val point = TrackPointEntity(
             trackId = trackId,
@@ -434,6 +460,10 @@ class TrackingService : LifecycleService() {
             speed = rawSpeed,
             bearing = rawBearing,
             accuracy = if (location.hasAccuracy()) location.accuracy else null,
+            lateralAccelMps2 = sensorSnapshot?.lateralAccelMps2,
+            verticalAccelMps2 = sensorSnapshot?.verticalAccelMps2,
+            yawRateDegPerS = sensorSnapshot?.yawRateDegPerS,
+            barometerAltitudeM = sensorSnapshot?.barometerAltitudeM,
         )
         pointBuffer.add(point)
 
@@ -644,6 +674,8 @@ class TrackingService : LifecycleService() {
         timerJob?.cancel()
         flushJob?.cancel()
         predictionJob?.cancel()
+        sensorCollector?.stop()
+        sensorCollector = null
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 }

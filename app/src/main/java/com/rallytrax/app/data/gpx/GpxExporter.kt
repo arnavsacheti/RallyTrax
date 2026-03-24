@@ -82,6 +82,9 @@ object GpxExporter {
                     writer.write(""" severity="${note.severity}"""")
                     writer.write(""" modifier="${note.modifier.name}"""")
                     writer.write(""" callDistanceM="${note.callDistanceM}"""")
+                    writer.write(""" severityHalf="${note.severityHalf.name}"""")
+                    writer.write(""" conjunction="${note.conjunction.name}"""")
+                    note.turnRadiusM?.let { writer.write(""" turnRadiusM="$it"""") }
                     writer.write(">")
                     writer.write(escapeXml(note.callText))
                     writer.write("</rt:paceNote>")

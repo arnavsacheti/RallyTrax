@@ -16,6 +16,8 @@ import kotlin.math.sqrt
 class ReplayEngine(
     private val trackPoints: List<TrackPointEntity>,
     private val paceNotes: List<PaceNoteEntity>,
+    /** Configurable lookahead time in seconds (default 6s, range 3-12). */
+    var lookaheadSeconds: Double = 6.0,
 ) {
     /** Cumulative distance at each track point index */
     private val cumulativeDistances: DoubleArray
@@ -161,15 +163,16 @@ class ReplayEngine(
     }
 
     /**
-     * Pre-call distance scales with speed:
-     * - At 20 km/h (~5.5 m/s): ~80m ahead
-     * - At 100 km/h (~27.8 m/s): ~200m ahead
-     * - At 160 km/h (~44.4 m/s): ~300m ahead
+     * Pre-call distance: time-based lookahead.
+     * distance = speed * lookaheadSeconds, clamped to [40m, 400m].
+     *
+     * Default 6s lookahead gives:
+     * - At 20 km/h (~5.5 m/s): ~33m ahead (clamped to 40m)
+     * - At 100 km/h (~27.8 m/s): ~167m ahead
+     * - At 160 km/h (~44.4 m/s): ~267m ahead
      */
     private fun computePreCallDistance(speedMps: Double): Double {
-        val baseDistance = 80.0
-        val speedFactor = (speedMps / 5.5) * 30.0 // Roughly 30m per 20km/h
-        return (baseDistance + speedFactor).coerceIn(80.0, 300.0)
+        return (speedMps * lookaheadSeconds).coerceIn(40.0, 400.0)
     }
 
     /**

@@ -31,4 +31,8 @@ data class TrackPointEntity(
     val curvatureDegPerM: Double? = null, // bearing change per metre
     val surfaceType: String? = null, // paved/gravel/dirt/cobblestone
     val segmentMarker: String? = null, // fuel/photo/break — marks user-created segment boundaries
+    val lateralAccelMps2: Double? = null, // phone sensor: lateral acceleration
+    val verticalAccelMps2: Double? = null, // phone sensor: vertical acceleration
+    val yawRateDegPerS: Double? = null, // phone sensor: gyroscope yaw rate
+    val barometerAltitudeM: Double? = null, // phone sensor: barometric altitude
 )

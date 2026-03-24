@@ -418,8 +418,9 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
                     NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
                     NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
                     NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                    NoteType.CREST -> BitmapDescriptorFactory.HUE_YELLOW
-                    NoteType.DIP -> BitmapDescriptorFactory.HUE_ORANGE
+                    NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> BitmapDescriptorFactory.HUE_RED
+                    NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> BitmapDescriptorFactory.HUE_YELLOW
+                    NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> BitmapDescriptorFactory.HUE_ORANGE
                     NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
                 }
                 Marker(

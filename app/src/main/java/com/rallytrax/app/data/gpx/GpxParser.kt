@@ -1,7 +1,9 @@
 package com.rallytrax.app.data.gpx
 
+import com.rallytrax.app.data.local.entity.Conjunction
 import com.rallytrax.app.data.local.entity.NoteModifier
 import com.rallytrax.app.data.local.entity.NoteType
+import com.rallytrax.app.data.local.entity.SeverityHalf
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
@@ -61,6 +63,9 @@ object GpxParser {
             var paceNoteSeverity = 0
             var paceNoteModifier: NoteModifier = NoteModifier.NONE
             var paceNoteCallDistM = 0.0
+            var paceNoteSeverityHalf = SeverityHalf.NONE
+            var paceNoteConjunction = Conjunction.DISTANCE
+            var paceNoteTurnRadiusM: Double? = null
 
             // Current trkpt state
             var currentLat: Double? = null
@@ -134,6 +139,13 @@ object GpxParser {
                                     NoteModifier.valueOf(parser.getAttributeValue(null, "modifier") ?: "NONE")
                                 } catch (_: Exception) { NoteModifier.NONE }
                                 paceNoteCallDistM = parser.getAttributeValue(null, "callDistanceM")?.toDoubleOrNull() ?: 0.0
+                                paceNoteSeverityHalf = try {
+                                    SeverityHalf.valueOf(parser.getAttributeValue(null, "severityHalf") ?: "NONE")
+                                } catch (_: Exception) { SeverityHalf.NONE }
+                                paceNoteConjunction = try {
+                                    Conjunction.valueOf(parser.getAttributeValue(null, "conjunction") ?: "DISTANCE")
+                                } catch (_: Exception) { Conjunction.DISTANCE }
+                                paceNoteTurnRadiusM = parser.getAttributeValue(null, "turnRadiusM")?.toDoubleOrNull()
                             }
                         }
                         currentTag = tag
@@ -170,6 +182,9 @@ object GpxParser {
                                         modifier = paceNoteModifier,
                                         callText = text,
                                         callDistanceM = paceNoteCallDistM,
+                                        severityHalf = paceNoteSeverityHalf,
+                                        conjunction = paceNoteConjunction,
+                                        turnRadiusM = paceNoteTurnRadiusM,
                                     )
                                 )
                                 inPaceNote = false

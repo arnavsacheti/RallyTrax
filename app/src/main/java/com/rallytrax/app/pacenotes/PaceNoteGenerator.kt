@@ -1,35 +1,37 @@
 package com.rallytrax.app.pacenotes
 
+import com.rallytrax.app.data.local.entity.Conjunction
 import com.rallytrax.app.data.local.entity.NoteModifier
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
+import com.rallytrax.app.data.local.entity.SeverityHalf
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Pace note generation engine.
+ * Pace note generation engine using circumscribed circle radius method.
  *
  * Pipeline:
- * 1. Smoothing (RDP simplification + Gaussian bearing smoothing)
- * 2. Cumulative distance & bearing computation
- * 3. Bearing delta analysis (50m windows, configurable threshold)
- * 4. Turn classification (severity 1-6 by angular deflection)
- * 5. Modifier detection (tightens / opens / long)
- * 6. Straight detection (>200m gap between notes)
- * 7. Elevation events (crests / dips from gradient reversals, min 4m)
- * 8. Call-distance computation (80–300m)
- * 9. Text assembly
+ * 1. RDP pre-filter for GPS noise
+ * 2. Interpolate to uniform ~3m segments
+ * 3. Compute circumscribed circle radius at each point
+ * 4. Segment turns (radius below straight threshold)
+ * 5. Classify severity via g-force threshold table (1-6 with optional +/-)
+ * 6. Detect modifiers (tightens/opens/long/short)
+ * 7. Determine conjunctions (into/and/distance)
+ * 8. Detect elevation events (small/normal/big crests and dips)
+ * 9. Insert straights for long gaps
+ * 10. Compute call distances and assemble text
  */
 object PaceNoteGenerator {
 
-    /** Sensitivity presets – lower value = more notes generated */
+    /** Retained for backward compatibility; only rdpEpsilon and minStraightM are used. */
     data class Sensitivity(
-        val bearingThresholdDeg: Double = 15.0,
+        val bearingThresholdDeg: Double = 15.0, // unused by radius method
         val rdpEpsilon: Double = 5.0,
         val minStraightM: Double = 200.0,
         val minElevationChangeM: Double = 4.0,
@@ -41,41 +43,140 @@ object PaceNoteGenerator {
         }
     }
 
+    /** Interpolated point for uniform-spacing analysis. */
+    private data class InterpPoint(
+        val lat: Double,
+        val lon: Double,
+        val elevation: Double?,
+        val cumulativeDistance: Double,
+        val originalIndex: Int, // closest original TrackPointEntity index
+    )
+
+    /** Detected turn region. */
+    private data class TurnRegion(
+        val startIdx: Int, // index into interpolated array
+        val endIdx: Int,
+        val apexIdx: Int, // index of minimum radius (tightest point)
+        val apexRadiusM: Double,
+        val isLeft: Boolean,
+        val entryAvgRadius: Double, // average radius of first half
+        val exitAvgRadius: Double, // average radius of second half
+        val arcLengthM: Double,
+    )
+
+    // ── Severity thresholds ──────────────────────────────────────────────
+    // Derived from: speed at which 0.3g lateral accel is reached for given radius
+    // v = sqrt(0.3 * 9.81 * r), then convert m/s to km/h
+
+    private data class GradeBand(val minRadius: Double, val maxRadius: Double, val grade: Int)
+
+    private val GRADE_BANDS = listOf(
+        GradeBand(0.0, 7.0, 1),      // Hairpin: 0-30 km/h
+        GradeBand(7.0, 12.0, 2),     // 30-40 km/h
+        GradeBand(12.0, 22.0, 3),    // 40-50 km/h
+        GradeBand(22.0, 43.0, 4),    // 50-70 km/h
+        GradeBand(43.0, 71.0, 5),    // 70-90 km/h
+        GradeBand(71.0, 148.0, 6),   // 90-130 km/h
+    )
+    private const val STRAIGHT_RADIUS_THRESHOLD = 148.0 // Above this = straight
+
+    private const val INTERP_SEGMENT_M = 3.0 // Uniform segment length
+    private const val RADIUS_NEIGHBOR_M = 10.0 // Look-ahead/behind for circumscribed circle
+    private const val TURN_MERGE_GAP_M = 5.0 // Merge turn regions closer than this
+    private const val MAX_RADIUS_CAP = 10000.0 // Cap for near-collinear points
+
+    // Conjunction thresholds (gap between consecutive turn apexes)
+    private const val INTO_THRESHOLD_M = 15.0
+    private const val AND_THRESHOLD_M = 30.0
+
     fun generate(
         trackId: String,
         points: List<TrackPointEntity>,
         sensitivity: Sensitivity = Sensitivity.MEDIUM,
+        halfStepEnabled: Boolean = false,
+        useSpeedCalibration: Boolean = false,
+        driverProfile: Map<Int, Double>? = null, // radiusBucket -> avgSpeedMps
     ): List<PaceNoteEntity> {
         if (points.size < 10) return emptyList()
 
-        // 1. RDP simplification
+        // 1. RDP pre-filter for GPS noise reduction
         val simplified = rdpSimplify(points, sensitivity.rdpEpsilon)
         if (simplified.size < 3) return emptyList()
 
-        // 2. Compute cumulative distances and bearings
-        val distances = computeCumulativeDistances(simplified)
-        val bearings = computeBearings(simplified)
+        // 2. Interpolate to uniform ~3m segments
+        val interpolated = interpolateUniform(simplified, INTERP_SEGMENT_M)
+        if (interpolated.size < 10) return emptyList()
 
-        // 3. Gaussian-smooth bearings
-        val smoothedBearings = gaussianSmoothBearings(bearings, sigma = 3)
+        // 3. Compute circumscribed circle radius and direction at each point
+        val radii = computeRadii(interpolated, RADIUS_NEIGHBOR_M)
+        val directions = computeDirections(interpolated, RADIUS_NEIGHBOR_M)
 
-        // 4. Find turns via bearing delta analysis
+        // 4. Segment turns (regions where radius < straight threshold)
+        val turnRegions = segmentTurns(interpolated, radii, directions)
+
+        // 5. Build pace notes from turn regions
         val rawNotes = mutableListOf<PaceNoteEntity>()
-        detectTurns(trackId, simplified, distances, smoothedBearings, sensitivity, rawNotes)
+        for (turn in turnRegions) {
+            val apexPt = interpolated[turn.apexIdx]
+            var severity = radiusToGrade(turn.apexRadiusM)
+            var severityHalf = if (halfStepEnabled) {
+                radiusToHalfStep(turn.apexRadiusM, severity)
+            } else {
+                SeverityHalf.NONE
+            }
 
-        // 5. Detect elevation events
-        detectElevationEvents(trackId, simplified, distances, sensitivity, rawNotes)
+            // Speed calibration: shift severity based on driver profile
+            if (useSpeedCalibration && driverProfile != null) {
+                val bucket = (turn.apexRadiusM / 10.0).toInt() * 10
+                val driverSpeed = driverProfile[bucket]
+                if (driverSpeed != null) {
+                    val refSpeed = referenceSpeedForGrade(severity)
+                    // If driver is consistently faster, shift severity up (less severe)
+                    if (driverSpeed > refSpeed * 1.15) {
+                        severity = (severity + 1).coerceAtMost(6)
+                        severityHalf = SeverityHalf.NONE
+                    } else if (driverSpeed < refSpeed * 0.85) {
+                        severity = (severity - 1).coerceAtLeast(1)
+                        severityHalf = SeverityHalf.NONE
+                    }
+                }
+            }
 
-        // 6. Sort by distance
+            // Classify turn type
+            val noteType = classifyTurnType(turn.isLeft, severity, turn.apexRadiusM)
+
+            // Detect modifier (tightens/opens/long/short)
+            val modifier = detectModifier(turn)
+
+            rawNotes.add(
+                PaceNoteEntity(
+                    trackId = trackId,
+                    pointIndex = apexPt.originalIndex,
+                    distanceFromStart = apexPt.cumulativeDistance,
+                    noteType = noteType,
+                    severity = severity,
+                    severityHalf = severityHalf,
+                    modifier = modifier,
+                    turnRadiusM = turn.apexRadiusM,
+                    callText = "",
+                )
+            )
+        }
+
+        // 6. Detect elevation events
+        detectElevationEvents(trackId, interpolated, sensitivity, rawNotes)
+
+        // 7. Sort by distance
         rawNotes.sortBy { it.distanceFromStart }
 
-        // 7. Insert straights
-        val withStraights = insertStraights(trackId, rawNotes, distances, sensitivity)
+        // 8. Determine conjunctions between consecutive turn notes
+        val withConjunctions = applyConjunctions(rawNotes)
 
-        // 8. Compute call distances
+        // 9. Insert straights for long gaps
+        val withStraights = insertStraights(trackId, withConjunctions, sensitivity)
+
+        // 10. Compute call distances and assemble text
         val withCallDistances = computeCallDistances(withStraights)
-
-        // 9. Assemble call text
         return withCallDistances.map { note ->
             note.copy(callText = assembleCallText(note))
         }
@@ -88,10 +189,7 @@ object PaceNoteGenerator {
         epsilon: Double,
     ): List<TrackPointEntity> {
         if (points.size < 3) return points
-
-        // Convert epsilon from meters to approximate degree threshold
         val epsDeg = epsilon / 111_000.0
-
         return rdpRecursive(points, epsDeg)
     }
 
@@ -103,7 +201,6 @@ object PaceNoteGenerator {
 
         var maxDist = 0.0
         var maxIndex = 0
-
         val start = points.first()
         val end = points.last()
 
@@ -131,226 +228,388 @@ object PaceNoteGenerator {
     ): Double {
         val dx = lineEnd.lon - lineStart.lon
         val dy = lineEnd.lat - lineStart.lat
-
         if (dx == 0.0 && dy == 0.0) {
             val pdx = point.lon - lineStart.lon
             val pdy = point.lat - lineStart.lat
             return sqrt(pdx * pdx + pdy * pdy)
         }
-
         val t = ((point.lon - lineStart.lon) * dx + (point.lat - lineStart.lat) * dy) / (dx * dx + dy * dy)
         val clampedT = t.coerceIn(0.0, 1.0)
-
         val closestX = lineStart.lon + clampedT * dx
         val closestY = lineStart.lat + clampedT * dy
-
         val resultDx = point.lon - closestX
         val resultDy = point.lat - closestY
-
         return sqrt(resultDx * resultDx + resultDy * resultDy)
     }
 
-    // ── Distance & Bearing ──────────────────────────────────────────────
+    // ── Interpolation ───────────────────────────────────────────────────
 
-    private fun computeCumulativeDistances(points: List<TrackPointEntity>): DoubleArray {
-        val distances = DoubleArray(points.size)
-        for (i in 1 until points.size) {
-            distances[i] = distances[i - 1] + haversine(
-                points[i - 1].lat, points[i - 1].lon,
-                points[i].lat, points[i].lon,
-            )
-        }
-        return distances
-    }
-
-    private fun computeBearings(points: List<TrackPointEntity>): DoubleArray {
-        val bearings = DoubleArray(points.size)
-        for (i in 0 until points.size - 1) {
-            bearings[i] = bearing(
-                points[i].lat, points[i].lon,
-                points[i + 1].lat, points[i + 1].lon,
-            )
-        }
-        if (points.size > 1) {
-            bearings[points.size - 1] = bearings[points.size - 2]
-        }
-        return bearings
-    }
-
-    private fun gaussianSmoothBearings(bearings: DoubleArray, sigma: Int): DoubleArray {
-        val smoothed = DoubleArray(bearings.size)
-        val kernelSize = sigma * 3
-        for (i in bearings.indices) {
-            var sinSum = 0.0
-            var cosSum = 0.0
-            var weightSum = 0.0
-            for (j in -kernelSize..kernelSize) {
-                val idx = (i + j).coerceIn(0, bearings.size - 1)
-                val weight = exp(-0.5 * (j.toDouble() / sigma) * (j.toDouble() / sigma))
-                val rad = Math.toRadians(bearings[idx])
-                sinSum += sin(rad) * weight
-                cosSum += cos(rad) * weight
-                weightSum += weight
-            }
-            smoothed[i] = (Math.toDegrees(atan2(sinSum / weightSum, cosSum / weightSum)) + 360) % 360
-        }
-        return smoothed
-    }
-
-    // ── Turn Detection ──────────────────────────────────────────────────
-
-    private fun detectTurns(
-        trackId: String,
+    private fun interpolateUniform(
         points: List<TrackPointEntity>,
-        distances: DoubleArray,
-        bearings: DoubleArray,
-        sensitivity: Sensitivity,
-        output: MutableList<PaceNoteEntity>,
-    ) {
-        val windowM = 50.0
+        segmentM: Double,
+    ): List<InterpPoint> {
+        if (points.size < 2) return emptyList()
+
+        val result = mutableListOf<InterpPoint>()
+        var cumDist = 0.0
+        var nextTargetDist = 0.0
+        var segIdx = 0
+
+        // Add first point
+        result.add(InterpPoint(points[0].lat, points[0].lon, points[0].elevation, 0.0, points[0].index))
+
+        for (i in 1 until points.size) {
+            val segDist = haversine(points[i - 1].lat, points[i - 1].lon, points[i].lat, points[i].lon)
+
+            // Skip GPS jumps (>200m between consecutive points)
+            if (segDist > 200.0) {
+                cumDist += segDist
+                nextTargetDist = cumDist + segmentM
+                result.add(InterpPoint(points[i].lat, points[i].lon, points[i].elevation, cumDist, points[i].index))
+                continue
+            }
+
+            val segStart = cumDist
+            val segEnd = cumDist + segDist
+
+            // Insert interpolated points at uniform intervals within this segment
+            while (nextTargetDist <= segEnd && segDist > 0.01) {
+                val frac = (nextTargetDist - segStart) / segDist
+                val lat = points[i - 1].lat + frac * (points[i].lat - points[i - 1].lat)
+                val lon = points[i - 1].lon + frac * (points[i].lon - points[i - 1].lon)
+                val ele = if (points[i - 1].elevation != null && points[i].elevation != null) {
+                    points[i - 1].elevation!! + frac * (points[i].elevation!! - points[i - 1].elevation!!)
+                } else {
+                    points[i].elevation ?: points[i - 1].elevation
+                }
+                // Assign original index of the closer point
+                val origIdx = if (frac < 0.5) points[i - 1].index else points[i].index
+                result.add(InterpPoint(lat, lon, ele, nextTargetDist, origIdx))
+                nextTargetDist += segmentM
+            }
+
+            cumDist = segEnd
+        }
+
+        return result
+    }
+
+    // ── Circumscribed Circle Radius ─────────────────────────────────────
+
+    /**
+     * For each interpolated point, compute the circumscribed circle radius
+     * through three points: ~neighborM before, the point, ~neighborM after.
+     */
+    private fun computeRadii(points: List<InterpPoint>, neighborM: Double): DoubleArray {
+        val radii = DoubleArray(points.size) { MAX_RADIUS_CAP }
+        if (points.size < 3) return radii
+
+        for (i in points.indices) {
+            // Find point ~neighborM before
+            val targetBefore = points[i].cumulativeDistance - neighborM
+            val beforeIdx = findClosestByDistance(points, targetBefore, 0, i)
+
+            // Find point ~neighborM after
+            val targetAfter = points[i].cumulativeDistance + neighborM
+            val afterIdx = findClosestByDistance(points, targetAfter, i, points.lastIndex)
+
+            if (beforeIdx == i || afterIdx == i || beforeIdx == afterIdx) {
+                radii[i] = MAX_RADIUS_CAP
+                continue
+            }
+
+            val a = points[beforeIdx]
+            val b = points[i]
+            val c = points[afterIdx]
+
+            radii[i] = circumscribedRadius(a.lat, a.lon, b.lat, b.lon, c.lat, c.lon)
+        }
+
+        return radii
+    }
+
+    /**
+     * Compute turn direction using cross product of vectors (before→point, point→after).
+     * Negative = left turn, Positive = right turn.
+     */
+    private fun computeDirections(points: List<InterpPoint>, neighborM: Double): DoubleArray {
+        val dirs = DoubleArray(points.size)
+        if (points.size < 3) return dirs
+
+        for (i in points.indices) {
+            val targetBefore = points[i].cumulativeDistance - neighborM
+            val beforeIdx = findClosestByDistance(points, targetBefore, 0, i)
+            val targetAfter = points[i].cumulativeDistance + neighborM
+            val afterIdx = findClosestByDistance(points, targetAfter, i, points.lastIndex)
+
+            if (beforeIdx == i || afterIdx == i) continue
+
+            // Cross product in local tangent plane (approximate)
+            val ax = points[i].lon - points[beforeIdx].lon
+            val ay = points[i].lat - points[beforeIdx].lat
+            val bx = points[afterIdx].lon - points[i].lon
+            val by = points[afterIdx].lat - points[i].lat
+
+            dirs[i] = ax * by - ay * bx // positive = right, negative = left
+        }
+
+        return dirs
+    }
+
+    private fun findClosestByDistance(
+        points: List<InterpPoint>,
+        targetDist: Double,
+        searchStart: Int,
+        searchEnd: Int,
+    ): Int {
+        var bestIdx = searchStart
+        var bestDiff = abs(points[searchStart].cumulativeDistance - targetDist)
+
+        for (i in searchStart..searchEnd) {
+            val diff = abs(points[i].cumulativeDistance - targetDist)
+            if (diff < bestDiff) {
+                bestDiff = diff
+                bestIdx = i
+            }
+        }
+
+        return bestIdx
+    }
+
+    /**
+     * Circumscribed circle radius through 3 points (in meters).
+     * R = (a * b * c) / (4 * area)
+     */
+    private fun circumscribedRadius(
+        lat1: Double, lon1: Double,
+        lat2: Double, lon2: Double,
+        lat3: Double, lon3: Double,
+    ): Double {
+        val a = haversine(lat1, lon1, lat2, lon2)
+        val b = haversine(lat2, lon2, lat3, lon3)
+        val c = haversine(lat3, lon3, lat1, lon1)
+
+        // Area via cross product (Heron's formula is less stable for flat triangles)
+        // Using the local tangent plane approximation for area
+        val cosLat = cos(Math.toRadians(lat2))
+        val x1 = (lon1 - lon2) * cosLat * 111_319.5
+        val y1 = (lat1 - lat2) * 111_319.5
+        val x3 = (lon3 - lon2) * cosLat * 111_319.5
+        val y3 = (lat3 - lat2) * 111_319.5
+
+        val crossProduct = abs(x1 * y3 - x3 * y1)
+        if (crossProduct < 0.01) return MAX_RADIUS_CAP // Nearly collinear
+
+        return (a * b * c) / (2.0 * crossProduct)
+    }
+
+    // ── Turn Segmentation ───────────────────────────────────────────────
+
+    private fun segmentTurns(
+        points: List<InterpPoint>,
+        radii: DoubleArray,
+        directions: DoubleArray,
+    ): List<TurnRegion> {
+        val regions = mutableListOf<TurnRegion>()
         var i = 0
 
-        while (i < points.size - 1) {
-            // Find window end
-            var j = i + 1
-            while (j < points.size && (distances[j] - distances[i]) < windowM) {
-                j++
-            }
-            if (j >= points.size) break
+        while (i < points.size) {
+            if (radii[i] < STRAIGHT_RADIUS_THRESHOLD) {
+                // Start of a turn region
+                val regionStart = i
+                var minRadius = radii[i]
+                var minIdx = i
 
-            val bearingDelta = normalizeDelta(bearings[j] - bearings[i])
-            val absDelta = abs(bearingDelta)
-
-            if (absDelta >= sensitivity.bearingThresholdDeg) {
-                // Found a turn – extend to find full turn extent
-                val turnStart = i
-                var turnEnd = j
-                var totalDelta = bearingDelta
-
-                // Keep extending while turn continues in same direction
-                while (turnEnd < points.size - 1) {
-                    var nextJ = turnEnd + 1
-                    while (nextJ < points.size && (distances[nextJ] - distances[turnEnd]) < windowM) {
-                        nextJ++
+                // Extend while still in a turn
+                while (i < points.size && radii[i] < STRAIGHT_RADIUS_THRESHOLD) {
+                    if (radii[i] < minRadius) {
+                        minRadius = radii[i]
+                        minIdx = i
                     }
-                    if (nextJ >= points.size) break
-
-                    val nextDelta = normalizeDelta(bearings[nextJ] - bearings[turnEnd])
-                    // Same direction and still significant
-                    if ((nextDelta > 0 == totalDelta > 0) && abs(nextDelta) >= sensitivity.bearingThresholdDeg * 0.5) {
-                        totalDelta += nextDelta
-                        turnEnd = nextJ
-                    } else {
-                        break
-                    }
+                    i++
                 }
+                val regionEnd = i - 1
 
-                val totalAbsDelta = abs(totalDelta)
-                val isLeft = totalDelta < 0
-                val turnMidIdx = (turnStart + turnEnd) / 2
-                val midPointIdx = turnMidIdx.coerceIn(0, points.size - 1)
+                // Determine dominant direction from the apex region
+                val isLeft = directions[minIdx] < 0
 
-                // Classify severity (1 = tightest, 6 = fastest)
-                val severity = classifySeverity(totalAbsDelta)
-                val noteType = classifyTurnType(isLeft, severity)
+                // Compute entry/exit half average radii for tightens/opens
+                val mid = (regionStart + regionEnd) / 2
+                val entryAvg = if (mid > regionStart) {
+                    radii.slice(regionStart..mid).average()
+                } else radii[regionStart]
+                val exitAvg = if (regionEnd > mid) {
+                    radii.slice(mid..regionEnd).average()
+                } else radii[regionEnd]
 
-                // Detect modifier
-                val modifier = detectTurnModifier(
-                    points, distances, bearings,
-                    turnStart, turnEnd, totalDelta,
-                )
+                val arcLength = points[regionEnd].cumulativeDistance - points[regionStart].cumulativeDistance
 
-                // Find closest original point index
-                val originalPointIndex = points[midPointIdx].index
-
-                output.add(
-                    PaceNoteEntity(
-                        trackId = trackId,
-                        pointIndex = originalPointIndex,
-                        distanceFromStart = distances[midPointIdx],
-                        noteType = noteType,
-                        severity = severity,
-                        modifier = modifier,
-                        callText = "", // assembled later
+                regions.add(
+                    TurnRegion(
+                        startIdx = regionStart,
+                        endIdx = regionEnd,
+                        apexIdx = minIdx,
+                        apexRadiusM = minRadius,
+                        isLeft = isLeft,
+                        entryAvgRadius = entryAvg,
+                        exitAvgRadius = exitAvg,
+                        arcLengthM = arcLength,
                     )
                 )
-
-                i = turnEnd + 1
             } else {
                 i++
             }
         }
+
+        // Merge adjacent turn regions that are very close (< TURN_MERGE_GAP_M)
+        return mergeCloseRegions(regions, points)
     }
 
-    private fun classifySeverity(absDeltaDeg: Double): Int {
+    private fun mergeCloseRegions(
+        regions: List<TurnRegion>,
+        points: List<InterpPoint>,
+    ): List<TurnRegion> {
+        if (regions.size < 2) return regions
+
+        val merged = mutableListOf(regions.first())
+
+        for (k in 1 until regions.size) {
+            val prev = merged.last()
+            val curr = regions[k]
+            val gap = points[curr.startIdx].cumulativeDistance - points[prev.endIdx].cumulativeDistance
+
+            if (gap < TURN_MERGE_GAP_M && prev.isLeft == curr.isLeft) {
+                // Merge: extend the previous region
+                val newApex = if (curr.apexRadiusM < prev.apexRadiusM) curr else prev
+                val newArc = points[curr.endIdx].cumulativeDistance - points[prev.startIdx].cumulativeDistance
+                val newMid = (prev.startIdx + curr.endIdx) / 2
+                merged[merged.lastIndex] = TurnRegion(
+                    startIdx = prev.startIdx,
+                    endIdx = curr.endIdx,
+                    apexIdx = newApex.apexIdx,
+                    apexRadiusM = newApex.apexRadiusM,
+                    isLeft = prev.isLeft,
+                    entryAvgRadius = prev.entryAvgRadius,
+                    exitAvgRadius = curr.exitAvgRadius,
+                    arcLengthM = newArc,
+                )
+            } else {
+                merged.add(curr)
+            }
+        }
+
+        return merged
+    }
+
+    // ── Severity Classification ─────────────────────────────────────────
+
+    private fun radiusToGrade(radiusM: Double): Int {
+        for (band in GRADE_BANDS) {
+            if (radiusM >= band.minRadius && radiusM < band.maxRadius) {
+                return band.grade
+            }
+        }
+        return 6 // Default to least severe turn grade
+    }
+
+    private fun radiusToHalfStep(radiusM: Double, grade: Int): SeverityHalf {
+        val band = GRADE_BANDS.find { it.grade == grade } ?: return SeverityHalf.NONE
+        val range = band.maxRadius - band.minRadius
+        if (range <= 0) return SeverityHalf.NONE
+
+        val position = (radiusM - band.minRadius) / range
         return when {
-            absDeltaDeg >= 150 -> 1 // Hairpin
-            absDeltaDeg >= 120 -> 1
-            absDeltaDeg >= 90 -> 2
-            absDeltaDeg >= 70 -> 3
-            absDeltaDeg >= 50 -> 4
-            absDeltaDeg >= 30 -> 5
-            else -> 6
+            position < 0.33 -> SeverityHalf.MINUS // tighter end of band
+            position > 0.67 -> SeverityHalf.PLUS  // faster end of band
+            else -> SeverityHalf.NONE
         }
     }
 
-    private fun classifyTurnType(isLeft: Boolean, severity: Int): NoteType {
-        return if (severity <= 1) {
-            if (isLeft) NoteType.HAIRPIN_LEFT else NoteType.HAIRPIN_RIGHT
-        } else {
-            if (isLeft) NoteType.LEFT else NoteType.RIGHT
+    /** Reference speed (m/s) for the midpoint of each severity grade. */
+    private fun referenceSpeedForGrade(grade: Int): Double {
+        return when (grade) {
+            1 -> 6.9   // ~25 km/h
+            2 -> 9.7   // ~35 km/h
+            3 -> 12.5  // ~45 km/h
+            4 -> 16.7  // ~60 km/h
+            5 -> 22.2  // ~80 km/h
+            6 -> 30.6  // ~110 km/h
+            else -> 36.1 // ~130 km/h
         }
     }
 
-    private fun detectTurnModifier(
-        points: List<TrackPointEntity>,
-        distances: DoubleArray,
-        bearings: DoubleArray,
-        turnStart: Int,
-        turnEnd: Int,
-        totalDelta: Double,
-    ): NoteModifier {
-        if (turnEnd - turnStart < 3) return NoteModifier.NONE
+    private fun classifyTurnType(isLeft: Boolean, severity: Int, radiusM: Double): NoteType {
+        return when {
+            severity <= 1 -> if (isLeft) NoteType.HAIRPIN_LEFT else NoteType.HAIRPIN_RIGHT
+            radiusM in 7.0..12.0 -> if (isLeft) NoteType.SQUARE_LEFT else NoteType.SQUARE_RIGHT
+            else -> if (isLeft) NoteType.LEFT else NoteType.RIGHT
+        }
+    }
 
-        val mid = (turnStart + turnEnd) / 2
-        val firstHalfDelta = abs(normalizeDelta(bearings[mid] - bearings[turnStart]))
-        val secondHalfDelta = abs(normalizeDelta(bearings[turnEnd] - bearings[mid]))
+    // ── Modifier Detection ──────────────────────────────────────────────
 
-        val turnLength = distances[turnEnd] - distances[turnStart]
+    private fun detectModifier(turn: TurnRegion): NoteModifier {
+        // Duration-based modifiers take priority
+        return when {
+            turn.arcLengthM < 30.0 -> NoteModifier.SHORT
+            turn.arcLengthM > 200.0 -> NoteModifier.VERY_LONG
+            turn.arcLengthM > 100.0 -> NoteModifier.LONG
+            // Radius change: compare entry vs exit half
+            turn.exitAvgRadius < turn.entryAvgRadius * 0.7 -> NoteModifier.TIGHTENS
+            turn.entryAvgRadius < turn.exitAvgRadius * 0.7 -> NoteModifier.OPENS
+            else -> NoteModifier.NONE
+        }
+    }
 
-        // Long turn > 100m
-        if (turnLength > 100.0) return NoteModifier.LONG
+    // ── Conjunctions ────────────────────────────────────────────────────
 
-        // Tightens: second half has more curvature
-        if (secondHalfDelta > firstHalfDelta * 1.5) return NoteModifier.TIGHTENS
+    private fun applyConjunctions(notes: List<PaceNoteEntity>): List<PaceNoteEntity> {
+        if (notes.size < 2) return notes
 
-        // Opens: first half has more curvature
-        if (firstHalfDelta > secondHalfDelta * 1.5) return NoteModifier.OPENS
+        val result = mutableListOf<PaceNoteEntity>()
+        for (i in notes.indices) {
+            val note = notes[i]
+            // Only apply conjunctions between turn notes (not elevation events)
+            if (i > 0 && isTurnNote(note) && isTurnNote(notes[i - 1])) {
+                val gap = note.distanceFromStart - notes[i - 1].distanceFromStart
+                val conjunction = when {
+                    gap < INTO_THRESHOLD_M -> Conjunction.INTO
+                    gap < AND_THRESHOLD_M -> Conjunction.AND
+                    else -> Conjunction.DISTANCE
+                }
+                // Apply conjunction to the previous note (it leads into this one)
+                if (result.isNotEmpty()) {
+                    result[result.lastIndex] = result.last().copy(conjunction = conjunction)
+                }
+            }
+            result.add(note)
+        }
+        return result
+    }
 
-        return NoteModifier.NONE
+    private fun isTurnNote(note: PaceNoteEntity): Boolean {
+        return note.noteType in listOf(
+            NoteType.LEFT, NoteType.RIGHT,
+            NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT,
+            NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT,
+        )
     }
 
     // ── Elevation Events ────────────────────────────────────────────────
 
     private fun detectElevationEvents(
         trackId: String,
-        points: List<TrackPointEntity>,
-        distances: DoubleArray,
+        points: List<InterpPoint>,
         sensitivity: Sensitivity,
         output: MutableList<PaceNoteEntity>,
     ) {
-        // Need elevation data
         val elevationPoints = points.mapIndexedNotNull { idx, p ->
-            p.elevation?.let { Triple(idx, distances[idx], it) }
+            p.elevation?.let { Triple(idx, p.cumulativeDistance, it) }
         }
         if (elevationPoints.size < 5) return
 
-        // Find gradient reversals
         var prevGradient: Double? = null
         var prevElevation: Double? = null
-        var prevDistance: Double? = null
-        var accumulatedChange = 0.0
-        var changeStartIdx = 0
 
         for (i in 1 until elevationPoints.size) {
             val (idx, dist, ele) = elevationPoints[i]
@@ -362,7 +621,6 @@ object PaceNoteGenerator {
             val gradient = (ele - prevEle) / segmentDist
 
             if (prevGradient != null) {
-                // Check for reversal
                 val isReversal = (prevGradient > 0.02 && gradient < -0.02) ||
                     (prevGradient < -0.02 && gradient > 0.02)
 
@@ -370,28 +628,32 @@ object PaceNoteGenerator {
                     val change = abs(ele - (prevElevation ?: ele))
                     if (change >= sensitivity.minElevationChangeM) {
                         val isCrest = prevGradient > 0
-                        val noteType = if (isCrest) NoteType.CREST else NoteType.DIP
+                        val noteType = when {
+                            isCrest && change < 3.0 -> NoteType.SMALL_CREST
+                            isCrest && change > 8.0 -> NoteType.BIG_CREST
+                            isCrest -> NoteType.CREST
+                            change < 3.0 -> NoteType.SMALL_DIP
+                            change > 8.0 -> NoteType.BIG_DIP
+                            else -> NoteType.DIP
+                        }
 
                         output.add(
                             PaceNoteEntity(
                                 trackId = trackId,
-                                pointIndex = points[prevIdx].index,
+                                pointIndex = points[prevIdx].originalIndex,
                                 distanceFromStart = prevDist,
                                 noteType = noteType,
-                                severity = 0, // not applicable for elevation events
+                                severity = 0,
                                 modifier = NoteModifier.NONE,
                                 callText = "",
                             )
                         )
                     }
-                    accumulatedChange = 0.0
-                    changeStartIdx = i
                 }
             }
 
             prevGradient = gradient
             prevElevation = ele
-            prevDistance = dist
         }
     }
 
@@ -400,15 +662,13 @@ object PaceNoteGenerator {
     private fun insertStraights(
         trackId: String,
         notes: List<PaceNoteEntity>,
-        distances: DoubleArray,
         sensitivity: Sensitivity,
     ): List<PaceNoteEntity> {
         if (notes.isEmpty()) return notes
         val result = mutableListOf<PaceNoteEntity>()
 
-        // Check gap before first note
+        // Gap before first note
         if (notes.first().distanceFromStart > sensitivity.minStraightM) {
-            val straightDist = notes.first().distanceFromStart
             result.add(
                 PaceNoteEntity(
                     trackId = trackId,
@@ -453,7 +713,7 @@ object PaceNoteGenerator {
         return notes.mapIndexed { i, note ->
             val callDist = if (i < notes.size - 1) {
                 (notes[i + 1].distanceFromStart - note.distanceFromStart)
-                    .coerceIn(0.0, 300.0)
+                    .coerceIn(0.0, 400.0)
             } else {
                 0.0
             }
@@ -466,22 +726,30 @@ object PaceNoteGenerator {
     private fun assembleCallText(note: PaceNoteEntity): String {
         val parts = mutableListOf<String>()
 
+        // Main note type and severity
         when (note.noteType) {
-            NoteType.LEFT -> parts.add("Left ${note.severity}")
-            NoteType.RIGHT -> parts.add("Right ${note.severity}")
+            NoteType.LEFT -> parts.add("Left ${formatSeverity(note)}")
+            NoteType.RIGHT -> parts.add("Right ${formatSeverity(note)}")
             NoteType.HAIRPIN_LEFT -> parts.add("Hairpin Left")
             NoteType.HAIRPIN_RIGHT -> parts.add("Hairpin Right")
+            NoteType.SQUARE_LEFT -> parts.add("Square Left")
+            NoteType.SQUARE_RIGHT -> parts.add("Square Right")
             NoteType.CREST -> parts.add("Crest")
             NoteType.DIP -> parts.add("Dip")
-            NoteType.STRAIGHT -> {
-                parts.add("Straight")
-            }
+            NoteType.SMALL_CREST -> parts.add("Small Crest")
+            NoteType.SMALL_DIP -> parts.add("Small Dip")
+            NoteType.BIG_CREST -> parts.add("Big Crest")
+            NoteType.BIG_DIP -> parts.add("Big Dip")
+            NoteType.STRAIGHT -> parts.add("Straight")
         }
 
+        // Modifier
         when (note.modifier) {
             NoteModifier.TIGHTENS -> parts.add("tightens")
             NoteModifier.OPENS -> parts.add("opens")
             NoteModifier.LONG -> parts.add("long")
+            NoteModifier.VERY_LONG -> parts.add("very long")
+            NoteModifier.SHORT -> parts.add("short")
             NoteModifier.INTO -> parts.add("into")
             NoteModifier.OVER -> parts.add("over")
             NoteModifier.DONT_CUT -> parts.add("don't cut")
@@ -489,34 +757,47 @@ object PaceNoteGenerator {
             NoteModifier.NONE -> {}
         }
 
-        // Append call distance
-        if (note.callDistanceM > 0) {
-            val roundedDist = (note.callDistanceM / 10).toInt() * 10
-            if (roundedDist >= 80) {
-                parts.add("${roundedDist}m")
+        // Conjunction / distance to next note
+        when (note.conjunction) {
+            Conjunction.INTO -> parts.add("into")
+            Conjunction.AND -> parts.add("and")
+            Conjunction.DISTANCE -> {
+                if (note.callDistanceM > 0) {
+                    val rounded = roundCallDistance(note.callDistanceM)
+                    if (rounded >= 30) {
+                        parts.add("${rounded}")
+                    }
+                }
             }
         }
 
         return parts.joinToString(" ")
     }
 
+    /** Format severity with optional +/- half-step. */
+    private fun formatSeverity(note: PaceNoteEntity): String {
+        val base = note.severity.toString()
+        return when (note.severityHalf) {
+            SeverityHalf.PLUS -> "$base plus"
+            SeverityHalf.MINUS -> "$base minus"
+            SeverityHalf.NONE -> base
+        }
+    }
+
+    /**
+     * Round call distances per professional convention:
+     * - Under 100m: use even numbers (30, 40, 50, 60, 70, 80)
+     * - Over 100m: use increments of 50 (100, 150, 200, 250, 300, 350, 400)
+     */
+    private fun roundCallDistance(distanceM: Double): Int {
+        return if (distanceM < 100) {
+            ((distanceM / 10).toInt() * 10).coerceAtLeast(30)
+        } else {
+            ((distanceM / 50).toInt() * 50).coerceAtMost(400)
+        }
+    }
+
     // ── Utility ─────────────────────────────────────────────────────────
-
-    private fun normalizeDelta(delta: Double): Double {
-        var d = delta % 360
-        if (d > 180) d -= 360
-        if (d < -180) d += 360
-        return d
-    }
-
-    private fun bearing(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val lat1R = Math.toRadians(lat1)
-        val lat2R = Math.toRadians(lat2)
-        val dLonR = Math.toRadians(lon2 - lon1)
-        val y = sin(dLonR) * cos(lat2R)
-        val x = cos(lat1R) * sin(lat2R) - sin(lat1R) * cos(lat2R) * cos(dLonR)
-        return (Math.toDegrees(atan2(y, x)) + 360) % 360
-    }
 
     private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 6371000.0

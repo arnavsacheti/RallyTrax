@@ -119,6 +119,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setCallTimingSeconds(seconds: Float) {
+        viewModelScope.launch {
+            preferencesRepository.setCallTimingSeconds(seconds)
+        }
+    }
+
+    fun setHalfStepSeverityEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setHalfStepSeverityEnabled(enabled)
+        }
+    }
+
     fun setBackupTracksEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setBackupTracksEnabled(enabled)

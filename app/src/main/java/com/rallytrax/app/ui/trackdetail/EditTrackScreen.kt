@@ -221,28 +221,29 @@ fun EditTrackScreen(
                 }
             }
 
-            // ── Pace Note Sensitivity ───────────────────────────────
+            // ── Pace Notes ─────────────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Pace Note Sensitivity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Pace Notes", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Changing sensitivity will regenerate pace notes.",
+                        "Regenerate pace notes using road geometry analysis.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Low", "Medium", "High").forEachIndexed { i, label ->
-                            FilterChip(
-                                selected = uiState.selectedSensitivity == i,
-                                onClick = { viewModel.regeneratePaceNotes(i) },
-                                label = { Text(label) },
-                                enabled = !uiState.isGeneratingNotes,
-                            )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Button(
+                            onClick = { viewModel.regeneratePaceNotes() },
+                            enabled = !uiState.isGeneratingNotes,
+                        ) {
+                            Text("Regenerate")
                         }
                         if (uiState.isGeneratingNotes) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp))

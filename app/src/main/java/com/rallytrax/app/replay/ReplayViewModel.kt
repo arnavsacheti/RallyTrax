@@ -109,7 +109,12 @@ class ReplayViewModel @Inject constructor(
                     return@launch
                 }
 
-                replayEngine = ReplayEngine(points, notes)
+                val prefs = preferencesRepository.preferences.first()
+                replayEngine = ReplayEngine(
+                    trackPoints = points,
+                    paceNotes = notes,
+                    lookaheadSeconds = prefs.callTimingSeconds.toDouble(),
+                )
 
                 _uiState.value = _uiState.value.copy(
                     track = track,
@@ -282,6 +287,11 @@ class ReplayViewModel @Inject constructor(
     fun setVolume(vol: Float) {
         _uiState.value = _uiState.value.copy(volume = vol)
         audioManager?.setVolume(vol)
+    }
+
+    /** Adjust call timing during active replay (per-session override, not persisted). */
+    fun setCallTimingSeconds(seconds: Float) {
+        replayEngine?.lookaheadSeconds = seconds.toDouble().coerceIn(3.0, 12.0)
     }
 
     private fun stopTrackingService() {

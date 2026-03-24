@@ -510,45 +510,77 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Default Pace Note Sensitivity
+                    // Call Timing
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = "Default Pace Note Sensitivity",
+                            text = "Call Timing",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = "${preferences.paceNoteSensitivity.toInt()}",
+                            text = "${"%.1f".format(preferences.callTimingSeconds)}s",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
+                    Text(
+                        text = "How far ahead notes are called",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = "Low",
+                            text = "Earlier",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = "High",
+                            text = "Later",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Slider(
-                        value = preferences.paceNoteSensitivity,
-                        onValueChange = { settingsViewModel.setPaceNoteSensitivity(it) },
-                        valueRange = 1f..10f,
-                        steps = 8,
+                        value = preferences.callTimingSeconds,
+                        onValueChange = { settingsViewModel.setCallTimingSeconds(it) },
+                        valueRange = 3f..12f,
+                        steps = 17, // 0.5s increments: (12-3)/0.5 - 1 = 17
                         modifier = Modifier
                             .fillMaxWidth()
-                            .semantics { contentDescription = "Default pace note sensitivity slider" },
+                            .semantics { contentDescription = "Call timing slider" },
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Half-Step Severity Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Half-Step Severity (+/-)",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                text = "Enables 16 severity graduations (e.g., 3+, 4-)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = preferences.halfStepSeverityEnabled,
+                            onCheckedChange = { settingsViewModel.setHalfStepSeverityEnabled(it) },
+                        )
+                    }
                 }
             }
 
