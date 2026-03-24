@@ -27,6 +27,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class SensorStats(
+    val peakLateralG: Double? = null, // peak lateral acceleration in G
+    val peakVerticalG: Double? = null, // peak vertical acceleration in G
+    val maxYawRateDegPerS: Double? = null, // max yaw rate
+    val hasSensorData: Boolean = false,
+)
+
 data class ActivitySummaryState(
     val track: TrackEntity? = null,
     val classification: RouteClassifier.ClassificationResult? = null,
@@ -38,6 +45,7 @@ data class ActivitySummaryState(
     val selectedVehicleId: String? = null,
     val isSaving: Boolean = false,
     val newlyUnlockedAchievements: List<AchievementEntity> = emptyList(),
+    val sensorStats: SensorStats = SensorStats(),
 )
 
 @HiltViewModel
@@ -107,6 +115,25 @@ class ActivitySummaryViewModel @Inject constructor(
             }
         }
 
+        // Compute sensor stats
+        val lateralAccels = points.mapNotNull { it.lateralAccelMps2 }
+        val verticalAccels = points.mapNotNull { it.verticalAccelMps2 }
+        val yawRates = points.mapNotNull { it.yawRateDegPerS }
+        val hasSensorData = lateralAccels.isNotEmpty() || verticalAccels.isNotEmpty()
+
+        val sensorStats = SensorStats(
+            peakLateralG = if (lateralAccels.isNotEmpty()) {
+                lateralAccels.maxOfOrNull { kotlin.math.abs(it) }?.let { it / 9.81 }
+            } else null,
+            peakVerticalG = if (verticalAccels.isNotEmpty()) {
+                verticalAccels.maxOfOrNull { kotlin.math.abs(it) }?.let { it / 9.81 }
+            } else null,
+            maxYawRateDegPerS = if (yawRates.isNotEmpty()) {
+                yawRates.maxOfOrNull { kotlin.math.abs(it) }
+            } else null,
+            hasSensorData = hasSensorData,
+        )
+
         _state.value = ActivitySummaryState(
             track = track,
             classification = classification,
@@ -115,6 +142,7 @@ class ActivitySummaryViewModel @Inject constructor(
             selectedRouteType = classification?.suggestedRouteType ?: "",
             selectedDifficulty = classification?.difficultyRating ?: "",
             selectedVehicleId = track.vehicleId ?: activeVehicle?.id,
+            sensorStats = sensorStats,
         )
     }
 

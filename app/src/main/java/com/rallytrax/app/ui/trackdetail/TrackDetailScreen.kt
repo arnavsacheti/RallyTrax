@@ -294,6 +294,8 @@ fun TrackDetailScreen(
                 paceNotes = uiState.paceNotes,
                 activeLayers = uiState.activeLayers,
                 useGoogleMaps = MapProvider.useGoogleMaps(preferences.mapProvider),
+                isRoute = uiState.track?.trackCategory == "route",
+                onToggleLayer = { viewModel.toggleLayer(it) },
                 onDismiss = { isMapFullscreen = false },
             )
         }
@@ -428,6 +430,21 @@ private fun GoogleTrackMap(
             }
         }
 
+        // Surface layer: colored segments by road surface type
+        if (MapLayer.SURFACE in activeLayers && trackPoints.size >= 2) {
+            for (i in 0 until trackPoints.size - 1) {
+                val surface = trackPoints[i].surfaceType ?: continue
+                val color = surfaceTypeColor(surface)
+                Polyline(
+                    points = listOf(
+                        com.google.android.gms.maps.model.LatLng(trackPoints[i].lat, trackPoints[i].lon),
+                        com.google.android.gms.maps.model.LatLng(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                    ),
+                    color = color, width = 12f,
+                )
+            }
+        }
+
         // Callouts layer
         if (MapLayer.CALLOUTS in activeLayers) {
             paceNotes.forEach { note ->
@@ -497,6 +514,8 @@ private fun FullscreenMapDialog(
     paceNotes: List<PaceNoteEntity>,
     activeLayers: Set<MapLayer>,
     useGoogleMaps: Boolean,
+    isRoute: Boolean = false,
+    onToggleLayer: (MapLayer) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     Dialog(
@@ -534,6 +553,22 @@ private fun FullscreenMapDialog(
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
+
+            // Layer toolbar at bottom
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                    ),
+            ) {
+                LayerToolbar(
+                    activeLayers = activeLayers,
+                    onToggle = onToggleLayer,
+                    isRoute = isRoute,
+                )
+            }
         }
     }
 }
@@ -556,6 +591,7 @@ private fun LayerToolbar(activeLayers: Set<MapLayer>, onToggle: (MapLayer) -> Un
         }
         LayerChip("Elevation", MapLayer.ELEVATION, activeLayers, onToggle)
         LayerChip("Curve", MapLayer.CURVATURE, activeLayers, onToggle)
+        LayerChip("Surface", MapLayer.SURFACE, activeLayers, onToggle)
         LayerChip("Callouts", MapLayer.CALLOUTS, activeLayers, onToggle)
     }
 }

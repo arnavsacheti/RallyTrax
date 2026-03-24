@@ -153,6 +153,41 @@ fun ActivitySummaryScreen(
                         )
                     }
 
+                    // Sensor stats (lateral G, vertical G, yaw rate)
+                    if (state.sensorStats.hasSensorData) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            state.sensorStats.peakLateralG?.let { g ->
+                                HeroStatCard(
+                                    icon = Icons.Filled.Speed,
+                                    label = "Peak Lateral G",
+                                    value = "${"%.2f".format(g)}g",
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            state.sensorStats.peakVerticalG?.let { g ->
+                                HeroStatCard(
+                                    icon = Icons.Filled.Route,
+                                    label = "Peak Vertical G",
+                                    value = "${"%.2f".format(g)}g",
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        state.sensorStats.maxYawRateDegPerS?.let { yaw ->
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HeroStatCard(
+                                icon = Icons.Filled.Speed,
+                                label = "Max Yaw Rate",
+                                value = "${"%.1f".format(yaw)}\u00B0/s",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
