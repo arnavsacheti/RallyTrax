@@ -15,6 +15,7 @@ import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.data.classification.ValhallaRouteClient
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.SegmentRepository
@@ -73,6 +74,7 @@ data class TrackDetailUiState(
     val paceNotes: List<PaceNoteEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isGeneratingNotes: Boolean = false,
+    val isFetchingElevation: Boolean = false,
     val activeLayers: Set<MapLayer> = setOf(MapLayer.ROUTE),
     // Route history (Phase 1: previous attempts)
     val routeCompletionCount: Int = 0,
@@ -96,6 +98,7 @@ class TrackDetailViewModel @Inject constructor(
     private val paceNoteDao: PaceNoteDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     private val segmentRepository: SegmentRepository,
+    private val valhallaRouteClient: ValhallaRouteClient,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -464,6 +467,76 @@ class TrackDetailViewModel @Inject constructor(
             kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
         val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
         return r * c
+    }
+
+    // ── Fetch elevation from Valhalla ─────────────────────────────────────
+
+    fun fetchElevation() {
+        val points = cachedPoints
+        if (points.isEmpty()) {
+            _snackbarMessage.tryEmit("No track points available")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isFetchingElevation = true)
+
+        viewModelScope.launch {
+            try {
+                val latLngs = points.map { LatLng(it.lat, it.lon) }
+                val withElevation = valhallaRouteClient.fetchHeight(latLngs)
+
+                // Check if we actually got elevation data
+                val hasElevation = withElevation.any { it.elevation != null }
+                if (!hasElevation) {
+                    _uiState.value = _uiState.value.copy(isFetchingElevation = false)
+                    _snackbarMessage.tryEmit("Could not fetch elevation data")
+                    return@launch
+                }
+
+                // Update track points with elevation
+                val updatedPoints = points.mapIndexed { i, pt ->
+                    pt.copy(elevation = withElevation[i].elevation ?: pt.elevation)
+                }
+                trackPointDao.insertPoints(updatedPoints) // upsert
+                cachedPoints = updatedPoints
+
+                // Compute cumulative elevation gain
+                var elevationGain = 0.0
+                var prevEle: Double? = null
+                for (pt in updatedPoints) {
+                    val ele = pt.elevation ?: continue
+                    prevEle?.let { prev ->
+                        val delta = ele - prev
+                        if (delta > 2.0) elevationGain += delta
+                    }
+                    prevEle = ele
+                }
+
+                // Update track entity
+                val track = _uiState.value.track
+                if (track != null) {
+                    val updatedTrack = track.copy(elevationGainM = elevationGain)
+                    trackDao.updateTrack(updatedTrack)
+                    _uiState.value = _uiState.value.copy(
+                        track = updatedTrack,
+                        trackPoints = updatedPoints,
+                        elevationProfile = buildElevationProfile(updatedPoints),
+                        isFetchingElevation = false,
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        trackPoints = updatedPoints,
+                        elevationProfile = buildElevationProfile(updatedPoints),
+                        isFetchingElevation = false,
+                    )
+                }
+
+                _snackbarMessage.tryEmit("Elevation updated (${elevationGain.toInt()}m gain)")
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isFetchingElevation = false)
+                _snackbarMessage.tryEmit("Failed to fetch elevation: ${e.message}")
+            }
+        }
     }
 
     // ── Vehicle assignment ──────────────────────────────────────────────────

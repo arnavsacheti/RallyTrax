@@ -179,6 +179,100 @@ class ValhallaRouteClient @Inject constructor() {
         return result
     }
 
+    /**
+     * Fetch elevation data for a list of points using Valhalla's /height endpoint.
+     * Returns a new list of LatLng with elevation populated, or the original list on failure.
+     */
+    suspend fun fetchHeight(
+        points: List<LatLng>,
+        valhallaUrl: String = ValhallaSurfaceClient.DEFAULT_VALHALLA_URL,
+    ): List<LatLng> = withContext(Dispatchers.IO) {
+        if (points.isEmpty()) return@withContext points
+
+        val urls = listOfNotNull(
+            valhallaUrl,
+            FALLBACK_VALHALLA_URL.takeIf { it != valhallaUrl },
+        )
+        for (baseUrl in urls) {
+            val result = fetchHeightFrom(points, baseUrl)
+            if (result != null) return@withContext result
+        }
+        points
+    }
+
+    private fun fetchHeightFrom(points: List<LatLng>, valhallaUrl: String): List<LatLng>? {
+        try {
+            // Valhalla /height has a limit; sample if needed and interpolate
+            val maxPoints = 1500
+            val sampled = if (points.size > maxPoints) {
+                val step = points.size.toDouble() / maxPoints
+                (0 until maxPoints).map { i -> points[(i * step).toInt()] }
+            } else {
+                points
+            }
+
+            val shape = JSONArray().apply {
+                sampled.forEach { pt ->
+                    put(JSONObject().apply {
+                        put("lat", pt.latitude)
+                        put("lon", pt.longitude)
+                    })
+                }
+            }
+
+            val request = JSONObject().apply {
+                put("shape", shape)
+                put("range", false)
+            }
+
+            val url = "$valhallaUrl/height"
+            Log.d(TAG, "Fetching height from $valhallaUrl: ${sampled.size} points")
+
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 15_000
+            connection.doOutput = true
+
+            connection.outputStream.use { os ->
+                os.write(request.toString().toByteArray())
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode != 200) {
+                Log.w(TAG, "Valhalla height returned $responseCode from $valhallaUrl")
+                connection.disconnect()
+                return null
+            }
+
+            val response = connection.inputStream.bufferedReader().readText()
+            connection.disconnect()
+
+            val root = JSONObject(response)
+            val heights = root.getJSONArray("height")
+
+            if (sampled.size == points.size) {
+                // No sampling was needed — direct 1:1 mapping
+                return points.mapIndexed { i, pt ->
+                    val h = heights.optDouble(i, Double.NaN)
+                    if (!h.isNaN()) pt.copy(elevation = h) else pt
+                }
+            } else {
+                // Interpolate elevation back to original points
+                val step = points.size.toDouble() / sampled.size
+                return points.mapIndexed { i, pt ->
+                    val sampledIdx = (i / step).toInt().coerceAtMost(sampled.size - 1)
+                    val h = heights.optDouble(sampledIdx, Double.NaN)
+                    if (!h.isNaN()) pt.copy(elevation = h) else pt
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Valhalla height failed from $valhallaUrl: ${e.message}")
+            return null
+        }
+    }
+
     companion object {
         private const val TAG = "ValhallaRouteClient"
         private const val FALLBACK_VALHALLA_URL = "https://valhalla1.openstreetmap.de"

@@ -3,6 +3,7 @@ package com.rallytrax.app.recording
 data class LatLng(
     val latitude: Double,
     val longitude: Double,
+    val elevation: Double? = null,
 )
 
 enum class RecordingStatus {
