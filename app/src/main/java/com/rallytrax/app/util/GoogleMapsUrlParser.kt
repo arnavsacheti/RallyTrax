@@ -6,7 +6,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Extracts a lat/lng coordinate from text shared by Google Maps.
+ * Extracts coordinates and route info from text shared by Google Maps.
  *
  * Handles these URL patterns:
  *  - https://www.google.com/maps/@47.123,-122.456,15z
@@ -37,28 +37,46 @@ object GoogleMapsUrlParser {
     // Matches a URL in surrounding text
     private val URL_REGEX = Regex("""https?://\S+""")
 
+    // Matches all coordinate-like segments in a /dir/ URL path
+    private val DIR_SEGMENT_REGEX = Regex("""(-?\d{1,3}\.\d{3,}),(-?\d{1,3}\.\d{3,})""")
+
+    // Matches embedded lat/lng in Google Maps data params: !3d<lat>!4d<lng>
+    private val DATA_COORD_REGEX = Regex("""!3d(-?\d+\.?\d+).*?!4d(-?\d+\.?\d+)""")
+
+    // Matches place name in /place/Name/ URLs
+    private val PLACE_NAME_REGEX = Regex("""/place/([^/@]+)""")
+
+    /**
+     * Result of parsing a shared Google Maps link.
+     */
+    data class ParseResult(
+        val waypoints: List<LatLng>,
+        val name: String? = null,
+    )
+
     /**
      * Parse coordinates from shared text. May perform a network call for short URLs.
      * Must be called off the main thread.
+     * Returns a ParseResult with all waypoints found, or null if nothing could be extracted.
      */
-    fun parse(text: String): LatLng? {
+    fun parseRoute(text: String): ParseResult? {
         Log.d(TAG, "Parsing shared text: ${text.take(200)}")
 
         val url = URL_REGEX.find(text)?.value
         if (url != null) {
-            val result = parseUrl(url)
+            val result = parseUrlFull(url)
             if (result != null) {
-                Log.d(TAG, "Extracted coordinates: $result")
+                Log.d(TAG, "Extracted ${result.waypoints.size} waypoint(s), name=${result.name}")
                 return result
             }
         }
 
         // Fallback: try extracting bare coordinates from the text itself
         BARE_COORD_REGEX.find(text)?.let { match ->
-            val result = toLatLng(match.groupValues[1], match.groupValues[2])
-            if (result != null) {
-                Log.d(TAG, "Extracted bare coordinates: $result")
-                return result
+            val coord = toLatLng(match.groupValues[1], match.groupValues[2])
+            if (coord != null) {
+                Log.d(TAG, "Extracted bare coordinates: $coord")
+                return ParseResult(waypoints = listOf(coord))
             }
         }
 
@@ -66,40 +84,78 @@ object GoogleMapsUrlParser {
         return null
     }
 
-    private fun parseUrl(url: String): LatLng? {
-        // Try extracting coordinates directly from the URL
-        extractCoords(url)?.let { return it }
+    /** Legacy single-coordinate API kept for compatibility. */
+    fun parse(text: String): LatLng? = parseRoute(text)?.waypoints?.firstOrNull()
 
-        // If it's a short URL, resolve redirects (up to 5 hops) and try again
+    private fun parseUrlFull(url: String): ParseResult? {
+        // Try extracting from the URL directly
+        extractFull(url)?.let { return it }
+
+        // If it's a short URL, resolve redirects with retry
         if (url.contains("goo.gl/") || url.contains("maps.app.goo.gl/")) {
-            val resolved = resolveRedirects(url, maxHops = 5)
-            if (resolved != null && resolved != url) {
-                Log.d(TAG, "Resolved short URL to: ${resolved.take(200)}")
-                extractCoords(resolved)?.let { return it }
+            repeat(3) { attempt ->
+                val resolved = resolveRedirects(url, maxHops = 5)
+                if (resolved != null && resolved != url) {
+                    Log.d(TAG, "Resolved short URL to: ${resolved.take(200)}")
+                    extractFull(resolved)?.let { return it }
+                }
+                if (attempt < 2) {
+                    Log.d(TAG, "Retry ${attempt + 1} for short URL resolution")
+                    Thread.sleep(500L * (attempt + 1))
+                }
             }
         }
 
         return null
     }
 
-    private fun extractCoords(url: String): LatLng? {
-        // @lat,lng pattern (most common in place/view URLs)
-        AT_COORD_REGEX.find(url)?.let { match ->
-            return toLatLng(match.groupValues[1], match.groupValues[2])
+    private fun extractFull(url: String): ParseResult? {
+        val waypoints = mutableListOf<LatLng>()
+        var name: String? = null
+
+        // Extract place name if present
+        PLACE_NAME_REGEX.find(url)?.let { match ->
+            name = java.net.URLDecoder.decode(match.groupValues[1], "UTF-8").replace('+', ' ')
         }
-        // ?q=lat,lng pattern
-        Q_PARAM_REGEX.find(url)?.let { match ->
-            return toLatLng(match.groupValues[1], match.groupValues[2])
+
+        // For /dir/ URLs, extract all coordinate segments from the path
+        if (url.contains("/dir/")) {
+            val pathPart = url.substringBefore("?").substringBefore("#")
+            val dirPath = pathPart.substringAfter("/dir/")
+            val segments = dirPath.split("/")
+            for (segment in segments) {
+                DIR_SEGMENT_REGEX.find(segment)?.let { match ->
+                    toLatLng(match.groupValues[1], match.groupValues[2])?.let { waypoints.add(it) }
+                }
+            }
+            // Also check for embedded coords in data params (e.g. !3d37.615!4d-122.389)
+            DATA_COORD_REGEX.findAll(url).forEach { match ->
+                toLatLng(match.groupValues[1], match.groupValues[2])?.let { coord ->
+                    if (waypoints.none { it.latitude == coord.latitude && it.longitude == coord.longitude }) {
+                        waypoints.add(coord)
+                    }
+                }
+            }
         }
-        // /dir/lat,lng/lat,lng pattern (directions — extract first coordinate)
-        DIR_COORD_REGEX.find(url)?.let { match ->
-            return toLatLng(match.groupValues[1], match.groupValues[2])
+
+        // If no /dir/ waypoints, try other patterns for single coordinate
+        if (waypoints.isEmpty()) {
+            AT_COORD_REGEX.find(url)?.let { match ->
+                toLatLng(match.groupValues[1], match.groupValues[2])?.let { waypoints.add(it) }
+            }
         }
-        // Bare coordinates anywhere in the URL
-        BARE_COORD_REGEX.find(url)?.let { match ->
-            return toLatLng(match.groupValues[1], match.groupValues[2])
+        if (waypoints.isEmpty()) {
+            Q_PARAM_REGEX.find(url)?.let { match ->
+                toLatLng(match.groupValues[1], match.groupValues[2])?.let { waypoints.add(it) }
+            }
         }
-        return null
+        if (waypoints.isEmpty()) {
+            BARE_COORD_REGEX.find(url)?.let { match ->
+                toLatLng(match.groupValues[1], match.groupValues[2])?.let { waypoints.add(it) }
+            }
+        }
+
+        return if (waypoints.isNotEmpty()) ParseResult(waypoints = waypoints, name = name) else null
     }
 
     private fun toLatLng(lat: String, lng: String): LatLng? {

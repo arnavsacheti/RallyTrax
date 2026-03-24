@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var trackPointDao: TrackPointDao
     @Inject lateinit var paceNoteDao: PaceNoteDao
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
+    @Inject lateinit var valhallaRouteClient: com.rallytrax.app.data.classification.ValhallaRouteClient
 
     private val updateViewModel: UpdateViewModel by viewModels()
     private val authViewModel: AuthViewModel by viewModels()
@@ -254,13 +255,20 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         is IntentResult.SharedText -> {
-                            val coords = withContext(Dispatchers.IO) {
-                                GoogleMapsUrlParser.parse(intentResult.text)
+                            val parseResult = withContext(Dispatchers.IO) {
+                                GoogleMapsUrlParser.parseRoute(intentResult.text)
                             }
-                            if (coords != null) {
-                                navController.navigate(
-                                    ExploreRoute(focusLat = coords.latitude, focusLng = coords.longitude),
+                            if (parseResult != null) {
+                                val trackId = createRouteFromWaypoints(
+                                    waypoints = parseResult.waypoints,
+                                    name = parseResult.name,
                                 )
+                                if (trackId != null) {
+                                    snackbarHostState.showSnackbar("Imported route: ${parseResult.name ?: "Shared Route"}")
+                                    navController.navigate(TrackDetailRoute(trackId))
+                                } else {
+                                    snackbarHostState.showSnackbar("Failed to save shared route")
+                                }
                             } else {
                                 snackbarHostState.showSnackbar("Could not extract location from shared link")
                             }
@@ -335,6 +343,86 @@ class MainActivity : ComponentActivity() {
             }
             else -> IntentResult.None
         }
+    }
+
+    private suspend fun createRouteFromWaypoints(
+        waypoints: List<com.rallytrax.app.recording.LatLng>,
+        name: String?,
+    ): String? {
+        return try {
+            val trackId = java.util.UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            val routeName = name ?: "Shared Route"
+
+            // Try fetching actual driving route from Valhalla
+            val routeResult = valhallaRouteClient.fetchRoute(waypoints)
+
+            val routePoints = routeResult?.points ?: waypoints
+            val totalDistance = routeResult?.distanceMeters
+                ?: if (waypoints.size >= 2) {
+                    var d = 0.0
+                    for (i in 1 until waypoints.size) {
+                        d += haversineMeters(
+                            waypoints[i - 1].latitude, waypoints[i - 1].longitude,
+                            waypoints[i].latitude, waypoints[i].longitude,
+                        )
+                    }
+                    d
+                } else 0.0
+            val totalDurationMs = ((routeResult?.durationSeconds ?: 0.0) * 1000).toLong()
+
+            // Compute bounding box from the full route geometry
+            var northLat = -90.0
+            var southLat = 90.0
+            var eastLon = -180.0
+            var westLon = 180.0
+            for (pt in routePoints) {
+                if (pt.latitude > northLat) northLat = pt.latitude
+                if (pt.latitude < southLat) southLat = pt.latitude
+                if (pt.longitude > eastLon) eastLon = pt.longitude
+                if (pt.longitude < westLon) westLon = pt.longitude
+            }
+
+            val track = com.rallytrax.app.data.local.entity.TrackEntity(
+                id = trackId,
+                name = routeName,
+                recordedAt = now,
+                distanceMeters = totalDistance,
+                durationMs = totalDurationMs,
+                boundingBoxNorthLat = northLat,
+                boundingBoxSouthLat = southLat,
+                boundingBoxEastLon = eastLon,
+                boundingBoxWestLon = westLon,
+                trackCategory = "route",
+            )
+            trackDao.insertTrack(track)
+
+            val points = routePoints.mapIndexed { index, pt ->
+                com.rallytrax.app.data.local.entity.TrackPointEntity(
+                    trackId = trackId,
+                    index = index,
+                    lat = pt.latitude,
+                    lon = pt.longitude,
+                    timestamp = now + index * 1000L,
+                )
+            }
+            trackPointDao.insertPoints(points)
+
+            trackId
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to create route from waypoints", e)
+            null
+        }
+    }
+
+    private fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+        return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
     }
 
     private suspend fun importTrackFromIntent(
