@@ -46,10 +46,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +74,13 @@ fun EditTrackScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showAddTagDialog by remember { mutableStateOf(false) }
     var editedName by remember(uiState.track?.name) { mutableStateOf(uiState.track?.name ?: "") }
+    val currentEditedName by rememberUpdatedState(editedName)
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.updateTrackName(currentEditedName)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
@@ -122,12 +131,6 @@ fun EditTrackScreen(
                         keyboardActions = KeyboardActions(onDone = {
                             viewModel.updateTrackName(editedName)
                         }),
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Press done to save",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
