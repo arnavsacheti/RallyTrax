@@ -196,6 +196,8 @@ private fun OverviewTab(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp),
             ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Vehicle hero
                 Card(
                     modifier = Modifier.fillMaxWidth(),
