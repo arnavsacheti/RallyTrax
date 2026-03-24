@@ -24,15 +24,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Decide whether to release
         id: decide
         run: |
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "manual_bump=false" >> "$GITHUB_OUTPUT"
-            echo "Triggered by ${{ github.event_name }}, proceeding"
+            # Check if there are meaningful commits since the last release tag
+            LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
+            if [ -n "$LATEST_TAG" ]; then
+              NEW_COMMITS=$(git log "$LATEST_TAG"..HEAD --pretty=format:"%s" --no-merges | grep -cv '\[skip ci\]' || true)
+            else
+              NEW_COMMITS=$(git log --pretty=format:"%s" --no-merges | grep -cv '\[skip ci\]' || true)
+            fi
+
+            if [ "$NEW_COMMITS" -gt 0 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+              echo "manual_bump=false" >> "$GITHUB_OUTPUT"
+              echo "Found $NEW_COMMITS new commit(s) since $LATEST_TAG, proceeding"
+            else
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "manual_bump=false" >> "$GITHUB_OUTPUT"
+              echo "No new commits since $LATEST_TAG, skipping release"
+            fi
           elif [ "${{ github.event_name }}" = "push" ]; then
             # Only proceed if versionName was changed in this push
             if git diff HEAD~1 -- app/build.gradle.kts | grep -q 'versionName'; then
