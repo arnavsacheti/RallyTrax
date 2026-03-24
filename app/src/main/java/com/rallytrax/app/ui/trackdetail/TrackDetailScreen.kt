@@ -100,6 +100,12 @@ import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
 import com.rallytrax.app.ui.map.OsmPolylineData
+import com.rallytrax.app.ui.theme.SeverityGreen
+import com.rallytrax.app.ui.theme.SeverityYellowGreen
+import com.rallytrax.app.ui.theme.SeverityYellow
+import com.rallytrax.app.ui.theme.SeverityOrange
+import com.rallytrax.app.ui.theme.SeverityRedOrange
+import com.rallytrax.app.ui.theme.SeverityMagenta
 import com.rallytrax.app.ui.theme.HeatmapCold
 import com.rallytrax.app.ui.theme.LayerAccel
 import com.rallytrax.app.ui.theme.LayerCallout
@@ -457,26 +463,50 @@ private fun GoogleTrackMap(
             }
         }
 
-        // Callouts layer
-        if (MapLayer.CALLOUTS in activeLayers) {
-            paceNotes.forEach { note ->
+        // Callouts layer: colored segments by severity + small icon markers
+        if (MapLayer.CALLOUTS in activeLayers && paceNotes.isNotEmpty()) {
+            val sortedNotes = paceNotes.filter { it.pointIndex in trackPoints.indices }.sortedBy { it.pointIndex }
+
+            // Draw colored polyline segments between consecutive pace notes
+            for (i in sortedNotes.indices) {
+                val note = sortedNotes[i]
+                val startIdx = if (i == 0) 0 else sortedNotes[i - 1].pointIndex
+                val endIdx = note.pointIndex
+                if (endIdx <= startIdx || startIdx !in trackPoints.indices || endIdx !in trackPoints.indices) continue
+                val segPoints = (startIdx..endIdx).map { j ->
+                    com.google.android.gms.maps.model.LatLng(trackPoints[j].lat, trackPoints[j].lon)
+                }
+                if (segPoints.size >= 2) {
+                    Polyline(
+                        points = segPoints,
+                        color = severityColor(note.severity),
+                        width = 14f,
+                    )
+                }
+            }
+            // Tail segment: from last note to end of track
+            val lastNote = sortedNotes.last()
+            if (lastNote.pointIndex < trackPoints.size - 1) {
+                val tailPoints = (lastNote.pointIndex until trackPoints.size).map { j ->
+                    com.google.android.gms.maps.model.LatLng(trackPoints[j].lat, trackPoints[j].lon)
+                }
+                if (tailPoints.size >= 2) {
+                    Polyline(points = tailPoints, color = severityColor(lastNote.severity), width = 14f)
+                }
+            }
+
+            // Place small icon markers at each pace note position
+            sortedNotes.forEach { note ->
                 val idx = note.pointIndex
                 if (idx in points.indices) {
                     val p = points[idx]
-                    val hue = when (note.noteType) {
-                        NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
-                        NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
-                        NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                        NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                        NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> BitmapDescriptorFactory.HUE_YELLOW
-                        NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> BitmapDescriptorFactory.HUE_ORANGE
-                        NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
-                    }
+                    val hue = noteTypeHue(note.noteType)
                     Marker(
                         state = rememberMarkerState(position = com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)),
                         title = note.callText,
                         snippet = "Severity ${note.severity}",
                         icon = BitmapDescriptorFactory.defaultMarker(hue),
+                        alpha = 0.9f,
                     )
                 }
             }
@@ -502,8 +532,37 @@ private fun OsmTrackMap(
     }
 
     val markers = mutableListOf<OsmMarkerData>()
-    if (MapLayer.CALLOUTS in activeLayers) {
-        paceNotes.forEach { note ->
+
+    // Callouts layer: colored segments by severity + icon markers
+    if (MapLayer.CALLOUTS in activeLayers && paceNotes.isNotEmpty()) {
+        val sortedNotes = paceNotes.filter { it.pointIndex in points.indices }.sortedBy { it.pointIndex }
+
+        // Colored polyline segments between consecutive pace notes
+        for (i in sortedNotes.indices) {
+            val note = sortedNotes[i]
+            val startIdx = if (i == 0) 0 else sortedNotes[i - 1].pointIndex
+            val endIdx = note.pointIndex
+            if (endIdx <= startIdx || startIdx !in points.indices || endIdx !in points.indices) continue
+            val segPoints = (startIdx..endIdx).map { j ->
+                GeoPoint(points[j].latitude, points[j].longitude)
+            }
+            if (segPoints.size >= 2) {
+                polylines.add(OsmPolylineData(points = segPoints, color = severityColor(note.severity), width = 14f))
+            }
+        }
+        // Tail segment: from last note to end of track
+        val lastNote = sortedNotes.last()
+        if (lastNote.pointIndex < points.size - 1) {
+            val tailPoints = (lastNote.pointIndex until points.size).map { j ->
+                GeoPoint(points[j].latitude, points[j].longitude)
+            }
+            if (tailPoints.size >= 2) {
+                polylines.add(OsmPolylineData(points = tailPoints, color = severityColor(lastNote.severity), width = 14f))
+            }
+        }
+
+        // Icon markers at each pace note position
+        sortedNotes.forEach { note ->
             val idx = note.pointIndex
             if (idx in points.indices) {
                 markers.add(OsmMarkerData(GeoPoint(points[idx].latitude, points[idx].longitude), note.callText))
@@ -1419,6 +1478,27 @@ private fun visibleCards(activeLayers: Set<MapLayer>): Set<CardType> {
 }
 
 // ── Utility Functions ───────────────────────────────────────────────────────
+
+/** Map pace note severity (1–6) to a segment colour matching Sideways-style gradation. */
+private fun severityColor(severity: Int): Color = when (severity) {
+    1 -> SeverityGreen
+    2 -> SeverityYellowGreen
+    3 -> SeverityYellow
+    4 -> SeverityOrange
+    5 -> SeverityRedOrange
+    else -> SeverityMagenta // 6+
+}
+
+/** Map NoteType to a marker hue for the small icon overlay. */
+private fun noteTypeHue(noteType: NoteType): Float = when (noteType) {
+    NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
+    NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
+    NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
+    NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> BitmapDescriptorFactory.HUE_RED
+    NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> BitmapDescriptorFactory.HUE_YELLOW
+    NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> BitmapDescriptorFactory.HUE_ORANGE
+    NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
+}
 
 private fun speedColor(fraction: Float): Color {
     return if (fraction < 0.5f) {

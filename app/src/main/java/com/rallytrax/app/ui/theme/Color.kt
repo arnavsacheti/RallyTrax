@@ -124,6 +124,14 @@ val DifficultyAmber = Color(0xFFFBBC04)
 val DifficultyOrange = Color(0xFFE8710A)
 val DifficultyRed = Color(0xFFEA4335)
 
+// ── Pace note severity colors (Sideways-style segment colouring) ────────────
+val SeverityGreen = Color(0xFF34A853)      // severity 1 – gentle
+val SeverityYellowGreen = Color(0xFF8BC34A) // severity 2 – easy
+val SeverityYellow = Color(0xFFFBBC04)     // severity 3 – moderate
+val SeverityOrange = Color(0xFFE8710A)     // severity 4 – medium
+val SeverityRedOrange = Color(0xFFEA4335)  // severity 5 – tight
+val SeverityMagenta = Color(0xFFE91E63)    // severity 6 – hairpin
+
 // ── Dashboard warning light colors ──────────────────────────────────────────
 val WarningAmber = Color(0xFFFFB300)
 val WarningRed = Color(0xFFEF5350)
