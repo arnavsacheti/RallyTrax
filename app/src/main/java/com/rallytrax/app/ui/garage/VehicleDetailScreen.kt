@@ -18,8 +18,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,9 +46,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import com.rallytrax.app.ui.theme.ShapeFullRound
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
@@ -117,18 +122,46 @@ fun VehicleDetailScreen(
                     .padding(innerPadding),
             ) {
                 // Tab row
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                        Text("Overview", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                        Text("Fuel", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                        Text("Maintenance", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }) {
-                        Text("Analytics", modifier = Modifier.padding(12.dp))
+                val tabLabels = listOf("Overview", "Fuel", "Maintenance", "Analytics")
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTab,
+                    edgePadding = 16.dp,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    indicator = { tabPositions ->
+                        if (selectedTab < tabPositions.size) {
+                            Box(
+                                Modifier
+                                    .tabIndicatorOffset(tabPositions[selectedTab])
+                                    .height(3.dp)
+                                    .clip(ShapeFullRound)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                    },
+                    divider = {},
+                ) {
+                    tabLabels.forEachIndexed { index, label ->
+                        val textColor by animateColorAsState(
+                            targetValue = if (selectedTab == index)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            animationSpec = tween(250),
+                            label = "tabColor",
+                        )
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                        ) {
+                            Text(
+                                text = label,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = textColor,
+                            )
+                        }
                     }
                 }
 
