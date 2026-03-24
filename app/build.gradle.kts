@@ -82,8 +82,8 @@ android {
         applicationId = "com.rallytrax.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 46
-        versionName = "1.2.23"
+        versionCode = 47
+        versionName = "1.2.24"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
