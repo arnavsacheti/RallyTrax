@@ -125,7 +125,7 @@ fun EditTrackScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Press done to save",
+                        "Press ✓ on keyboard to save",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
