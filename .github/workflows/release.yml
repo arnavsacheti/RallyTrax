@@ -1,0 +1,250 @@
+name: Release
+
+on:
+  # Daily morning build (8 AM UTC)
+  schedule:
+    - cron: '0 8 * * *'
+
+  # Manual trigger
+  workflow_dispatch: {}
+
+  # Override: someone commits a version bump
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/build.gradle.kts'
+
+jobs:
+  # ── Gate: decide whether this run should proceed ─────────────────────────
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      manual_bump: ${{ steps.decide.outputs.manual_bump }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decide whether to release
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "manual_bump=false" >> "$GITHUB_OUTPUT"
+            echo "Triggered by ${{ github.event_name }}, proceeding"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            # Only proceed if versionName was changed in this push
+            if git diff HEAD~1 -- app/build.gradle.kts | grep -q 'versionName'; then
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+              echo "manual_bump=true" >> "$GITHUB_OUTPUT"
+              echo "Version was manually bumped, proceeding"
+            else
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "manual_bump=false" >> "$GITHUB_OUTPUT"
+              echo "No version bump detected, skipping release"
+            fi
+          fi
+
+  # ── Prepare: bump version if needed ──────────────────────────────────────
+  prepare:
+    needs: gate
+    if: needs.gate.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      version_bumped: ${{ steps.bump.outputs.version_bumped }}
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto-increment patch version
+        if: needs.gate.outputs.manual_bump != 'true'
+        id: bump
+        run: |
+          CURRENT=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+
+          CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
+          NEW_CODE=$((CURRENT_CODE + 1))
+
+          sed -i "s/versionName = \"$CURRENT\"/versionName = \"$NEW_VERSION\"/" app/build.gradle.kts
+          sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" app/build.gradle.kts
+
+          echo "version_bumped=true" >> "$GITHUB_OUTPUT"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped: $CURRENT -> $NEW_VERSION (code $CURRENT_CODE -> $NEW_CODE)"
+
+      - name: Skip bump for manual version change
+        if: needs.gate.outputs.manual_bump == 'true'
+        id: skip_bump
+        run: |
+          CURRENT=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "version_bumped=false" >> "$GITHUB_OUTPUT"
+          echo "new_version=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "Version already bumped manually to $CURRENT"
+
+      - name: Read current version
+        id: read
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bumped source
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-bumped
+          path: .
+          include-hidden-files: true
+
+  # ── Build release APK ───────────────────────────────────────────────────
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: source-bumped
+
+      - run: chmod +x gradlew
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Inject Firebase API key
+        run: sed -i 's/FIREBASE_API_KEY_PLACEHOLDER/${{ secrets.FIREBASE_API_KEY }}/' app/google-services.json
+
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/ci-release.jks
+
+      - name: Build release APK
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          WEB_CLIENT_ID: ${{ secrets.WEB_CLIENT_ID }}
+          KEYSTORE_FILE: ${{ github.workspace }}/app/ci-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk
+
+  # ── Publish: tag, release notes, GitHub Release ─────────────────────────
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-apk
+          path: release-apk/
+
+      # Apply version bump to the checkout
+      - name: Apply version bump
+        if: needs.prepare.outputs.version_bumped == 'true'
+        run: |
+          NEW_VERSION="${{ needs.prepare.outputs.new_version }}"
+          CURRENT=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
+
+          if [ "$CURRENT" != "$NEW_VERSION" ]; then
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$NEW_VERSION"
+            NEW_CODE=$((CURRENT_CODE + 1))
+            sed -i "s/versionName = \"$CURRENT\"/versionName = \"$NEW_VERSION\"/" app/build.gradle.kts
+            sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" app/build.gradle.kts
+          fi
+
+      # Commit version bump
+      - name: Commit version bump
+        if: needs.prepare.outputs.version_bumped == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore: bump version to ${{ needs.prepare.outputs.new_version }} [skip ci]"
+          git push
+
+      # Tag
+      - name: Determine release version
+        id: release_version
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Tag release
+        id: tagging
+        run: |
+          TAG="${{ steps.release_version.outputs.tag }}"
+          if ! git tag -l "$TAG" | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release ${{ steps.release_version.outputs.version }}"
+            git push origin "$TAG"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG already exists, skipping"
+          fi
+
+      # Rename APK
+      - name: Rename release APK
+        run: |
+          VERSION="${{ steps.release_version.outputs.version }}"
+          RELEASE_APK=$(find release-apk/ -name "*.apk" | head -1)
+          if [ -n "$RELEASE_APK" ]; then
+            cp "$RELEASE_APK" "release-apk/RallyTrax-v${VERSION}.apk"
+          fi
+
+      # Release notes
+      - name: Generate release notes
+        if: steps.tagging.outputs.created == 'true'
+        run: |
+          TAG="${{ steps.release_version.outputs.tag }}"
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^$TAG$" | head -n 1)
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s" --no-merges | grep -v '\[skip ci\]')
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | grep -v '\[skip ci\]')
+          fi
+          cat > /tmp/release_notes.md << NOTES_EOF
+          ## What's Changed
+
+          $CHANGELOG
+
+          ---
+          **Full Changelog**: ${PREV_TAG:+\`$PREV_TAG\`...\`$TAG\`}${PREV_TAG:-Initial release}
+          NOTES_EOF
+
+      # GitHub Release
+      - name: Create GitHub Release
+        if: steps.tagging.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.release_version.outputs.tag }}"
+          VERSION="${{ steps.release_version.outputs.version }}"
+          gh release create "$TAG" \
+            --title "RallyTrax $VERSION" \
+            --notes-file /tmp/release_notes.md \
+            "release-apk/RallyTrax-v${VERSION}.apk"
