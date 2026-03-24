@@ -18,8 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -116,19 +116,27 @@ fun VehicleDetailScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                // Tab row
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                        Text("Overview", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                        Text("Fuel", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                        Text("Maintenance", modifier = Modifier.padding(12.dp))
-                    }
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }) {
-                        Text("Analytics", modifier = Modifier.padding(12.dp))
+                // Tab row – M3 secondary tabs
+                val tabLabels = listOf("Overview", "Fuel", "Maintenance", "Analytics")
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTab,
+                    edgePadding = 16.dp,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
+                    tabLabels.forEachIndexed { index, label ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            },
+                            selectedContentColor = MaterialTheme.colorScheme.primary,
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
 
