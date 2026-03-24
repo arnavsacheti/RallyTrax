@@ -184,6 +184,15 @@ fun TrackDetailScreen(
                                 },
                                 leadingIcon = { Icon(Icons.Filled.Share, null) },
                             )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (uiState.isFetchingElevation) "Fetching elevation…" else "Fetch Elevation") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.fetchElevation()
+                                },
+                                enabled = !uiState.isFetchingElevation,
+                                leadingIcon = { Icon(Icons.Filled.Refresh, null) },
+                            )
                         }
                     }
                 },
