@@ -19,7 +19,7 @@
   <meta name="twitter:description" content="Record drives, generate rally-style pace notes, and replay with a synthetic co-driver. Free on Android.">
 
   <!-- Favicon (inline SVG data URI) -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='6' fill='%231A73E8'/%3E%3Cpath d='M7 20L14 8L21 20H17L14 14L11 20H7Z' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" href="favicon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,10 +31,7 @@
   <nav class="nav">
     <div class="nav-inner">
       <a href="#" class="nav-logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="6" fill="#1A73E8"/>
-          <path d="M7 20L14 8L21 20H17L14 14L11 20H7Z" fill="white"/>
-        </svg>
+        <img src="logo-28.png" width="28" height="28" alt="RallyTrax" style="border-radius:6px">
         <span>RallyTrax</span>
       </a>
       <div class="nav-links">
@@ -69,72 +66,10 @@
     <div class="hero-phone-wrapper">
       <div class="pixel-phone hero-phone animate-on-scroll" data-animation="fade-up">
         <div class="pixel-screen">
-          <!-- Mock Home Screen -->
-          <div class="mock-app mock-home">
-            <div class="mock-statusbar">
-              <span>9:41</span>
-              <div class="mock-statusbar-icons">
-                <span>&#9679;&#9679;&#9679;&#9679;</span>
-                <span>&#9632;</span>
-              </div>
+              <img src="screenshots/home.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
             </div>
-            <div class="mock-header">
-              <div>
-                <div class="mock-greeting">Good morning</div>
-                <div class="mock-title">Dashboard</div>
-              </div>
-              <div class="mock-avatar"></div>
-            </div>
-            <div class="mock-stats-row">
-              <div class="mock-stat-card">
-                <div class="mock-stat-label">This Week</div>
-                <div class="mock-stat-value">247 <span>km</span></div>
-              </div>
-              <div class="mock-stat-card">
-                <div class="mock-stat-label">Tracks</div>
-                <div class="mock-stat-value">12</div>
-              </div>
-            </div>
-            <div class="mock-section-label">Recent Drives</div>
-            <div class="mock-track-card">
-              <div class="mock-track-map"></div>
-              <div class="mock-track-info">
-                <div class="mock-track-name">Angeles Crest Hwy</div>
-                <div class="mock-track-meta">34.2 km &middot; 28 min &middot; Today</div>
-              </div>
-            </div>
-            <div class="mock-track-card">
-              <div class="mock-track-map map2"></div>
-              <div class="mock-track-info">
-                <div class="mock-track-name">Mulholland Drive</div>
-                <div class="mock-track-meta">18.7 km &middot; 22 min &middot; Yesterday</div>
-              </div>
-            </div>
-            <div class="mock-fab">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="4" fill="none" stroke="white" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-            </div>
-            <div class="mock-bottomnav">
-              <div class="mock-nav-item active">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1a1 1 0 00.7-1.7l-9-9a1 1 0 00-1.4 0l-9 9A1 1 0 003 13z"/></svg>
-                <span>Home</span>
-              </div>
-              <div class="mock-nav-item">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
-                <span>Explore</span>
-              </div>
-              <div class="mock-nav-item">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-                <span>Library</span>
-              </div>
-              <div class="mock-nav-item">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                <span>Garage</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
   </section>
 
   <!-- Feature: Record -->
@@ -168,64 +103,8 @@
       <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-left">
         <div class="pixel-phone">
           <div class="pixel-screen">
-            <!-- Mock Recording Screen -->
-            <div class="mock-app mock-recording">
-              <div class="mock-statusbar dark">
-                <span>9:41</span>
-                <div class="mock-statusbar-icons"><span>REC</span></div>
-              </div>
-              <div class="mock-map-area">
-                <div class="mock-map-bg">
-                  <svg viewBox="0 0 300 400" width="100%" height="100%">
-                    <rect fill="#1a1a2e" width="300" height="400"/>
-                    <!-- Road grid -->
-                    <line x1="0" y1="100" x2="300" y2="100" stroke="#2a2a4a" stroke-width="0.5"/>
-                    <line x1="0" y1="200" x2="300" y2="200" stroke="#2a2a4a" stroke-width="0.5"/>
-                    <line x1="0" y1="300" x2="300" y2="300" stroke="#2a2a4a" stroke-width="0.5"/>
-                    <line x1="75" y1="0" x2="75" y2="400" stroke="#2a2a4a" stroke-width="0.5"/>
-                    <line x1="150" y1="0" x2="150" y2="400" stroke="#2a2a4a" stroke-width="0.5"/>
-                    <line x1="225" y1="0" x2="225" y2="400" stroke="#2a2a4a" stroke-width="0.5"/>
-                    <!-- Track polyline -->
-                    <polyline points="50,350 60,320 80,280 120,240 150,210 170,180 160,150 140,120 130,90 140,60 170,40 200,50 220,80 210,120 190,160 200,200 230,230 250,250" fill="none" stroke="#1A73E8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                    <!-- Current position pulse -->
-                    <circle cx="250" cy="250" r="12" fill="#1A73E8" opacity="0.2">
-                      <animate attributeName="r" values="8;16;8" dur="2s" repeatCount="indefinite"/>
-                      <animate attributeName="opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite"/>
-                    </circle>
-                    <circle cx="250" cy="250" r="6" fill="#1A73E8"/>
-                    <circle cx="250" cy="250" r="3" fill="white"/>
-                  </svg>
-                </div>
-              </div>
-              <div class="mock-recording-hud">
-                <div class="mock-rec-indicator">
-                  <span class="rec-dot"></span> Recording
-                </div>
-                <div class="mock-rec-stats">
-                  <div class="mock-rec-stat">
-                    <div class="mock-rec-stat-value">12:34</div>
-                    <div class="mock-rec-stat-label">Duration</div>
-                  </div>
-                  <div class="mock-rec-stat">
-                    <div class="mock-rec-stat-value">8.4 <small>km</small></div>
-                    <div class="mock-rec-stat-label">Distance</div>
-                  </div>
-                  <div class="mock-rec-stat">
-                    <div class="mock-rec-stat-value">67 <small>km/h</small></div>
-                    <div class="mock-rec-stat-label">Speed</div>
-                  </div>
-                </div>
-                <div class="mock-rec-controls">
-                  <button class="mock-rec-btn pause">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                  </button>
-                  <button class="mock-rec-btn stop">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                  </button>
-                </div>
-              </div>
+              <img src="screenshots/recording.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
             </div>
-          </div>
         </div>
       </div>
     </div>
@@ -262,66 +141,11 @@
       <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-right">
         <div class="pixel-phone">
           <div class="pixel-screen">
-            <!-- Mock Explore Screen -->
-            <div class="mock-app mock-explore">
-              <div class="mock-statusbar">
-                <span>9:41</span>
-                <div class="mock-statusbar-icons">
-                  <span>&#9679;&#9679;&#9679;&#9679;</span>
-                  <span>&#9632;</span>
-                </div>
-              </div>
-              <div class="mock-explore-map">
-                <svg viewBox="0 0 280 460" width="100%" height="100%">
-                  <rect fill="#1a1a2e" width="280" height="460"/>
-                  <!-- Map grid -->
-                  <line x1="0" y1="92" x2="280" y2="92" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <line x1="0" y1="184" x2="280" y2="184" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <line x1="0" y1="276" x2="280" y2="276" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <line x1="0" y1="368" x2="280" y2="368" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <line x1="70" y1="0" x2="70" y2="460" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <line x1="140" y1="0" x2="140" y2="460" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <line x1="210" y1="0" x2="210" y2="460" stroke="#2a2a4a" stroke-width="0.5"/>
-                  <!-- Track 1 - Speed heatmap style -->
-                  <polyline points="30,380 45,350 70,310 100,280 120,250 130,220 120,190 100,160 95,130 110,100 140,80 170,90 185,120" fill="none" stroke="#2EC486" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  <polyline points="185,120 175,155 165,190 175,225 200,250 225,265" fill="none" stroke="#FFD93D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  <polyline points="225,265 245,275 255,290" fill="none" stroke="#E63946" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  <!-- Track 2 -->
-                  <polyline points="40,420 60,400 90,370 110,360 140,350 160,330 180,310 190,290 200,260" fill="none" stroke="#1A73E8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
-                  <!-- Track 3 -->
-                  <polyline points="200,400 210,370 230,340 240,310 235,280 220,250 200,230 180,210 160,180 150,150" fill="none" stroke="#1A73E8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
-                </svg>
-              </div>
-              <!-- Layer chips -->
-              <div class="mock-explore-layers">
-                <span class="mock-chip active">Speed</span>
-                <span class="mock-chip">Elevation</span>
-                <span class="mock-chip">Curvature</span>
-                <span class="mock-chip">Accel</span>
-              </div>
-              <div class="mock-bottomnav">
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1a1 1 0 00.7-1.7l-9-9a1 1 0 00-1.4 0l-9 9A1 1 0 003 13z"/></svg>
-                  <span>Home</span>
-                </div>
-                <div class="mock-nav-item active">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
-                  <span>Explore</span>
-                </div>
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-                  <span>Library</span>
-                </div>
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                  <span>Garage</span>
-                </div>
-              </div>
+              <img src="screenshots/explore.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
             </div>
           </div>
         </div>
       </div>
-    </div>
   </section>
 
   <!-- Feature: Library -->
@@ -355,96 +179,8 @@
       <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-right">
         <div class="pixel-phone">
           <div class="pixel-screen">
-            <!-- Mock Library Screen -->
-            <div class="mock-app mock-library">
-              <div class="mock-statusbar">
-                <span>9:41</span>
-                <div class="mock-statusbar-icons">
-                  <span>&#9679;&#9679;&#9679;&#9679;</span>
-                  <span>&#9632;</span>
-                </div>
-              </div>
-              <div class="mock-lib-header">
-                <div class="mock-title">Library</div>
-                <div class="mock-search-bar">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  <span>Search tracks...</span>
-                </div>
-                <div class="mock-filter-row">
-                  <span class="mock-chip active">All</span>
-                  <span class="mock-chip">Canyon</span>
-                  <span class="mock-chip">Highway</span>
-                  <span class="mock-chip">Mountain</span>
-                </div>
-              </div>
-              <div class="mock-lib-list">
-                <div class="mock-lib-item">
-                  <div class="mock-lib-thumb"></div>
-                  <div class="mock-lib-info">
-                    <div class="mock-lib-name">Angeles Crest Hwy</div>
-                    <div class="mock-lib-meta">34.2 km &middot; 28 min</div>
-                    <div class="mock-lib-tags">
-                      <span class="mock-tag">Canyon</span>
-                      <span class="mock-tag">Favourite</span>
-                    </div>
-                  </div>
-                  <div class="mock-lib-date">Today</div>
-                </div>
-                <div class="mock-lib-item">
-                  <div class="mock-lib-thumb t2"></div>
-                  <div class="mock-lib-info">
-                    <div class="mock-lib-name">Mulholland Drive</div>
-                    <div class="mock-lib-meta">18.7 km &middot; 22 min</div>
-                    <div class="mock-lib-tags">
-                      <span class="mock-tag">Mountain</span>
-                    </div>
-                  </div>
-                  <div class="mock-lib-date">Yesterday</div>
-                </div>
-                <div class="mock-lib-item">
-                  <div class="mock-lib-thumb t3"></div>
-                  <div class="mock-lib-info">
-                    <div class="mock-lib-name">Pacific Coast Hwy</div>
-                    <div class="mock-lib-meta">62.1 km &middot; 48 min</div>
-                    <div class="mock-lib-tags">
-                      <span class="mock-tag">Highway</span>
-                      <span class="mock-tag">Scenic</span>
-                    </div>
-                  </div>
-                  <div class="mock-lib-date">Mar 15</div>
-                </div>
-                <div class="mock-lib-item">
-                  <div class="mock-lib-thumb t4"></div>
-                  <div class="mock-lib-info">
-                    <div class="mock-lib-name">Ortega Highway</div>
-                    <div class="mock-lib-meta">42.8 km &middot; 35 min</div>
-                    <div class="mock-lib-tags">
-                      <span class="mock-tag">Canyon</span>
-                    </div>
-                  </div>
-                  <div class="mock-lib-date">Mar 12</div>
-                </div>
-              </div>
-              <div class="mock-bottomnav">
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1a1 1 0 00.7-1.7l-9-9a1 1 0 00-1.4 0l-9 9A1 1 0 003 13z"/></svg>
-                  <span>Home</span>
-                </div>
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
-                  <span>Explore</span>
-                </div>
-                <div class="mock-nav-item active">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-                  <span>Library</span>
-                </div>
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                  <span>Garage</span>
-                </div>
-              </div>
+              <img src="screenshots/routes.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
             </div>
-          </div>
         </div>
       </div>
     </div>
@@ -490,92 +226,11 @@
       <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-left">
         <div class="pixel-phone">
           <div class="pixel-screen">
-            <!-- Mock Track Detail / Pace Notes Screen -->
-            <div class="mock-app mock-pacenotes">
-              <div class="mock-statusbar">
-                <span>9:41</span>
-                <div class="mock-statusbar-icons">
-                  <span>&#9679;&#9679;&#9679;&#9679;</span>
-                  <span>&#9632;</span>
-                </div>
-              </div>
-              <div class="mock-detail-header">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                <span>Angeles Crest Hwy</span>
-              </div>
-              <div class="mock-detail-map">
-                <svg viewBox="0 0 300 140" width="100%" height="100%">
-                  <rect fill="#1a1a2e" width="300" height="140"/>
-                  <polyline points="20,120 40,110 70,90 100,70 130,60 150,55 160,50 140,40 120,35 130,25 160,20 190,25 210,40 200,60 180,80 190,100 220,110 260,115 280,120" fill="none" stroke="#1A73E8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <!-- Pace note markers -->
-                  <circle cx="100" cy="70" r="5" fill="#FF6B35" stroke="#1a1a2e" stroke-width="1.5"/>
-                  <circle cx="160" cy="50" r="5" fill="#FF6B35" stroke="#1a1a2e" stroke-width="1.5"/>
-                  <circle cx="120" cy="35" r="5" fill="#E63946" stroke="#1a1a2e" stroke-width="1.5"/>
-                  <circle cx="200" cy="60" r="5" fill="#FF6B35" stroke="#1a1a2e" stroke-width="1.5"/>
-                </svg>
-              </div>
-              <div class="mock-detail-tabs">
-                <span class="mock-detail-tab">Overview</span>
-                <span class="mock-detail-tab active">Pace Notes</span>
-                <span class="mock-detail-tab">Elevation</span>
-              </div>
-              <div class="mock-notes-list">
-                <div class="mock-note-item">
-                  <div class="mock-note-icon left-turn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
-                  </div>
-                  <div class="mock-note-content">
-                    <div class="mock-note-call">Left 3, tightens</div>
-                    <div class="mock-note-dist">at 2.4 km</div>
-                  </div>
-                  <div class="mock-note-severity s3">3</div>
-                </div>
-                <div class="mock-note-item">
-                  <div class="mock-note-icon right-turn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
-                  </div>
-                  <div class="mock-note-content">
-                    <div class="mock-note-call">Right 4, over crest</div>
-                    <div class="mock-note-dist">at 3.1 km</div>
-                  </div>
-                  <div class="mock-note-severity s4">4</div>
-                </div>
-                <div class="mock-note-item">
-                  <div class="mock-note-icon hairpin-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M18.56 5.44l-4.94 4.94 1.41 1.41 2.12-2.12c1.95 1.95 1.95 5.12 0 7.07-1.95 1.95-5.12 1.95-7.07 0-1.95-1.95-1.95-5.12 0-7.07l3.54-3.54-1.41-1.41-3.54 3.54a6 6 0 000 8.49 6 6 0 008.49 0 6 6 0 000-8.49l2.12-2.12 1.41 1.41L22 2h-5.56l2.12 3.44z"/></svg>
-                  </div>
-                  <div class="mock-note-content">
-                    <div class="mock-note-call">Hairpin right</div>
-                    <div class="mock-note-dist">at 4.7 km</div>
-                  </div>
-                  <div class="mock-note-severity s6">6</div>
-                </div>
-                <div class="mock-note-item">
-                  <div class="mock-note-icon straight-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z"/></svg>
-                  </div>
-                  <div class="mock-note-content">
-                    <div class="mock-note-call">Straight, 320</div>
-                    <div class="mock-note-dist">at 5.2 km</div>
-                  </div>
-                  <div class="mock-note-severity s1">1</div>
-                </div>
-                <div class="mock-note-item">
-                  <div class="mock-note-icon left-turn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
-                  </div>
-                  <div class="mock-note-content">
-                    <div class="mock-note-call">Left 2, long</div>
-                    <div class="mock-note-dist">at 5.5 km</div>
-                  </div>
-                  <div class="mock-note-severity s2">2</div>
-                </div>
-              </div>
+              <img src="screenshots/trackdetail.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
+            </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
   </section>
 
   <!-- Feature: Replay -->
@@ -609,67 +264,8 @@
       <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-right">
         <div class="pixel-phone">
           <div class="pixel-screen">
-            <!-- Mock Replay HUD -->
-            <div class="mock-app mock-replay">
-              <div class="mock-statusbar dark">
-                <span>9:41</span>
-                <div class="mock-statusbar-icons"><span>&#9679;&#9679;&#9679;&#9679;</span></div>
-              </div>
-              <!-- Next note card -->
-              <div class="mock-replay-note-card">
-                <div class="mock-replay-note-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
-                </div>
-                <div class="mock-replay-note-text">
-                  <div class="mock-replay-note-call">Left 3, tightens</div>
-                  <div class="mock-replay-note-dist">in 80 m</div>
-                </div>
-              </div>
-              <!-- Map area -->
-              <div class="mock-replay-map">
-                <svg viewBox="0 0 300 360" width="100%" height="100%">
-                  <rect fill="#0d0d1a" width="300" height="360"/>
-                  <!-- Dark map roads -->
-                  <line x1="0" y1="80" x2="300" y2="80" stroke="#1a1a30" stroke-width="1"/>
-                  <line x1="0" y1="160" x2="300" y2="160" stroke="#1a1a30" stroke-width="1"/>
-                  <line x1="0" y1="240" x2="300" y2="240" stroke="#1a1a30" stroke-width="1"/>
-                  <line x1="60" y1="0" x2="60" y2="360" stroke="#1a1a30" stroke-width="1"/>
-                  <line x1="150" y1="0" x2="150" y2="360" stroke="#1a1a30" stroke-width="1"/>
-                  <line x1="240" y1="0" x2="240" y2="360" stroke="#1a1a30" stroke-width="1"/>
-                  <!-- Recorded track -->
-                  <polyline points="30,340 50,310 80,270 120,230 150,200 170,170 160,140 140,110 130,80 140,50 170,30 200,40 220,70 210,110 190,150 200,190 230,220 260,240 280,260" fill="none" stroke="#3d5a80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
-                  <!-- Driven portion -->
-                  <polyline points="30,340 50,310 80,270 120,230 150,200" fill="none" stroke="#1A73E8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  <!-- Upcoming turn marker -->
-                  <circle cx="170" cy="170" r="10" fill="#FF6B35" opacity="0.3"/>
-                  <circle cx="170" cy="170" r="5" fill="#FF6B35"/>
-                  <!-- Position -->
-                  <circle cx="150" cy="200" r="14" fill="#1A73E8" opacity="0.15">
-                    <animate attributeName="r" values="10;18;10" dur="2s" repeatCount="indefinite"/>
-                  </circle>
-                  <circle cx="150" cy="200" r="7" fill="#1A73E8"/>
-                  <circle cx="150" cy="200" r="3" fill="white"/>
-                  <!-- Direction indicator -->
-                  <polygon points="150,186 145,196 155,196" fill="white" opacity="0.9"/>
-                </svg>
-              </div>
-              <!-- Speed display -->
-              <div class="mock-replay-speed">
-                <div class="mock-replay-speed-value">67</div>
-                <div class="mock-replay-speed-unit">km/h</div>
-              </div>
-              <!-- Progress bar -->
-              <div class="mock-replay-progress">
-                <div class="mock-replay-progress-fill" style="width: 38%"></div>
-              </div>
-              <div class="mock-replay-progress-label">
-                <span>38% complete</span>
-                <span class="mock-replay-mute">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0014 8.5v7a4.47 4.47 0 002.5-3.5zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                </span>
-              </div>
+              <img src="screenshots/trackdetail.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
             </div>
-          </div>
         </div>
       </div>
     </div>
@@ -706,84 +302,8 @@
       <div class="feature-phone-wrapper animate-on-scroll" data-animation="fade-left">
         <div class="pixel-phone">
           <div class="pixel-screen">
-            <!-- Mock Garage Screen -->
-            <div class="mock-app mock-garage">
-              <div class="mock-statusbar">
-                <span>9:41</span>
-                <div class="mock-statusbar-icons">
-                  <span>&#9679;&#9679;&#9679;&#9679;</span>
-                  <span>&#9632;</span>
-                </div>
-              </div>
-              <div class="mock-garage-header">
-                <div class="mock-title">Garage</div>
-              </div>
-              <div class="mock-garage-list">
-                <div class="mock-vehicle-card active-vehicle">
-                  <div class="mock-vehicle-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#1A73E8"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                  </div>
-                  <div class="mock-vehicle-info">
-                    <div class="mock-vehicle-name">2024 Toyota GR86</div>
-                    <div class="mock-vehicle-meta">12,450 mi &middot; 28.4 mpg</div>
-                    <div class="mock-vehicle-tags">
-                      <span class="mock-tag accent">Active</span>
-                      <span class="mock-tag">8 tracks</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="mock-vehicle-card">
-                  <div class="mock-vehicle-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#888"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                  </div>
-                  <div class="mock-vehicle-info">
-                    <div class="mock-vehicle-name">2022 Mazda MX-5</div>
-                    <div class="mock-vehicle-meta">31,200 mi &middot; 32.1 mpg</div>
-                    <div class="mock-vehicle-tags">
-                      <span class="mock-tag">5 tracks</span>
-                    </div>
-                  </div>
-                  <div class="mock-vehicle-warning">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#FF6B35"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                  </div>
-                </div>
-                <div class="mock-vehicle-card">
-                  <div class="mock-vehicle-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#888"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                  </div>
-                  <div class="mock-vehicle-info">
-                    <div class="mock-vehicle-name">2019 Honda Civic Si</div>
-                    <div class="mock-vehicle-meta">48,700 mi &middot; 30.5 mpg</div>
-                    <div class="mock-vehicle-tags">
-                      <span class="mock-tag">3 tracks</span>
-                      <span class="mock-tag">Archived</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="mock-fab">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              </div>
-              <div class="mock-bottomnav">
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1a1 1 0 00.7-1.7l-9-9a1 1 0 00-1.4 0l-9 9A1 1 0 003 13z"/></svg>
-                  <span>Home</span>
-                </div>
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
-                  <span>Explore</span>
-                </div>
-                <div class="mock-nav-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-                  <span>Library</span>
-                </div>
-                <div class="mock-nav-item active">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm11 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                  <span>Garage</span>
-                </div>
-              </div>
+              <img src="screenshots/settings.png" alt="RallyTrax App Screenshot" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">
             </div>
-          </div>
         </div>
       </div>
     </div>
