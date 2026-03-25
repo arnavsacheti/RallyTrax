@@ -2,6 +2,8 @@ package com.rallytrax.app.pacenotes
 
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -432,5 +434,105 @@ class PaceNoteSegmentTest {
                 ))
             }
         }
+    }
+
+    // ── Regression tests ────────────────────────────────────────────────
+
+    /**
+     * Two distinct same-direction turns close together must NOT merge.
+     * Before the fix, mergeCloseRegions collapsed same-direction turns within 5m.
+     */
+    @Test
+    fun twoConsecutiveSameDirectionTurns_notMerged() {
+        val segments = listOf(
+            Triple(0.0, 50.0, false),     // straight lead-in
+            Triple(25.0, 40.0, true),     // left turn 1
+            Triple(0.0, 3.0, false),      // 3m gap (< 5m merge threshold)
+            Triple(30.0, 45.0, true),     // left turn 2 — same direction
+            Triple(0.0, 50.0, false),     // straight lead-out
+        )
+        val points = generateTrace(segments, trackId = "merge-test")
+        val notes = PaceNoteGenerator.generate("merge-test", points, PaceNoteGenerator.Sensitivity.HIGH)
+
+        val leftTurns = notes.filter { it.noteType == NoteType.LEFT }
+        println("\n  twoConsecutiveSameDirectionTurns_notMerged:")
+        println("    Total notes: ${notes.size}, Left turns: ${leftTurns.size}")
+        notes.forEach { println("    ${it.noteType} sev=${it.severity} r=${it.turnRadiusM} call=${it.callText}") }
+
+        assertTrue(
+            "Expected at least 2 left turns but got ${leftTurns.size} — same-direction turns were merged",
+            leftTurns.size >= 2,
+        )
+    }
+
+    /**
+     * A tight hairpin should be classified as grade 1 with accurate radius.
+     * Before the fix, 10m fixed neighbors diluted the radius measurement.
+     */
+    @Test
+    fun tightHairpin_correctRadius() {
+        val hairpinRadius = 5.0
+        val segments = listOf(
+            Triple(0.0, 80.0, false),                          // straight lead-in
+            Triple(hairpinRadius, hairpinRadius * PI, true),   // ~180° hairpin left
+            Triple(0.0, 80.0, false),                          // straight lead-out
+        )
+        val points = generateTrace(segments, trackId = "hairpin-test")
+        val notes = PaceNoteGenerator.generate("hairpin-test", points, PaceNoteGenerator.Sensitivity.HIGH)
+
+        val hairpins = notes.filter {
+            it.noteType == NoteType.HAIRPIN_LEFT || it.noteType == NoteType.HAIRPIN_RIGHT ||
+                (it.noteType == NoteType.LEFT && it.severity <= 2)
+        }
+        println("\n  tightHairpin_correctRadius:")
+        notes.forEach { println("    ${it.noteType} sev=${it.severity} r=%.1fm call=${it.callText}".format(it.turnRadiusM ?: 0.0)) }
+
+        assertTrue("Expected at least 1 tight turn note but got ${hairpins.size}", hairpins.isNotEmpty())
+        val tightest = hairpins.minBy { it.turnRadiusM ?: Double.MAX_VALUE }
+        assertEquals(
+            "Hairpin severity should be 1 (got ${tightest.severity}, radius=${tightest.turnRadiusM})",
+            1, tightest.severity,
+        )
+        assertTrue(
+            "Measured radius ${tightest.turnRadiusM}m should be within 4m of actual ${hairpinRadius}m",
+            tightest.turnRadiusM != null && tightest.turnRadiusM!! < hairpinRadius + 4.0,
+        )
+    }
+
+    /**
+     * An east-west curve should produce similar notes to an equivalent north-south curve.
+     * Before the fix, RDP used a fixed degrees-to-meters conversion that under-estimated
+     * longitude distances at higher latitudes, causing asymmetric over-simplification.
+     */
+    @Test
+    fun eastWestCurve_notOverSimplified() {
+        val curveSegments = listOf(
+            Triple(0.0, 40.0, false),
+            Triple(30.0, 50.0, true),
+            Triple(0.0, 40.0, false),
+        )
+
+        // North-south curve (bearing 0 = north)
+        val nsPoints = generateTrace(
+            curveSegments, startLat = 45.0, startLon = 10.0, startBearing = 0.0, trackId = "ns",
+        )
+        val nsNotes = PaceNoteGenerator.generate("ns", nsPoints, PaceNoteGenerator.Sensitivity.HIGH)
+
+        // East-west curve (bearing 90 = east)
+        val ewPoints = generateTrace(
+            curveSegments, startLat = 45.0, startLon = 10.0, startBearing = 90.0, trackId = "ew",
+        )
+        val ewNotes = PaceNoteGenerator.generate("ew", ewPoints, PaceNoteGenerator.Sensitivity.HIGH)
+
+        val nsTurns = nsNotes.filter { it.noteType != NoteType.STRAIGHT }
+        val ewTurns = ewNotes.filter { it.noteType != NoteType.STRAIGHT }
+
+        println("\n  eastWestCurve_notOverSimplified:")
+        println("    N-S turns: ${nsTurns.size}, E-W turns: ${ewTurns.size}")
+
+        assertEquals(
+            "E-W and N-S curves should produce same number of turn notes (got NS=${nsTurns.size}, EW=${ewTurns.size})",
+            nsTurns.size, ewTurns.size,
+        )
     }
 }

@@ -3,6 +3,9 @@ package com.rallytrax.app.ui.trackdetail
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -94,6 +97,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.rallytrax.app.data.local.entity.NoteModifier
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
@@ -498,7 +502,11 @@ private fun GoogleTrackMap(
                     Marker(
                         state = rememberMarkerState(position = com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)),
                         title = note.callText,
-                        snippet = "Severity ${note.severity}",
+                        snippet = buildString {
+                            append("Grade ${note.severity}")
+                            note.turnRadiusM?.let { append(" · R=%.0fm".format(it)) }
+                            if (note.modifier != NoteModifier.NONE) append(" · ${note.modifier.name.lowercase()}")
+                        },
                         icon = BitmapDescriptorFactory.fromBitmap(bitmap),
                         anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                     )
@@ -557,7 +565,11 @@ private fun OsmTrackMap(
                 val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
                     note.noteType, note.severity, note.modifier, density,
                 )
-                markers.add(OsmMarkerData(GeoPoint(points[apexIdx].latitude, points[apexIdx].longitude), note.callText, icon = bitmap))
+                val osmTitle = buildString {
+                    append(note.callText)
+                    note.turnRadiusM?.let { append(" (R=%.0fm)".format(it)) }
+                }
+                markers.add(OsmMarkerData(GeoPoint(points[apexIdx].latitude, points[apexIdx].longitude), osmTitle, icon = bitmap))
             }
         }
     }
@@ -912,32 +924,73 @@ private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, m
 
 @Composable
 private fun PaceNoteItem(note: PaceNoteEntity, unitSystem: UnitSystem) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    var expanded by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp),
     ) {
-        PaceNoteIconRenderer.PaceNoteIcon(
-            noteType = note.noteType,
-            severity = note.severity,
-            modifier = note.modifier,
-            sizeDp = 36.dp,
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(note.callText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            Text(formatDistance(note.distanceFromStart, unitSystem), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PaceNoteIconRenderer.PaceNoteIcon(
+                noteType = note.noteType,
+                severity = note.severity,
+                modifier = note.modifier,
+                sizeDp = 36.dp,
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(note.callText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(formatDistance(note.distanceFromStart, unitSystem), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (note.severity in 1..6) {
+                Card(
+                    shape = RoundedCornerShape(6.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                ) {
+                    Text("${note.severity}", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer)
+                }
+            }
         }
-        if (note.severity in 1..6) {
-            Card(
-                shape = RoundedCornerShape(6.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-            ) {
-                Text("${note.severity}", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer)
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column(modifier = Modifier.padding(start = 46.dp, top = 4.dp)) {
+                val details = buildList {
+                    note.turnRadiusM?.let { add("R = %.1fm".format(it)) }
+                    classificationExplanation(note)?.let { add(it) }
+                }
+                if (details.isNotEmpty()) {
+                    Text(
+                        details.joinToString("  ·  "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
+}
+
+private fun classificationExplanation(note: PaceNoteEntity): String? {
+    val radius = note.turnRadiusM ?: return null
+    val band = when (note.severity) {
+        1 -> "0–7m (Hairpin, <30 km/h)"
+        2 -> "7–12m (30–40 km/h)"
+        3 -> "12–22m (40–50 km/h)"
+        4 -> "22–43m (50–70 km/h)"
+        5 -> "43–71m (70–90 km/h)"
+        6 -> "71–148m (90–130 km/h)"
+        else -> return null
+    }
+    return "Grade ${note.severity}: radius in $band"
 }
 
 // ── Curvature Distribution Card ─────────────────────────────────────────────
