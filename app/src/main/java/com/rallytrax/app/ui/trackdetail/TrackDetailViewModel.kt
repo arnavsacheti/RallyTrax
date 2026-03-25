@@ -136,7 +136,15 @@ class TrackDetailViewModel @Inject constructor(
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
 
-            val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
+            var paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
+
+            // Auto-regenerate pace notes if missing segment indices (migration from v12)
+            if (paceNotes.isNotEmpty() && paceNotes.any { it.segmentStartIndex == null }) {
+                val generated = PaceNoteGenerator.generate(trackId, points)
+                paceNoteDao.deleteNotesForTrack(trackId)
+                paceNoteDao.insertNotes(generated)
+                paceNotes = generated
+            }
 
             // Route history (previous attempts)
             val routeTracks = if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()

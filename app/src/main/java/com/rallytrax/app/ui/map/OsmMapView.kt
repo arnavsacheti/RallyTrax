@@ -31,6 +31,7 @@ data class OsmMarkerData(
     val title: String = "",
     val hue: Float = 0f, // 0–360, similar to BitmapDescriptorFactory hues
     val alpha: Float = 1f,
+    val icon: android.graphics.Bitmap? = null, // custom icon bitmap (e.g. rally pace note icon)
 )
 
 /**
@@ -140,8 +141,13 @@ fun OsmMapView(
                 val osmMarker = Marker(mapView).apply {
                     position = markerData.position
                     title = markerData.title
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     alpha = markerData.alpha
+                    if (markerData.icon != null) {
+                        icon = android.graphics.drawable.BitmapDrawable(context.resources, markerData.icon)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    } else {
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    }
                 }
                 mapView.overlays.add(osmMarker)
             }

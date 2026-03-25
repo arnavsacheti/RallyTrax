@@ -159,6 +159,8 @@ object PaceNoteGenerator {
                     modifier = modifier,
                     turnRadiusM = turn.apexRadiusM,
                     callText = "",
+                    segmentStartIndex = interpolated[turn.startIdx].originalIndex,
+                    segmentEndIndex = interpolated[turn.endIdx].originalIndex,
                 )
             )
         }
@@ -637,6 +639,11 @@ object PaceNoteGenerator {
                             else -> NoteType.DIP
                         }
 
+                        // Compute elevation segment region (~30m each side)
+                        val elevLookback = 10 // ~30m at 3m interpolation
+                        val elevStart = (prevIdx - elevLookback).coerceAtLeast(0)
+                        val elevEnd = (prevIdx + elevLookback).coerceAtMost(points.size - 1)
+
                         output.add(
                             PaceNoteEntity(
                                 trackId = trackId,
@@ -646,6 +653,8 @@ object PaceNoteGenerator {
                                 severity = 0,
                                 modifier = NoteModifier.NONE,
                                 callText = "",
+                                segmentStartIndex = points[elevStart].originalIndex,
+                                segmentEndIndex = points[elevEnd].originalIndex,
                             )
                         )
                     }
@@ -669,15 +678,18 @@ object PaceNoteGenerator {
 
         // Gap before first note
         if (notes.first().distanceFromStart > sensitivity.minStraightM) {
+            val endIdx = notes.first().segmentStartIndex ?: notes.first().pointIndex
             result.add(
                 PaceNoteEntity(
                     trackId = trackId,
-                    pointIndex = 0,
+                    pointIndex = endIdx / 2, // midpoint for icon placement
                     distanceFromStart = 0.0,
                     noteType = NoteType.STRAIGHT,
                     severity = 0,
                     modifier = NoteModifier.NONE,
                     callText = "",
+                    segmentStartIndex = 0,
+                    segmentEndIndex = endIdx,
                 )
             )
         }
@@ -689,15 +701,19 @@ object PaceNoteGenerator {
                 val gap = notes[i + 1].distanceFromStart - notes[i].distanceFromStart
                 if (gap > sensitivity.minStraightM) {
                     val midDist = notes[i].distanceFromStart + gap / 2
+                    val segStart = notes[i].segmentEndIndex ?: notes[i].pointIndex
+                    val segEnd = notes[i + 1].segmentStartIndex ?: notes[i + 1].pointIndex
                     result.add(
                         PaceNoteEntity(
                             trackId = trackId,
-                            pointIndex = notes[i].pointIndex,
+                            pointIndex = (segStart + segEnd) / 2,
                             distanceFromStart = midDist,
                             noteType = NoteType.STRAIGHT,
                             severity = 0,
                             modifier = NoteModifier.NONE,
                             callText = "",
+                            segmentStartIndex = segStart,
+                            segmentEndIndex = segEnd,
                         )
                     )
                 }

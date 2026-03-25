@@ -75,11 +75,13 @@ import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import com.rallytrax.app.data.local.entity.NoteType
+import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.replay.ReplayViewModel
 import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
 import com.rallytrax.app.ui.map.OsmPolylineData
+import com.rallytrax.app.ui.map.PaceNoteIconRenderer
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
@@ -240,12 +242,7 @@ fun ReplayHudScreen(
                 // ── Next-note card (severity-tinted) ──
                 if (uiState.isActive && uiState.nextNote != null && !uiState.isFinished) {
                     val note = uiState.nextNote!!
-                    val severityBg = when (note.severity) {
-                        1, 2 -> Color(0xFF34A853).copy(alpha = 0.15f) // green
-                        3, 4 -> Color(0xFFFBBC04).copy(alpha = 0.15f) // amber
-                        5, 6 -> Color(0xFFEA4335).copy(alpha = 0.15f) // red
-                        else -> Color(0xFF1E1E1E)
-                    }
+                    val severityBg = PaceNoteIconRenderer.severityColor(note.noteType, note.severity).copy(alpha = 0.15f)
 
                     Card(
                         modifier = Modifier
@@ -259,13 +256,12 @@ fun ReplayHudScreen(
                             Modifier.fillMaxWidth().padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            val noteColor = noteTypeColor(note.noteType)
-                            Box(
-                                Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(noteColor.copy(alpha = 0.25f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(noteTypeAbbrev(note.noteType), color = noteColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
+                            PaceNoteIconRenderer.PaceNoteIcon(
+                                noteType = note.noteType,
+                                severity = note.severity,
+                                modifier = note.modifier,
+                                sizeDp = 40.dp,
+                            )
                             Spacer(Modifier.width(12.dp))
                             Text(
                                 note.callText, color = Color.White,
@@ -398,11 +394,21 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
         uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = false, mapToolbarEnabled = false,
             myLocationButtonEnabled = false, scrollGesturesEnabled = true, zoomGesturesEnabled = true, rotationGesturesEnabled = true),
     ) {
-        if (uiState.polylinePoints.size >= 2) {
-            Polyline(
-                points = uiState.polylinePoints.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
-                color = Color(0xFF1A73E8), width = 12f,
-            )
+        val allPoints = uiState.polylinePoints.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
+        if (allPoints.size >= 2) {
+            // Draw colored segments for pace notes, dimmed base for gaps
+            val segments = buildColoredSegments(uiState.polylinePoints.size, uiState.paceNotes)
+            for (seg in segments) {
+                val start = seg.startIndex.coerceIn(0, allPoints.size - 1)
+                val end = seg.endIndex.coerceIn(0, allPoints.size - 1)
+                if (end > start) {
+                    Polyline(
+                        points = allPoints.subList(start, end + 1),
+                        color = seg.color,
+                        width = if (seg.isFeature) 14f else 10f,
+                    )
+                }
+            }
         }
         if (driverPos != null) {
             val driverMarkerState = rememberMarkerState(key = "driver",
@@ -410,24 +416,27 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
             driverMarkerState.position = com.google.android.gms.maps.model.LatLng(driverPos.latitude, driverPos.longitude)
             Marker(state = driverMarkerState, title = "You", icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_CYAN))
         }
+        // Rally-style icons for pace notes (skip straights)
+        val context = LocalContext.current
+        val density = context.resources.displayMetrics.densityDpi
         uiState.paceNotes.forEach { note ->
-            val idx = note.pointIndex
-            if (idx in uiState.polylinePoints.indices) {
-                val pos = uiState.polylinePoints[idx]
-                val hue = when (note.noteType) {
-                    NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
-                    NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
-                    NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                    NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                    NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> BitmapDescriptorFactory.HUE_YELLOW
-                    NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> BitmapDescriptorFactory.HUE_ORANGE
-                    NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
-                }
+            if (note.noteType == NoteType.STRAIGHT) return@forEach
+            val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
+                (note.segmentStartIndex + note.segmentEndIndex) / 2
+            } else {
+                note.pointIndex
+            }
+            if (midIdx in uiState.polylinePoints.indices) {
+                val pos = uiState.polylinePoints[midIdx]
+                val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
+                    note.noteType, note.severity, note.modifier, density,
+                )
                 Marker(
                     state = rememberMarkerState(key = "note_${note.id}",
                         position = com.google.android.gms.maps.model.LatLng(pos.latitude, pos.longitude)),
                     title = note.callText,
-                    icon = BitmapDescriptorFactory.defaultMarker(hue), alpha = 0.6f,
+                    icon = BitmapDescriptorFactory.fromBitmap(bitmap),
+                    anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                 )
             }
         }
@@ -437,17 +446,41 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
 @Composable
 private fun OsmReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
     val driverPos = uiState.driverPosition
-    val osmPolylines = if (uiState.polylinePoints.size >= 2) {
-        listOf(OsmPolylineData(points = uiState.polylinePoints.map { GeoPoint(it.latitude, it.longitude) }))
+    val context = LocalContext.current
+    val density = context.resources.displayMetrics.densityDpi
+
+    // Build colored polyline segments
+    val allGeoPoints = uiState.polylinePoints.map { GeoPoint(it.latitude, it.longitude) }
+    val osmPolylines = if (allGeoPoints.size >= 2) {
+        val segments = buildColoredSegments(uiState.polylinePoints.size, uiState.paceNotes)
+        segments.mapNotNull { seg ->
+            val start = seg.startIndex.coerceIn(0, allGeoPoints.size - 1)
+            val end = seg.endIndex.coerceIn(0, allGeoPoints.size - 1)
+            if (end > start) {
+                OsmPolylineData(
+                    points = allGeoPoints.subList(start, end + 1),
+                    color = seg.color,
+                    width = if (seg.isFeature) 14f else 10f,
+                )
+            } else null
+        }
     } else emptyList()
 
     val osmMarkers = buildList {
         if (driverPos != null) add(OsmMarkerData(GeoPoint(driverPos.latitude, driverPos.longitude), "You", hue = 180f))
         uiState.paceNotes.forEach { note ->
-            val idx = note.pointIndex
-            if (idx in uiState.polylinePoints.indices) {
-                val pos = uiState.polylinePoints[idx]
-                add(OsmMarkerData(GeoPoint(pos.latitude, pos.longitude), note.callText, alpha = 0.6f))
+            if (note.noteType == NoteType.STRAIGHT) return@forEach
+            val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
+                (note.segmentStartIndex + note.segmentEndIndex) / 2
+            } else {
+                note.pointIndex
+            }
+            if (midIdx in uiState.polylinePoints.indices) {
+                val pos = uiState.polylinePoints[midIdx]
+                val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
+                    note.noteType, note.severity, note.modifier, density,
+                )
+                add(OsmMarkerData(GeoPoint(pos.latitude, pos.longitude), note.callText, icon = bitmap))
             }
         }
     }
@@ -460,6 +493,59 @@ private fun OsmReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
     } else null
 
     OsmMapView(Modifier.fillMaxSize(), polylines = osmPolylines, markers = osmMarkers, darkMode = true, followPosition = followPos, fitBounds = fitBounds)
+}
+
+// ── Colored Segment Builder ──────────────────────────────────────────────────
+
+private data class ColoredSegment(
+    val startIndex: Int,
+    val endIndex: Int,
+    val color: Color,
+    val isFeature: Boolean,
+)
+
+private val BASE_TRACK_COLOR = Color(0xFF1A73E8).copy(alpha = 0.3f) // dimmed Rally Blue
+
+private fun buildColoredSegments(
+    totalPoints: Int,
+    paceNotes: List<PaceNoteEntity>,
+): List<ColoredSegment> {
+    if (totalPoints < 2) return emptyList()
+
+    // Collect feature segments (skip straights)
+    data class Feature(val start: Int, val end: Int, val color: Color)
+
+    val features = paceNotes
+        .filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+        .map { note ->
+            Feature(
+                start = note.segmentStartIndex!!.coerceIn(0, totalPoints - 1),
+                end = note.segmentEndIndex!!.coerceIn(0, totalPoints - 1),
+                color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
+            )
+        }
+        .filter { it.end > it.start }
+        .sortedBy { it.start }
+
+    val segments = mutableListOf<ColoredSegment>()
+    var cursor = 0
+
+    for (feat in features) {
+        // Gap before this feature
+        if (feat.start > cursor) {
+            segments.add(ColoredSegment(cursor, feat.start, BASE_TRACK_COLOR, isFeature = false))
+        }
+        // The feature segment
+        segments.add(ColoredSegment(feat.start, feat.end, feat.color, isFeature = true))
+        cursor = feat.end
+    }
+
+    // Trailing gap
+    if (cursor < totalPoints - 1) {
+        segments.add(ColoredSegment(cursor, totalPoints - 1, BASE_TRACK_COLOR, isFeature = false))
+    }
+
+    return segments
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────

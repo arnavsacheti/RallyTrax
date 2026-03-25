@@ -15,6 +15,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.rallytrax.app.data.local.dao.PaceNoteDao
+import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
@@ -98,8 +99,16 @@ class ReplayViewModel @Inject constructor(
             try {
                 val track = trackDao.getTrackById(trackId)
                 val points = trackPointDao.getPointsForTrackOnce(trackId)
-                val notes = paceNoteDao.getNotesForTrackOnce(trackId)
+                var notes = paceNoteDao.getNotesForTrackOnce(trackId)
                 val polyline = points.map { LatLng(it.lat, it.lon) }
+
+                // Auto-regenerate pace notes if missing segment indices (migration from v12)
+                if (notes.isNotEmpty() && notes.any { it.segmentStartIndex == null } && points.isNotEmpty()) {
+                    val generated = PaceNoteGenerator.generate(trackId, points)
+                    paceNoteDao.deleteNotesForTrack(trackId)
+                    paceNoteDao.insertNotes(generated)
+                    notes = generated
+                }
 
                 if (track == null || points.isEmpty()) {
                     _uiState.value = _uiState.value.copy(

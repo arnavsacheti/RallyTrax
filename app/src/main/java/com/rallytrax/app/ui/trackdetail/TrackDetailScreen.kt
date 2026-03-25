@@ -100,6 +100,7 @@ import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
 import com.rallytrax.app.ui.map.OsmPolylineData
+import com.rallytrax.app.ui.map.PaceNoteIconRenderer
 import com.rallytrax.app.ui.theme.HeatmapCold
 import com.rallytrax.app.ui.theme.LayerAccel
 import com.rallytrax.app.ui.theme.LayerCallout
@@ -356,11 +357,12 @@ private fun GoogleTrackMap(
         cameraPositionState = cameraPositionState,
         uiSettings = MapUiSettings(zoomControlsEnabled = true, scrollGesturesEnabled = true, zoomGesturesEnabled = true),
     ) {
-        // Base route polyline (always visible)
+        // Base route polyline (dimmed when callouts layer active with colored segments)
         if (points.size >= 2) {
+            val baseColor = if (MapLayer.CALLOUTS in activeLayers) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
             Polyline(
                 points = points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
-                color = Color(0xFF1A73E8), width = 8f,
+                color = baseColor, width = 8f,
             )
         }
 
@@ -457,26 +459,43 @@ private fun GoogleTrackMap(
             }
         }
 
-        // Callouts layer
+        // Callouts layer: colored segments + rally icons
         if (MapLayer.CALLOUTS in activeLayers) {
-            paceNotes.forEach { note ->
-                val idx = note.pointIndex
-                if (idx in points.indices) {
-                    val p = points[idx]
-                    val hue = when (note.noteType) {
-                        NoteType.LEFT -> BitmapDescriptorFactory.HUE_BLUE
-                        NoteType.RIGHT -> BitmapDescriptorFactory.HUE_GREEN
-                        NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                        NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> BitmapDescriptorFactory.HUE_RED
-                        NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> BitmapDescriptorFactory.HUE_YELLOW
-                        NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> BitmapDescriptorFactory.HUE_ORANGE
-                        NoteType.STRAIGHT -> BitmapDescriptorFactory.HUE_VIOLET
+            val allMapPoints = points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
+            // Draw colored segments for features
+            paceNotes.filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+                .forEach { note ->
+                    val start = note.segmentStartIndex!!.coerceIn(0, allMapPoints.size - 1)
+                    val end = note.segmentEndIndex!!.coerceIn(0, allMapPoints.size - 1)
+                    if (end > start) {
+                        Polyline(
+                            points = allMapPoints.subList(start, end + 1),
+                            color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
+                            width = 12f,
+                        )
                     }
+                }
+            // Rally-style icon markers (skip straights)
+            val context = LocalContext.current
+            val density = context.resources.displayMetrics.densityDpi
+            paceNotes.forEach { note ->
+                if (note.noteType == NoteType.STRAIGHT) return@forEach
+                val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
+                    (note.segmentStartIndex + note.segmentEndIndex) / 2
+                } else {
+                    note.pointIndex
+                }
+                if (midIdx in points.indices) {
+                    val p = points[midIdx]
+                    val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
+                        note.noteType, note.severity, note.modifier, density,
+                    )
                     Marker(
                         state = rememberMarkerState(position = com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude)),
                         title = note.callText,
                         snippet = "Severity ${note.severity}",
-                        icon = BitmapDescriptorFactory.defaultMarker(hue),
+                        icon = BitmapDescriptorFactory.fromBitmap(bitmap),
+                        anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                     )
                 }
             }
@@ -496,17 +515,47 @@ private fun OsmTrackMap(
     val lngs = points.map { it.longitude }
     val fitBounds = BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
 
+    val context = LocalContext.current
+    val density = context.resources.displayMetrics.densityDpi
+    val calloutsActive = MapLayer.CALLOUTS in activeLayers
+
     val polylines = mutableListOf<OsmPolylineData>()
     if (points.size >= 2) {
-        polylines.add(OsmPolylineData(points = points.map { GeoPoint(it.latitude, it.longitude) }, width = 8f))
+        val baseColor = if (calloutsActive) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
+        polylines.add(OsmPolylineData(points = points.map { GeoPoint(it.latitude, it.longitude) }, color = baseColor, width = 8f))
+    }
+
+    // Colored segments for callouts
+    if (calloutsActive && points.size >= 2) {
+        val geoPoints = points.map { GeoPoint(it.latitude, it.longitude) }
+        paceNotes.filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+            .forEach { note ->
+                val start = note.segmentStartIndex!!.coerceIn(0, geoPoints.size - 1)
+                val end = note.segmentEndIndex!!.coerceIn(0, geoPoints.size - 1)
+                if (end > start) {
+                    polylines.add(OsmPolylineData(
+                        points = geoPoints.subList(start, end + 1),
+                        color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
+                        width = 12f,
+                    ))
+                }
+            }
     }
 
     val markers = mutableListOf<OsmMarkerData>()
-    if (MapLayer.CALLOUTS in activeLayers) {
+    if (calloutsActive) {
         paceNotes.forEach { note ->
-            val idx = note.pointIndex
-            if (idx in points.indices) {
-                markers.add(OsmMarkerData(GeoPoint(points[idx].latitude, points[idx].longitude), note.callText))
+            if (note.noteType == NoteType.STRAIGHT) return@forEach
+            val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
+                (note.segmentStartIndex + note.segmentEndIndex) / 2
+            } else {
+                note.pointIndex
+            }
+            if (midIdx in points.indices) {
+                val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
+                    note.noteType, note.severity, note.modifier, density,
+                )
+                markers.add(OsmMarkerData(GeoPoint(points[midIdx].latitude, points[midIdx].longitude), note.callText, icon = bitmap))
             }
         }
     }
@@ -860,36 +909,16 @@ private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, m
 
 @Composable
 private fun PaceNoteItem(note: PaceNoteEntity, unitSystem: UnitSystem) {
-    val iconColor = when (note.noteType) {
-        NoteType.LEFT -> Color(0xFF1A73E8)
-        NoteType.RIGHT -> Color(0xFF34A853)
-        NoteType.HAIRPIN_LEFT, NoteType.HAIRPIN_RIGHT -> Color(0xFFEA4335)
-        NoteType.SQUARE_LEFT, NoteType.SQUARE_RIGHT -> Color(0xFFEA4335)
-        NoteType.CREST, NoteType.SMALL_CREST, NoteType.BIG_CREST -> Color(0xFFFBBC04)
-        NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> Color(0xFFFF6D00)
-        NoteType.STRAIGHT -> Color(0xFF9C27B0)
-    }
-    val typeIcon = when (note.noteType) {
-        NoteType.LEFT -> "L"; NoteType.RIGHT -> "R"
-        NoteType.HAIRPIN_LEFT -> "HL"; NoteType.HAIRPIN_RIGHT -> "HR"
-        NoteType.SQUARE_LEFT -> "SL"; NoteType.SQUARE_RIGHT -> "SR"
-        NoteType.CREST -> "CR"; NoteType.SMALL_CREST -> "sC"; NoteType.BIG_CREST -> "BC"
-        NoteType.DIP -> "DP"; NoteType.SMALL_DIP -> "sD"; NoteType.BIG_DIP -> "BD"
-        NoteType.STRAIGHT -> "ST"
-    }
-
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Card(
-            modifier = Modifier.size(36.dp), shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = iconColor.copy(alpha = 0.15f)),
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(typeIcon, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = iconColor)
-            }
-        }
+        PaceNoteIconRenderer.PaceNoteIcon(
+            noteType = note.noteType,
+            severity = note.severity,
+            modifier = note.modifier,
+            sizeDp = 36.dp,
+        )
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(note.callText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)

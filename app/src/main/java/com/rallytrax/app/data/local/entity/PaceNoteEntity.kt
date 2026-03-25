@@ -73,4 +73,6 @@ data class PaceNoteEntity(
     val severityHalf: SeverityHalf = SeverityHalf.NONE, // +/- half-step
     val conjunction: Conjunction = Conjunction.DISTANCE, // into/and/distance
     val turnRadiusM: Double? = null, // computed radius for calibration
+    val segmentStartIndex: Int? = null, // track point index where feature begins
+    val segmentEndIndex: Int? = null, // track point index where feature ends
 )
