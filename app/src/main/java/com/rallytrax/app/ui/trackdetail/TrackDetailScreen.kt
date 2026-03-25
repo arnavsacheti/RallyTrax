@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -325,9 +326,10 @@ private fun TrackMap(
     activeLayers: Set<MapLayer>,
     useGoogleMaps: Boolean,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(bottom = 100.dp),
 ) {
     if (useGoogleMaps) {
-        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier)
+        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding)
     } else {
         OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier)
     }
@@ -340,6 +342,7 @@ private fun GoogleTrackMap(
     paceNotes: List<PaceNoteEntity>,
     activeLayers: Set<MapLayer>,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(bottom = 100.dp),
 ) {
     val cameraPositionState = rememberCameraPositionState()
     val bounds = remember(points) {
@@ -356,6 +359,7 @@ private fun GoogleTrackMap(
         modifier = modifier,
         cameraPositionState = cameraPositionState,
         uiSettings = MapUiSettings(zoomControlsEnabled = true, scrollGesturesEnabled = true, zoomGesturesEnabled = true),
+        contentPadding = contentPadding,
     ) {
         // Base route polyline (dimmed when callouts layer active with colored segments)
         if (points.size >= 2) {
@@ -595,6 +599,7 @@ private fun FullscreenMapDialog(
                 activeLayers = activeLayers,
                 useGoogleMaps = useGoogleMaps,
                 modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 56.dp),
             )
 
             // Exit fullscreen button
