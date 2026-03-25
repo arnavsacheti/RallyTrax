@@ -237,6 +237,10 @@ dependencies {
     // OpenStreetMap (fallback when Google Maps API key is not configured)
     implementation(libs.osmdroid.android)
 
+    // Android Auto (Car App Library)
+    implementation(libs.car.app)
+    implementation(libs.car.app.projected)
+
     // Location
     implementation(libs.play.services.location)
 
