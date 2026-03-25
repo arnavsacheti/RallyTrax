@@ -350,7 +350,7 @@ object PaceNoteGenerator {
             val bx = points[afterIdx].lon - points[i].lon
             val by = points[afterIdx].lat - points[i].lat
 
-            dirs[i] = ax * by - ay * bx // positive = right, negative = left
+            dirs[i] = ax * by - ay * bx // positive = left, negative = right
         }
 
         return dirs
@@ -431,7 +431,7 @@ object PaceNoteGenerator {
                 val regionEnd = i - 1
 
                 // Determine dominant direction from the apex region
-                val isLeft = directions[minIdx] < 0
+                val isLeft = directions[minIdx] > 0
 
                 // Compute entry/exit half average radii for tightens/opens
                 val mid = (regionStart + regionEnd) / 2
