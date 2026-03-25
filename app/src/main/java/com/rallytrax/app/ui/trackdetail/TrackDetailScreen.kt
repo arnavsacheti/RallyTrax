@@ -489,13 +489,9 @@ private fun GoogleTrackMap(
             val density = (LocalDensity.current.density * 160f).toInt()
             paceNotes.forEach { note ->
                 if (note.noteType == NoteType.STRAIGHT) return@forEach
-                val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
-                    (note.segmentStartIndex + note.segmentEndIndex) / 2
-                } else {
-                    note.pointIndex
-                }
-                if (midIdx in points.indices) {
-                    val p = points[midIdx]
+                val apexIdx = note.pointIndex
+                if (apexIdx in points.indices) {
+                    val p = points[apexIdx]
                     val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
                         note.noteType, note.severity, note.modifier, density,
                     )
@@ -556,16 +552,12 @@ private fun OsmTrackMap(
     if (calloutsActive) {
         paceNotes.forEach { note ->
             if (note.noteType == NoteType.STRAIGHT) return@forEach
-            val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
-                (note.segmentStartIndex + note.segmentEndIndex) / 2
-            } else {
-                note.pointIndex
-            }
-            if (midIdx in points.indices) {
+            val apexIdx = note.pointIndex
+            if (apexIdx in points.indices) {
                 val bitmap = PaceNoteIconRenderer.createMarkerBitmap(
                     note.noteType, note.severity, note.modifier, density,
                 )
-                markers.add(OsmMarkerData(GeoPoint(points[midIdx].latitude, points[midIdx].longitude), note.callText, icon = bitmap))
+                markers.add(OsmMarkerData(GeoPoint(points[apexIdx].latitude, points[apexIdx].longitude), note.callText, icon = bitmap))
             }
         }
     }
