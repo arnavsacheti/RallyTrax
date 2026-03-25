@@ -223,6 +223,10 @@ class TrackDetailViewModel @Inject constructor(
         }
     }
 
+    fun clearSuggestions() {
+        _uiState.value = _uiState.value.copy(suggestedSegments = emptyList())
+    }
+
     fun createUserSegment(name: String, startIndex: Int, endIndex: Int) {
         viewModelScope.launch {
             try {
