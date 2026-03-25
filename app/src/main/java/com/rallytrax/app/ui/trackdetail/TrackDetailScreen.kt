@@ -46,6 +46,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -292,6 +293,7 @@ fun TrackDetailScreen(
                         onDetectSegments = { viewModel.detectNewSegments() },
                         onSegmentClick = onSegmentClick,
                         onViewAllSegments = onViewAllSegments,
+                        onRegeneratePaceNotes = { viewModel.regeneratePaceNotes() },
                     )
                 }
             }
@@ -467,10 +469,13 @@ private fun GoogleTrackMap(
         if (MapLayer.CALLOUTS in activeLayers) {
             val allMapPoints = points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
             // Draw colored segments for features
-            paceNotes.filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+            paceNotes.filter { it.noteType != NoteType.STRAIGHT }
                 .forEach { note ->
-                    val start = note.segmentStartIndex!!.coerceIn(0, allMapPoints.size - 1)
-                    val end = note.segmentEndIndex!!.coerceIn(0, allMapPoints.size - 1)
+                    // Use segment indices if available, otherwise fallback to region around pointIndex
+                    val start = (note.segmentStartIndex ?: (note.pointIndex - 5).coerceAtLeast(0))
+                        .coerceIn(0, allMapPoints.size - 1)
+                    val end = (note.segmentEndIndex ?: (note.pointIndex + 5).coerceAtMost(allMapPoints.size - 1))
+                        .coerceIn(0, allMapPoints.size - 1)
                     if (end > start) {
                         Polyline(
                             points = allMapPoints.subList(start, end + 1),
@@ -532,10 +537,12 @@ private fun OsmTrackMap(
     // Colored segments for callouts
     if (calloutsActive && points.size >= 2) {
         val geoPoints = points.map { GeoPoint(it.latitude, it.longitude) }
-        paceNotes.filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+        paceNotes.filter { it.noteType != NoteType.STRAIGHT }
             .forEach { note ->
-                val start = note.segmentStartIndex!!.coerceIn(0, geoPoints.size - 1)
-                val end = note.segmentEndIndex!!.coerceIn(0, geoPoints.size - 1)
+                val start = (note.segmentStartIndex ?: (note.pointIndex - 5).coerceAtLeast(0))
+                    .coerceIn(0, geoPoints.size - 1)
+                val end = (note.segmentEndIndex ?: (note.pointIndex + 5).coerceAtMost(geoPoints.size - 1))
+                    .coerceIn(0, geoPoints.size - 1)
                 if (end > start) {
                     polylines.add(OsmPolylineData(
                         points = geoPoints.subList(start, end + 1),
@@ -1087,6 +1094,7 @@ private fun ViewTab(
     onDetectSegments: () -> Unit = {},
     onSegmentClick: (String) -> Unit = {},
     onViewAllSegments: () -> Unit = {},
+    onRegeneratePaceNotes: () -> Unit = {},
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1130,7 +1138,13 @@ private fun ViewTab(
         // Pace notes
         if (CardType.PACE_NOTES in visible && uiState.paceNotes.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
-            PaceNotesList(uiState.paceNotes, unitSystem)
+            PaceNotesList(
+                paceNotes = uiState.paceNotes,
+                unitSystem = unitSystem,
+                isStale = uiState.paceNotesStale,
+                isRegenerating = uiState.isGeneratingNotes,
+                onRegenerate = onRegeneratePaceNotes,
+            )
         }
 
         // Segments
@@ -1405,7 +1419,13 @@ private fun TrackInfoChips(track: com.rallytrax.app.data.local.entity.TrackEntit
 // ── Pace Notes List (read-only) ─────────────────────────────────────────────
 
 @Composable
-private fun PaceNotesList(paceNotes: List<PaceNoteEntity>, unitSystem: UnitSystem) {
+private fun PaceNotesList(
+    paceNotes: List<PaceNoteEntity>,
+    unitSystem: UnitSystem,
+    isStale: Boolean = false,
+    isRegenerating: Boolean = false,
+    onRegenerate: () -> Unit = {},
+) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -1416,6 +1436,49 @@ private fun PaceNotesList(paceNotes: List<PaceNoteEntity>, unitSystem: UnitSyste
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
+            if (isStale) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Regenerate for map segment visualization",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (isRegenerating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            FilledTonalButton(
+                                onClick = onRegenerate,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            ) {
+                                Text("Update", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             paceNotes.take(20).forEach { note ->
                 PaceNoteItem(note, unitSystem)

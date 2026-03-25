@@ -84,6 +84,7 @@ data class TrackDetailUiState(
     val segments: List<TrackSegmentUi> = emptyList(),
     val isDetectingSegments: Boolean = false,
     val suggestedSegments: List<SegmentMatcher.OverlapCandidate> = emptyList(),
+    val paceNotesStale: Boolean = false, // true when pace notes lack segment data and need regeneration
 )
 
 enum class MapLayer {
@@ -136,15 +137,8 @@ class TrackDetailViewModel @Inject constructor(
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
 
-            var paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
-
-            // Auto-regenerate pace notes if missing segment indices (migration from v12)
-            if (paceNotes.isNotEmpty() && paceNotes.any { it.segmentStartIndex == null }) {
-                val generated = PaceNoteGenerator.generate(trackId, points)
-                paceNoteDao.deleteNotesForTrack(trackId)
-                paceNoteDao.insertNotes(generated)
-                paceNotes = generated
-            }
+            val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
+            val paceNotesStale = paceNotes.isNotEmpty() && paceNotes.any { it.segmentStartIndex == null }
 
             // Route history (previous attempts)
             val routeTracks = if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()
@@ -183,6 +177,7 @@ class TrackDetailViewModel @Inject constructor(
                 curvatureDistribution = curvatureDistribution,
                 tags = tags,
                 paceNotes = paceNotes,
+                paceNotesStale = paceNotesStale,
                 isLoading = false,
                 routeCompletionCount = completionCount,
                 personalBestMs = personalBest,
@@ -357,6 +352,7 @@ class TrackDetailViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     paceNotes = notes,
                     isGeneratingNotes = false,
+                    paceNotesStale = false,
                 )
 
                 _snackbarMessage.tryEmit("Generated ${notes.size} pace notes")

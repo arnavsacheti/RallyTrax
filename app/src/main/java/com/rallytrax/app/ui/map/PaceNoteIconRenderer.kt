@@ -9,22 +9,17 @@ import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.withSave
 import com.rallytrax.app.data.local.entity.NoteModifier
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.ui.theme.DifficultyAmber
 import com.rallytrax.app.ui.theme.DifficultyGreen
 import com.rallytrax.app.ui.theme.DifficultyOrange
 import com.rallytrax.app.ui.theme.DifficultyRed
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -36,8 +31,8 @@ object PaceNoteIconRenderer {
 
     // ── Color Mapping ────────────────────────────────────────────────────
 
-    private val CrestColor = Color(0xFFFBBC04) // Yellow
-    private val DipColor = Color(0xFFFF6D00) // Orange
+    private val CrestColor = Color(0xFFFBBC04)
+    private val DipColor = Color(0xFFFF6D00)
 
     fun severityColor(noteType: NoteType, severity: Int): Color = when {
         noteType == NoteType.STRAIGHT -> Color(0xFF9C27B0)
@@ -58,38 +53,15 @@ object PaceNoteIconRenderer {
         severity: Int,
         modifier: NoteModifier,
         densityDpi: Int,
-        sizeDp: Int = 32,
+        sizeDp: Int = 48,
     ): Bitmap {
-        val sizePx = (sizeDp * densityDpi / 160f).toInt()
+        val sizePx = (sizeDp * densityDpi / 160f).toInt().coerceAtLeast(48)
         val key = IconKey(noteType, severity, modifier, sizePx)
         bitmapCache[key]?.let { return it }
 
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val bgColor = severityColor(noteType, severity)
-
-        // Draw rounded-rect background
-        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = bgColor.toArgb()
-            style = Paint.Style.FILL
-        }
-        val cornerR = sizePx * 0.2f
-        canvas.drawRoundRect(RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat()), cornerR, cornerR, bgPaint)
-
-        // Draw icon in white
-        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = sizePx * 0.08f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-
-        val cx = sizePx / 2f
-        val cy = sizePx / 2f
-        val r = sizePx * 0.32f // icon radius
-
-        drawIconOnNativeCanvas(canvas, noteType, severity, modifier, iconPaint, cx, cy, r, sizePx.toFloat())
+        drawFullIcon(canvas, noteType, severity, modifier, sizePx.toFloat())
 
         bitmapCache[key] = bitmap
         return bitmap
@@ -104,50 +76,60 @@ object PaceNoteIconRenderer {
         modifier: NoteModifier = NoteModifier.NONE,
         sizeDp: Dp = 40.dp,
     ) {
-        val bgColor = severityColor(noteType, severity)
         ComposeCanvas(modifier = Modifier.size(sizeDp)) {
-            val sizePx = size.width
-            val cornerR = sizePx * 0.2f
-
-            // Background
-            drawRoundRect(
-                color = bgColor,
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerR, cornerR),
-            )
-
-            // Icon in white
-            drawPaceNoteShape(noteType, severity, modifier, sizePx)
+            drawContext.canvas.nativeCanvas.apply {
+                drawFullIcon(this, noteType, severity, modifier, size.width)
+            }
         }
     }
 
-    // ── Native Canvas icon drawing (for Bitmap) ──────────────────────────
+    // ── Full icon drawing (background + shape) ───────────────────────────
 
-    private fun drawIconOnNativeCanvas(
+    private fun drawFullIcon(
         canvas: Canvas,
         noteType: NoteType,
         severity: Int,
         modifier: NoteModifier,
-        paint: Paint,
-        cx: Float,
-        cy: Float,
-        r: Float,
         size: Float,
     ) {
+        val bgColor = severityColor(noteType, severity)
+
+        // Rounded-rect background
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = bgColor.toArgb()
+            style = Paint.Style.FILL
+        }
+        val cornerR = size * 0.18f
+        canvas.drawRoundRect(RectF(0f, 0f, size, size), cornerR, cornerR, bgPaint)
+
+        // White icon stroke
+        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = size * 0.1f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        val cx = size / 2f
+        val cy = size / 2f
+        val r = size * 0.3f // drawing radius
+
         when {
-            noteType == NoteType.STRAIGHT -> drawStraightArrow(canvas, paint, cx, cy, r)
-            noteType.isCrest() -> drawCrest(canvas, paint, cx, cy, r, noteType)
-            noteType.isDip() -> drawDip(canvas, paint, cx, cy, r, noteType)
-            noteType == NoteType.SQUARE_LEFT -> drawSquareTurn(canvas, paint, cx, cy, r, isLeft = true)
-            noteType == NoteType.SQUARE_RIGHT -> drawSquareTurn(canvas, paint, cx, cy, r, isLeft = false)
+            noteType == NoteType.STRAIGHT -> drawStraightArrow(canvas, iconPaint, cx, cy, r)
+            noteType.isCrest() -> drawCrest(canvas, iconPaint, cx, cy, r, noteType)
+            noteType.isDip() -> drawDip(canvas, iconPaint, cx, cy, r, noteType)
+            noteType == NoteType.SQUARE_LEFT -> drawSquareTurn(canvas, iconPaint, cx, cy, r, isLeft = true)
+            noteType == NoteType.SQUARE_RIGHT -> drawSquareTurn(canvas, iconPaint, cx, cy, r, isLeft = false)
             else -> {
                 val isLeft = noteType.isLeft()
                 val sweepAngle = severityToSweepAngle(noteType, severity)
-                drawCurvedArrow(canvas, paint, cx, cy, r, isLeft, sweepAngle)
-                if (modifier == NoteModifier.TIGHTENS) drawTightensIndicator(canvas, paint, cx, cy, r, isLeft)
-                if (modifier == NoteModifier.OPENS) drawOpensIndicator(canvas, paint, cx, cy, r, isLeft)
+                drawCurvedArrow(canvas, iconPaint, cx, cy, r, isLeft, sweepAngle)
             }
         }
     }
+
+    // ── Individual shape drawing ─────────────────────────────────────────
 
     private fun severityToSweepAngle(noteType: NoteType, severity: Int): Float = when {
         noteType == NoteType.HAIRPIN_LEFT || noteType == NoteType.HAIRPIN_RIGHT -> 170f
@@ -159,6 +141,11 @@ object PaceNoteIconRenderer {
         else -> 30f
     }
 
+    /**
+     * Draws a curved arrow representing a turn.
+     * The arrow enters from the bottom and curves left or right.
+     * The sweep angle determines how tight the curve is.
+     */
     private fun drawCurvedArrow(
         canvas: Canvas,
         paint: Paint,
@@ -168,35 +155,52 @@ object PaceNoteIconRenderer {
         isLeft: Boolean,
         sweepAngle: Float,
     ) {
+        // Draw a path: straight entry from bottom, then arc curve
         val path = Path()
-        val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
 
-        // Start from bottom, sweep upward
-        val startAngle = if (isLeft) 90f else 90f - sweepAngle
+        // Arc center is offset so the arrow enters from below
+        val arcCx = cx
+        val arcCy = cy
+        val arcRect = RectF(arcCx - r, arcCy - r, arcCx + r, arcCy + r)
+
+        // For left turns: start at bottom (90°) and sweep counter-clockwise (negative)
+        // For right turns: start at bottom (90°) and sweep clockwise (positive)
+        val startAngle = 90f
         val sweep = if (isLeft) -sweepAngle else sweepAngle
 
+        // Draw the straight entry segment from bottom of icon to arc start
+        val arcStartX = arcCx + r * cos(Math.toRadians(startAngle.toDouble())).toFloat()
+        val arcStartY = arcCy + r * sin(Math.toRadians(startAngle.toDouble())).toFloat()
+        path.moveTo(arcStartX, cy + r * 1.2f) // below arc start
+        path.lineTo(arcStartX, arcStartY)
+
+        // Draw the arc
         path.addArc(arcRect, startAngle, sweep)
         canvas.drawPath(path, paint)
 
         // Arrowhead at the end of the arc
-        val endAngleRad = Math.toRadians((startAngle + sweep).toDouble())
-        val tipX = cx + r * cos(endAngleRad).toFloat()
-        val tipY = cy + r * sin(endAngleRad).toFloat()
+        val endAngleDeg = startAngle + sweep
+        val endAngleRad = Math.toRadians(endAngleDeg.toDouble())
+        val tipX = arcCx + r * cos(endAngleRad).toFloat()
+        val tipY = arcCy + r * sin(endAngleRad).toFloat()
 
-        val arrowSize = r * 0.4f
-        val arrowAngle1 = endAngleRad + if (isLeft) Math.toRadians(150.0) else Math.toRadians(-150.0)
-        val arrowAngle2 = endAngleRad + if (isLeft) Math.toRadians(210.0) else Math.toRadians(-210.0)
+        // Tangent direction at the arc end
+        val tangentAngle = if (isLeft) endAngleRad - PI / 2 else endAngleRad + PI / 2
+        val arrowLen = r * 0.5f
+        val arrowSpread = PI / 6 // 30 degrees
+
+        val arrow1Angle = tangentAngle + PI + arrowSpread
+        val arrow2Angle = tangentAngle + PI - arrowSpread
 
         val arrowPath = Path()
-        arrowPath.moveTo(tipX, tipY)
-        arrowPath.lineTo(
-            tipX + arrowSize * cos(arrowAngle1).toFloat(),
-            tipY + arrowSize * sin(arrowAngle1).toFloat(),
+        arrowPath.moveTo(
+            tipX + arrowLen * cos(arrow1Angle).toFloat(),
+            tipY + arrowLen * sin(arrow1Angle).toFloat(),
         )
-        arrowPath.moveTo(tipX, tipY)
+        arrowPath.lineTo(tipX, tipY)
         arrowPath.lineTo(
-            tipX + arrowSize * cos(arrowAngle2).toFloat(),
-            tipY + arrowSize * sin(arrowAngle2).toFloat(),
+            tipX + arrowLen * cos(arrow2Angle).toFloat(),
+            tipY + arrowLen * sin(arrow2Angle).toFloat(),
         )
         canvas.drawPath(arrowPath, paint)
     }
@@ -210,136 +214,92 @@ object PaceNoteIconRenderer {
         isLeft: Boolean,
     ) {
         val path = Path()
-        // Vertical line up, then horizontal turn
-        val startX = if (isLeft) cx + r * 0.3f else cx - r * 0.3f
-        val startY = cy + r
-        val cornerY = cy - r * 0.3f
+        val startX = if (isLeft) cx + r * 0.2f else cx - r * 0.2f
+        val cornerY = cy - r * 0.2f
         val endX = if (isLeft) cx - r else cx + r
 
-        path.moveTo(startX, startY)
+        // Vertical entry, then 90° turn
+        path.moveTo(startX, cy + r * 1.2f)
         path.lineTo(startX, cornerY)
         path.lineTo(endX, cornerY)
-
         canvas.drawPath(path, paint)
 
         // Arrowhead
-        val arrowSize = r * 0.35f
+        val arrowLen = r * 0.45f
         val arrowPath = Path()
         arrowPath.moveTo(endX, cornerY)
         if (isLeft) {
-            arrowPath.lineTo(endX + arrowSize, cornerY - arrowSize * 0.5f)
+            arrowPath.lineTo(endX + arrowLen * 0.7f, cornerY - arrowLen * 0.5f)
             arrowPath.moveTo(endX, cornerY)
-            arrowPath.lineTo(endX + arrowSize, cornerY + arrowSize * 0.5f)
+            arrowPath.lineTo(endX + arrowLen * 0.7f, cornerY + arrowLen * 0.5f)
         } else {
-            arrowPath.lineTo(endX - arrowSize, cornerY - arrowSize * 0.5f)
+            arrowPath.lineTo(endX - arrowLen * 0.7f, cornerY - arrowLen * 0.5f)
             arrowPath.moveTo(endX, cornerY)
-            arrowPath.lineTo(endX - arrowSize, cornerY + arrowSize * 0.5f)
+            arrowPath.lineTo(endX - arrowLen * 0.7f, cornerY + arrowLen * 0.5f)
         }
         canvas.drawPath(arrowPath, paint)
     }
 
     private fun drawStraightArrow(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float) {
-        // Vertical arrow pointing up
-        canvas.drawLine(cx, cy + r, cx, cy - r, paint)
-        val arrowSize = r * 0.4f
-        canvas.drawLine(cx, cy - r, cx - arrowSize, cy - r + arrowSize, paint)
-        canvas.drawLine(cx, cy - r, cx + arrowSize, cy - r + arrowSize, paint)
+        val top = cy - r
+        val bottom = cy + r * 1.2f
+
+        // Vertical line
+        canvas.drawLine(cx, bottom, cx, top, paint)
+
+        // Arrowhead
+        val arrowLen = r * 0.5f
+        canvas.drawLine(cx, top, cx - arrowLen * 0.7f, top + arrowLen, paint)
+        canvas.drawLine(cx, top, cx + arrowLen * 0.7f, top + arrowLen, paint)
     }
 
     private fun drawCrest(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float, type: NoteType) {
         val scale = when (type) {
-            NoteType.SMALL_CREST -> 0.6f
+            NoteType.SMALL_CREST -> 0.65f
             NoteType.BIG_CREST -> 1.0f
-            else -> 0.8f
+            else -> 0.82f
         }
         val h = r * scale
-        val w = r * 0.9f
-        // Chevron up (^)
+        val w = r * 1.0f
         val path = Path()
-        path.moveTo(cx - w, cy + h * 0.4f)
-        path.lineTo(cx, cy - h * 0.6f)
-        path.lineTo(cx + w, cy + h * 0.4f)
+        path.moveTo(cx - w, cy + h * 0.5f)
+        path.lineTo(cx, cy - h * 0.5f)
+        path.lineTo(cx + w, cy + h * 0.5f)
         canvas.drawPath(path, paint)
     }
 
     private fun drawDip(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float, type: NoteType) {
         val scale = when (type) {
-            NoteType.SMALL_DIP -> 0.6f
+            NoteType.SMALL_DIP -> 0.65f
             NoteType.BIG_DIP -> 1.0f
-            else -> 0.8f
+            else -> 0.82f
         }
         val h = r * scale
-        val w = r * 0.9f
-        // Chevron down (v)
+        val w = r * 1.0f
         val path = Path()
-        path.moveTo(cx - w, cy - h * 0.4f)
-        path.lineTo(cx, cy + h * 0.6f)
-        path.lineTo(cx + w, cy - h * 0.4f)
+        path.moveTo(cx - w, cy - h * 0.5f)
+        path.lineTo(cx, cy + h * 0.5f)
+        path.lineTo(cx + w, cy - h * 0.5f)
         canvas.drawPath(path, paint)
-    }
-
-    private fun drawTightensIndicator(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float, isLeft: Boolean) {
-        // Small narrowing wedge near the end of the arrow
-        val indicatorPaint = Paint(paint).apply { strokeWidth = paint.strokeWidth * 0.6f }
-        val x = if (isLeft) cx + r * 0.5f else cx - r * 0.5f
-        canvas.drawLine(x, cy + r * 0.6f, x, cy + r * 0.3f, indicatorPaint)
-    }
-
-    private fun drawOpensIndicator(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float, isLeft: Boolean) {
-        // Small widening wedge near the end of the arrow
-        val indicatorPaint = Paint(paint).apply { strokeWidth = paint.strokeWidth * 0.6f }
-        val x = if (isLeft) cx + r * 0.5f else cx - r * 0.5f
-        canvas.drawLine(x, cy + r * 0.3f, x, cy + r * 0.6f, indicatorPaint)
-        canvas.drawLine(x - r * 0.15f, cy + r * 0.6f, x + r * 0.15f, cy + r * 0.6f, indicatorPaint)
-    }
-
-    // ── Compose DrawScope icon drawing ───────────────────────────────────
-
-    private fun DrawScope.drawPaceNoteShape(
-        noteType: NoteType,
-        severity: Int,
-        modifier: NoteModifier,
-        sizePx: Float,
-    ) {
-        val stroke = Stroke(
-            width = sizePx * 0.08f,
-            cap = StrokeCap.Round,
-            join = StrokeJoin.Round,
-        )
-        val cx = sizePx / 2f
-        val cy = sizePx / 2f
-        val r = sizePx * 0.32f
-        val white = Color.White
-
-        // Use native canvas for path-based drawing
-        drawContext.canvas.nativeCanvas.apply {
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                style = Paint.Style.STROKE
-                strokeWidth = sizePx * 0.08f
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-            }
-            drawIconOnNativeCanvas(this, noteType, severity, modifier, paint, cx, cy, r, sizePx)
-        }
     }
 
     // ── Helper extensions ────────────────────────────────────────────────
 
-    private fun NoteType.isLeft(): Boolean = this == NoteType.LEFT || this == NoteType.HAIRPIN_LEFT || this == NoteType.SQUARE_LEFT
+    private fun NoteType.isLeft(): Boolean =
+        this == NoteType.LEFT || this == NoteType.HAIRPIN_LEFT || this == NoteType.SQUARE_LEFT
 
-    private fun NoteType.isCrest(): Boolean = this == NoteType.CREST || this == NoteType.SMALL_CREST || this == NoteType.BIG_CREST
+    private fun NoteType.isCrest(): Boolean =
+        this == NoteType.CREST || this == NoteType.SMALL_CREST || this == NoteType.BIG_CREST
 
-    private fun NoteType.isDip(): Boolean = this == NoteType.DIP || this == NoteType.SMALL_DIP || this == NoteType.BIG_DIP
+    private fun NoteType.isDip(): Boolean =
+        this == NoteType.DIP || this == NoteType.SMALL_DIP || this == NoteType.BIG_DIP
 
-    private fun Color.toArgb(): Int {
-        return android.graphics.Color.argb(
-            (alpha * 255).toInt(),
-            (red * 255).toInt(),
-            (green * 255).toInt(),
-            (blue * 255).toInt(),
-        )
-    }
+    private fun Color.toArgb(): Int = android.graphics.Color.argb(
+        (alpha * 255).toInt(),
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt(),
+    )
 
     private data class IconKey(
         val noteType: NoteType,
@@ -350,9 +310,7 @@ object PaceNoteIconRenderer {
 
     private fun <K, V> lruCache(maxSize: Int): MutableMap<K, V> {
         return object : LinkedHashMap<K, V>(maxSize, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean {
-                return size > maxSize
-            }
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean = size > maxSize
         }
     }
 }

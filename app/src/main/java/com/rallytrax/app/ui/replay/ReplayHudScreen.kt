@@ -516,11 +516,16 @@ private fun buildColoredSegments(
     data class Feature(val start: Int, val end: Int, val color: Color)
 
     val features = paceNotes
-        .filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+        .filter { it.noteType != NoteType.STRAIGHT }
         .map { note ->
+            // Use segment indices if available, fallback to region around pointIndex
+            val start = (note.segmentStartIndex ?: (note.pointIndex - 5).coerceAtLeast(0))
+                .coerceIn(0, totalPoints - 1)
+            val end = (note.segmentEndIndex ?: (note.pointIndex + 5).coerceAtMost(totalPoints - 1))
+                .coerceIn(0, totalPoints - 1)
             Feature(
-                start = note.segmentStartIndex!!.coerceIn(0, totalPoints - 1),
-                end = note.segmentEndIndex!!.coerceIn(0, totalPoints - 1),
+                start = start,
+                end = end,
                 color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
             )
         }
