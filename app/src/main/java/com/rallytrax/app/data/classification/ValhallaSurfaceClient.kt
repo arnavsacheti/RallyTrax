@@ -27,9 +27,25 @@ class ValhallaSurfaceClient @Inject constructor() {
         points: List<TrackPointEntity>,
         valhallaUrl: String = DEFAULT_VALHALLA_URL,
     ): Map<Int, String> = withContext(Dispatchers.IO) {
-        try {
-            if (points.size < 2) return@withContext emptyMap()
+        if (points.size < 2) return@withContext emptyMap()
 
+        // Try primary Valhalla, then fallback to public OSM instance
+        val urls = listOfNotNull(
+            valhallaUrl,
+            FALLBACK_VALHALLA_URL.takeIf { it != valhallaUrl },
+        )
+        for (baseUrl in urls) {
+            val result = fetchTraceAttributesFrom(points, baseUrl)
+            if (result.isNotEmpty()) return@withContext result
+        }
+        emptyMap()
+    }
+
+    private fun fetchTraceAttributesFrom(
+        points: List<TrackPointEntity>,
+        valhallaUrl: String,
+    ): Map<Int, String> {
+        try {
             // Sample points (Valhalla has limits, ~2000 points max)
             val sampled = if (points.size > 1500) {
                 val step = points.size / 1500
@@ -78,10 +94,10 @@ class ValhallaSurfaceClient @Inject constructor() {
             val response = connection.inputStream.bufferedReader().readText()
             connection.disconnect()
 
-            parseTraceAttributes(response, sampled, points)
+            return parseTraceAttributes(response, sampled, points)
         } catch (e: Exception) {
-            Log.w(TAG, "Valhalla trace_attributes failed: ${e.message}")
-            emptyMap()
+            Log.w(TAG, "Valhalla trace_attributes failed ($valhallaUrl): ${e.message}")
+            return emptyMap()
         }
     }
 
@@ -163,5 +179,6 @@ class ValhallaSurfaceClient @Inject constructor() {
         private const val TAG = "ValhallaSurfaceClient"
         // Default Valhalla URL — user can configure in settings
         const val DEFAULT_VALHALLA_URL = "https://valhalla.rallytrax.app"
+        private const val FALLBACK_VALHALLA_URL = "https://valhalla1.openstreetmap.de"
     }
 }

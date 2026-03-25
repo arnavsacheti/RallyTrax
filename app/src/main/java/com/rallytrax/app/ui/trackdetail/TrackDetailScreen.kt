@@ -55,7 +55,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 // InputChip removed — moved to EditTrackScreen
 import androidx.compose.material3.MaterialTheme
-// OutlinedTextField/OutlinedButton removed — moved to EditTrackScreen
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -98,6 +98,7 @@ import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.pacenotes.SegmentMatcher
 import com.rallytrax.app.recording.LatLng
 import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
@@ -295,6 +296,8 @@ fun TrackDetailScreen(
                         onSegmentClick = onSegmentClick,
                         onViewAllSegments = onViewAllSegments,
                         onRegeneratePaceNotes = { viewModel.regeneratePaceNotes() },
+                        onSaveSegment = viewModel::saveSegmentSuggestion,
+                        onDismissSuggestions = { viewModel.clearSuggestions() },
                     )
                 }
             }
@@ -529,8 +532,97 @@ private fun OsmTrackMap(
 
     val polylines = mutableListOf<OsmPolylineData>()
     if (points.size >= 2) {
-        val baseColor = if (calloutsActive) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
+        val hasOverlay = setOf(MapLayer.SPEED, MapLayer.ACCEL, MapLayer.ELEVATION, MapLayer.CURVATURE, MapLayer.SURFACE)
+            .any { it in activeLayers }
+        val baseColor = if (calloutsActive || hasOverlay) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
         polylines.add(OsmPolylineData(points = points.map { GeoPoint(it.latitude, it.longitude) }, color = baseColor, width = 8f))
+    }
+
+    // Speed layer: colored segments
+    if (MapLayer.SPEED in activeLayers && trackPoints.size >= 2) {
+        val maxSpeed = trackPoints.maxOfOrNull { it.speed ?: 0.0 } ?: 1.0
+        for (i in 0 until trackPoints.size - 1) {
+            val speed = trackPoints[i].speed ?: 0.0
+            val fraction = (speed / maxSpeed).coerceIn(0.0, 1.0)
+            polylines.add(OsmPolylineData(
+                points = listOf(
+                    GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
+                    GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                ),
+                color = speedColor(fraction.toFloat()), width = 12f,
+            ))
+        }
+    }
+
+    // Accel/Decel layer
+    if (MapLayer.ACCEL in activeLayers && trackPoints.size >= 2) {
+        for (i in 0 until trackPoints.size - 1) {
+            val accel = trackPoints[i].accelMps2 ?: continue
+            if (abs(accel) < 0.5) continue
+            val baseLayerColor = if (accel > 0) LayerAccel else LayerDecel
+            val alpha = (abs(accel) / 3.0).coerceIn(0.2, 1.0).toFloat()
+            polylines.add(OsmPolylineData(
+                points = listOf(
+                    GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
+                    GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                ),
+                color = baseLayerColor.copy(alpha = alpha), width = 12f,
+            ))
+        }
+    }
+
+    // Elevation layer: green (low) to brown (high)
+    if (MapLayer.ELEVATION in activeLayers && trackPoints.size >= 2) {
+        val elevations = trackPoints.mapNotNull { it.elevation }
+        if (elevations.isNotEmpty()) {
+            val minEle = elevations.min()
+            val maxEle = elevations.max()
+            val eleRange = (maxEle - minEle).coerceAtLeast(1.0)
+            for (i in 0 until trackPoints.size - 1) {
+                val ele = trackPoints[i].elevation ?: continue
+                val fraction = ((ele - minEle) / eleRange).coerceIn(0.0, 1.0).toFloat()
+                polylines.add(OsmPolylineData(
+                    points = listOf(
+                        GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
+                        GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                    ),
+                    color = lerpColor(LayerSpeedLow, Color(0xFF8B4513), fraction), width = 12f,
+                ))
+            }
+        }
+    }
+
+    // Curvature layer: green (straight) to red (tight)
+    if (MapLayer.CURVATURE in activeLayers && trackPoints.size >= 2) {
+        val curvatures = trackPoints.mapNotNull { it.curvatureDegPerM?.let { c -> abs(c) } }
+        if (curvatures.isNotEmpty()) {
+            val maxCurv = curvatures.max().coerceAtLeast(1.0)
+            for (i in 0 until trackPoints.size - 1) {
+                val curv = trackPoints[i].curvatureDegPerM?.let { abs(it) } ?: continue
+                val fraction = (curv / maxCurv).coerceIn(0.0, 1.0).toFloat()
+                polylines.add(OsmPolylineData(
+                    points = listOf(
+                        GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
+                        GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                    ),
+                    color = lerpColor(LayerSpeedLow, LayerCurvature, fraction), width = 12f,
+                ))
+            }
+        }
+    }
+
+    // Surface layer: colored by road surface type
+    if (MapLayer.SURFACE in activeLayers && trackPoints.size >= 2) {
+        for (i in 0 until trackPoints.size - 1) {
+            val surface = trackPoints[i].surfaceType ?: continue
+            polylines.add(OsmPolylineData(
+                points = listOf(
+                    GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
+                    GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                ),
+                color = surfaceTypeColor(surface), width = 12f,
+            ))
+        }
     }
 
     // Colored segments for callouts
@@ -1094,6 +1186,8 @@ private fun ViewTab(
     onSegmentClick: (String) -> Unit = {},
     onViewAllSegments: () -> Unit = {},
     onRegeneratePaceNotes: () -> Unit = {},
+    onSaveSegment: (SegmentMatcher.OverlapCandidate, String) -> Unit = { _, _ -> },
+    onDismissSuggestions: () -> Unit = {},
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1151,10 +1245,12 @@ private fun ViewTab(
         SegmentsCard(
             segments = uiState.segments,
             isDetecting = uiState.isDetectingSegments,
-            suggestedCount = uiState.suggestedSegments.size,
+            suggestedSegments = uiState.suggestedSegments,
             onDetectSegments = onDetectSegments,
             onSegmentClick = onSegmentClick,
             onViewAllSegments = onViewAllSegments,
+            onSaveSegment = onSaveSegment,
+            onDismissSuggestions = onDismissSuggestions,
             unitSystem = unitSystem,
         )
 
@@ -1177,17 +1273,19 @@ private fun ViewTab(
 private fun SegmentsCard(
     segments: List<TrackSegmentUi>,
     isDetecting: Boolean,
-    suggestedCount: Int,
+    suggestedSegments: List<SegmentMatcher.OverlapCandidate>,
     onDetectSegments: () -> Unit,
     onSegmentClick: (String) -> Unit,
     onViewAllSegments: () -> Unit,
+    onSaveSegment: (SegmentMatcher.OverlapCandidate, String) -> Unit,
+    onDismissSuggestions: () -> Unit,
     unitSystem: UnitSystem,
 ) {
-    androidx.compose.material3.Card(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
+        colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
     ) {
@@ -1200,7 +1298,7 @@ private fun SegmentsCard(
                 Text(
                     text = "Segments (${segments.size})",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    fontWeight = FontWeight.Bold,
                 )
                 if (segments.isNotEmpty()) {
                     TextButton(onClick = onViewAllSegments) {
@@ -1209,7 +1307,7 @@ private fun SegmentsCard(
                 }
             }
 
-            if (segments.isEmpty() && !isDetecting) {
+            if (segments.isEmpty() && !isDetecting && suggestedSegments.isEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "No segments detected yet. Detect shared road sections across your stints.",
@@ -1241,7 +1339,7 @@ private fun SegmentsCard(
                             Text(
                                 text = segment.name,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
                         Text(
@@ -1293,6 +1391,77 @@ private fun SegmentsCard(
                 }
                 if (isDetecting) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                }
+            }
+
+            // Suggested segments from detection
+            if (suggestedSegments.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Suggestions (${suggestedSegments.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    IconButton(onClick = onDismissSuggestions) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Dismiss suggestions",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+
+                suggestedSegments.forEachIndexed { index, candidate ->
+                    var segmentName by remember { mutableStateOf("Segment ${index + 1}") }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = segmentName,
+                                onValueChange = { segmentName = it },
+                                label = { Text("Name") },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(
+                                    onDone = { onSaveSegment(candidate, segmentName) },
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = formatDistance(candidate.overlapDistanceM, unitSystem),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilledTonalButton(
+                            onClick = { onSaveSegment(candidate, segmentName) },
+                        ) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Save",
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+
+                    if (index < suggestedSegments.lastIndex) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
                 }
             }
         }
