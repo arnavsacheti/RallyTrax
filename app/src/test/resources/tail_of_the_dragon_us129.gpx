@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RallyTrax Test Data"
+  xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Tail of the Dragon (US-129)</name>
+    <desc>US Route 129 from Deals Gap, NC to Tabcat Creek / Chilhowee, TN. 11 miles, 318 curves. One of America's most famous driving roads through the Great Smoky Mountains and Cherokee National Forest.</desc>
+    <author><name>RallyTrax Synthetic Test Data</name></author>
+    <time>2026-03-20T10:00:00Z</time>
+    <bounds minlat="35.4620" minlon="-83.9350" maxlat="35.5150" maxlon="-83.8500"/>
+  </metadata>
+  <trk>
+    <name>Tail of the Dragon - Deals Gap to Chilhowee</name>
+    <type>driving</type>
+    <trkseg>
+      <!-- Deals Gap - Start (NC/TN State Line area) -->
+      <trkpt lat="35.4633" lon="-83.9210"><ele>521</ele><time>2026-03-20T10:00:00Z</time></trkpt>
+      <trkpt lat="35.4641" lon="-83.9198"><ele>519</ele><time>2026-03-20T10:00:05Z</time></trkpt>
+      <trkpt lat="35.4648" lon="-83.9183"><ele>516</ele><time>2026-03-20T10:00:10Z</time></trkpt>
+      <!-- First set of tight curves heading northeast -->
+      <trkpt lat="35.4655" lon="-83.9170"><ele>514</ele><time>2026-03-20T10:00:15Z</time></trkpt>
+      <trkpt lat="35.4660" lon="-83.9155"><ele>511</ele><time>2026-03-20T10:00:20Z</time></trkpt>
+      <trkpt lat="35.4658" lon="-83.9138"><ele>508</ele><time>2026-03-20T10:00:25Z</time></trkpt>
+      <trkpt lat="35.4663" lon="-83.9120"><ele>505</ele><time>2026-03-20T10:00:30Z</time></trkpt>
+      <trkpt lat="35.4670" lon="-83.9108"><ele>502</ele><time>2026-03-20T10:00:35Z</time></trkpt>
+      <!-- Switchback section -->
+      <trkpt lat="35.4675" lon="-83.9092"><ele>498</ele><time>2026-03-20T10:00:40Z</time></trkpt>
+      <trkpt lat="35.4672" lon="-83.9075"><ele>495</ele><time>2026-03-20T10:00:45Z</time></trkpt>
+      <trkpt lat="35.4678" lon="-83.9060"><ele>491</ele><time>2026-03-20T10:00:50Z</time></trkpt>
+      <trkpt lat="35.4685" lon="-83.9048"><ele>488</ele><time>2026-03-20T10:00:55Z</time></trkpt>
+      <trkpt lat="35.4690" lon="-83.9032"><ele>484</ele><time>2026-03-20T10:01:00Z</time></trkpt>
+      <trkpt lat="35.4688" lon="-83.9015"><ele>480</ele><time>2026-03-20T10:01:05Z</time></trkpt>
+      <trkpt lat="35.4693" lon="-83.8998"><ele>476</ele><time>2026-03-20T10:01:10Z</time></trkpt>
+      <!-- Series of S-curves along Little Tennessee River valley -->
+      <trkpt lat="35.4700" lon="-83.8985"><ele>472</ele><time>2026-03-20T10:01:15Z</time></trkpt>
+      <trkpt lat="35.4708" lon="-83.8972"><ele>468</ele><time>2026-03-20T10:01:20Z</time></trkpt>
+      <trkpt lat="35.4712" lon="-83.8955"><ele>464</ele><time>2026-03-20T10:01:25Z</time></trkpt>
+      <trkpt lat="35.4718" lon="-83.8940"><ele>460</ele><time>2026-03-20T10:01:30Z</time></trkpt>
+      <trkpt lat="35.4715" lon="-83.8922"><ele>456</ele><time>2026-03-20T10:01:35Z</time></trkpt>
+      <trkpt lat="35.4720" lon="-83.8905"><ele>452</ele><time>2026-03-20T10:01:40Z</time></trkpt>
+      <trkpt lat="35.4728" lon="-83.8892"><ele>448</ele><time>2026-03-20T10:01:45Z</time></trkpt>
+      <trkpt lat="35.4735" lon="-83.8880"><ele>444</ele><time>2026-03-20T10:01:50Z</time></trkpt>
+      <!-- Curves through forested section -->
+      <trkpt lat="35.4740" lon="-83.8865"><ele>440</ele><time>2026-03-20T10:01:55Z</time></trkpt>
+      <trkpt lat="35.4738" lon="-83.8848"><ele>436</ele><time>2026-03-20T10:02:00Z</time></trkpt>
+      <trkpt lat="35.4745" lon="-83.8832"><ele>432</ele><time>2026-03-20T10:02:05Z</time></trkpt>
+      <trkpt lat="35.4752" lon="-83.8818"><ele>428</ele><time>2026-03-20T10:02:10Z</time></trkpt>
+      <trkpt lat="35.4758" lon="-83.8802"><ele>424</ele><time>2026-03-20T10:02:15Z</time></trkpt>
+      <trkpt lat="35.4762" lon="-83.8785"><ele>420</ele><time>2026-03-20T10:02:20Z</time></trkpt>
+      <trkpt lat="35.4768" lon="-83.8770"><ele>416</ele><time>2026-03-20T10:02:25Z</time></trkpt>
+      <trkpt lat="35.4775" lon="-83.8758"><ele>412</ele><time>2026-03-20T10:02:30Z</time></trkpt>
+      <!-- Mid-route curves - Calderwood Dam area -->
+      <trkpt lat="35.4780" lon="-83.8742"><ele>408</ele><time>2026-03-20T10:02:35Z</time></trkpt>
+      <trkpt lat="35.4785" lon="-83.8725"><ele>404</ele><time>2026-03-20T10:02:40Z</time></trkpt>
+      <trkpt lat="35.4790" lon="-83.8710"><ele>400</ele><time>2026-03-20T10:02:45Z</time></trkpt>
+      <trkpt lat="35.4795" lon="-83.8695"><ele>396</ele><time>2026-03-20T10:02:50Z</time></trkpt>
+      <trkpt lat="35.4800" lon="-83.8678"><ele>392</ele><time>2026-03-20T10:02:55Z</time></trkpt>
+      <trkpt lat="35.4808" lon="-83.8665"><ele>388</ele><time>2026-03-20T10:03:00Z</time></trkpt>
+      <trkpt lat="35.4815" lon="-83.8652"><ele>385</ele><time>2026-03-20T10:03:05Z</time></trkpt>
+      <trkpt lat="35.4822" lon="-83.8640"><ele>382</ele><time>2026-03-20T10:03:10Z</time></trkpt>
+      <!-- Tight serpentine curves -->
+      <trkpt lat="35.4828" lon="-83.8625"><ele>378</ele><time>2026-03-20T10:03:15Z</time></trkpt>
+      <trkpt lat="35.4825" lon="-83.8608"><ele>374</ele><time>2026-03-20T10:03:20Z</time></trkpt>
+      <trkpt lat="35.4830" lon="-83.8592"><ele>370</ele><time>2026-03-20T10:03:25Z</time></trkpt>
+      <trkpt lat="35.4838" lon="-83.8580"><ele>366</ele><time>2026-03-20T10:03:30Z</time></trkpt>
+      <trkpt lat="35.4845" lon="-83.8568"><ele>362</ele><time>2026-03-20T10:03:35Z</time></trkpt>
+      <trkpt lat="35.4852" lon="-83.8555"><ele>358</ele><time>2026-03-20T10:03:40Z</time></trkpt>
+      <trkpt lat="35.4858" lon="-83.8540"><ele>354</ele><time>2026-03-20T10:03:45Z</time></trkpt>
+      <trkpt lat="35.4865" lon="-83.8528"><ele>350</ele><time>2026-03-20T10:03:50Z</time></trkpt>
+      <!-- Curves along Calderwood Lake -->
+      <trkpt lat="35.4870" lon="-83.8512"><ele>346</ele><time>2026-03-20T10:03:55Z</time></trkpt>
+      <trkpt lat="35.4878" lon="-83.8498"><ele>342</ele><time>2026-03-20T10:04:00Z</time></trkpt>
+      <trkpt lat="35.4885" lon="-83.8485"><ele>338</ele><time>2026-03-20T10:04:05Z</time></trkpt>
+      <trkpt lat="35.4892" lon="-83.8472"><ele>334</ele><time>2026-03-20T10:04:10Z</time></trkpt>
+      <trkpt lat="35.4898" lon="-83.8458"><ele>330</ele><time>2026-03-20T10:04:15Z</time></trkpt>
+      <trkpt lat="35.4905" lon="-83.8445"><ele>326</ele><time>2026-03-20T10:04:20Z</time></trkpt>
+      <trkpt lat="35.4910" lon="-83.8430"><ele>322</ele><time>2026-03-20T10:04:25Z</time></trkpt>
+      <trkpt lat="35.4918" lon="-83.8418"><ele>318</ele><time>2026-03-20T10:04:30Z</time></trkpt>
+      <!-- Continuing northeast toward Tabcat Creek -->
+      <trkpt lat="35.4925" lon="-83.8405"><ele>315</ele><time>2026-03-20T10:04:35Z</time></trkpt>
+      <trkpt lat="35.4930" lon="-83.8390"><ele>312</ele><time>2026-03-20T10:04:40Z</time></trkpt>
+      <trkpt lat="35.4938" lon="-83.8378"><ele>309</ele><time>2026-03-20T10:04:45Z</time></trkpt>
+      <trkpt lat="35.4945" lon="-83.8365"><ele>306</ele><time>2026-03-20T10:04:50Z</time></trkpt>
+      <trkpt lat="35.4952" lon="-83.8350"><ele>303</ele><time>2026-03-20T10:04:55Z</time></trkpt>
+      <trkpt lat="35.4958" lon="-83.8335"><ele>300</ele><time>2026-03-20T10:05:00Z</time></trkpt>
+      <trkpt lat="35.4965" lon="-83.8322"><ele>297</ele><time>2026-03-20T10:05:05Z</time></trkpt>
+      <trkpt lat="35.4972" lon="-83.8310"><ele>294</ele><time>2026-03-20T10:05:10Z</time></trkpt>
+      <!-- Sharp curves near Parsons Branch -->
+      <trkpt lat="35.4978" lon="-83.8295"><ele>291</ele><time>2026-03-20T10:05:15Z</time></trkpt>
+      <trkpt lat="35.4975" lon="-83.8278"><ele>288</ele><time>2026-03-20T10:05:20Z</time></trkpt>
+      <trkpt lat="35.4980" lon="-83.8262"><ele>285</ele><time>2026-03-20T10:05:25Z</time></trkpt>
+      <trkpt lat="35.4988" lon="-83.8248"><ele>282</ele><time>2026-03-20T10:05:30Z</time></trkpt>
+      <trkpt lat="35.4995" lon="-83.8235"><ele>279</ele><time>2026-03-20T10:05:35Z</time></trkpt>
+      <trkpt lat="35.5002" lon="-83.8222"><ele>276</ele><time>2026-03-20T10:05:40Z</time></trkpt>
+      <trkpt lat="35.5008" lon="-83.8208"><ele>273</ele><time>2026-03-20T10:05:45Z</time></trkpt>
+      <trkpt lat="35.5015" lon="-83.8195"><ele>270</ele><time>2026-03-20T10:05:50Z</time></trkpt>
+      <!-- Final curves approaching Chilhowee -->
+      <trkpt lat="35.5022" lon="-83.8182"><ele>268</ele><time>2026-03-20T10:05:55Z</time></trkpt>
+      <trkpt lat="35.5028" lon="-83.8168"><ele>266</ele><time>2026-03-20T10:06:00Z</time></trkpt>
+      <trkpt lat="35.5035" lon="-83.8155"><ele>264</ele><time>2026-03-20T10:06:05Z</time></trkpt>
+      <trkpt lat="35.5042" lon="-83.8142"><ele>262</ele><time>2026-03-20T10:06:10Z</time></trkpt>
+      <trkpt lat="35.5048" lon="-83.8128"><ele>260</ele><time>2026-03-20T10:06:15Z</time></trkpt>
+      <trkpt lat="35.5055" lon="-83.8115"><ele>258</ele><time>2026-03-20T10:06:20Z</time></trkpt>
+      <trkpt lat="35.5062" lon="-83.8102"><ele>256</ele><time>2026-03-20T10:06:25Z</time></trkpt>
+      <trkpt lat="35.5068" lon="-83.8088"><ele>254</ele><time>2026-03-20T10:06:30Z</time></trkpt>
+      <trkpt lat="35.5075" lon="-83.8075"><ele>252</ele><time>2026-03-20T10:06:35Z</time></trkpt>
+      <trkpt lat="35.5082" lon="-83.8062"><ele>250</ele><time>2026-03-20T10:06:40Z</time></trkpt>
+      <trkpt lat="35.5088" lon="-83.8048"><ele>248</ele><time>2026-03-20T10:06:45Z</time></trkpt>
+      <trkpt lat="35.5095" lon="-83.8535"><ele>246</ele><time>2026-03-20T10:06:50Z</time></trkpt>
+      <!-- Tabcat Creek / Chilhowee - End -->
+      <trkpt lat="35.5102" lon="-83.8548"><ele>244</ele><time>2026-03-20T10:06:55Z</time></trkpt>
+      <trkpt lat="35.5110" lon="-83.8545"><ele>242</ele><time>2026-03-20T10:07:00Z</time></trkpt>
+      <trkpt lat="35.5118" lon="-83.8548"><ele>240</ele><time>2026-03-20T10:07:05Z</time></trkpt>
+      <trkpt lat="35.5125" lon="-83.8549"><ele>238</ele><time>2026-03-20T10:07:10Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

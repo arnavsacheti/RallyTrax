@@ -82,6 +82,8 @@ object PaceNoteGenerator {
 
     private const val INTERP_SEGMENT_M = 3.0 // Uniform segment length
     private const val RADIUS_NEIGHBOR_M = 10.0 // Look-ahead/behind for circumscribed circle
+    private const val RADIUS_REFINE_THRESHOLD = 25.0 // Refine radius for turns tighter than this
+    private const val MIN_NEIGHBOR_M = 6.0 // Floor for adaptive neighbor (2× interpolation step)
     private const val TURN_MERGE_GAP_M = 5.0 // Merge turn regions closer than this
     private const val MAX_RADIUS_CAP = 10000.0 // Cap for near-collinear points
 
@@ -109,7 +111,7 @@ object PaceNoteGenerator {
 
         // 3. Compute circumscribed circle radius and direction at each point
         val radii = computeRadii(interpolated, RADIUS_NEIGHBOR_M)
-        val directions = computeDirections(interpolated, RADIUS_NEIGHBOR_M)
+        val directions = computeDirections(interpolated, RADIUS_NEIGHBOR_M, radii)
 
         // 4. Segment turns (regions where radius < straight threshold)
         val turnRegions = segmentTurns(interpolated, radii, directions)
@@ -191,8 +193,8 @@ object PaceNoteGenerator {
         epsilon: Double,
     ): List<TrackPointEntity> {
         if (points.size < 3) return points
-        val epsDeg = epsilon / 111_000.0
-        return rdpRecursive(points, epsDeg)
+        // epsilon is in meters; perpendicularDistance now returns meters
+        return rdpRecursive(points, epsilon)
     }
 
     private fun rdpRecursive(
@@ -223,24 +225,34 @@ object PaceNoteGenerator {
         }
     }
 
+    /**
+     * Perpendicular distance from [point] to line([lineStart], [lineEnd]) in metres.
+     * Uses a local tangent-plane projection with latitude-corrected longitude scaling.
+     */
     private fun perpendicularDistance(
         point: TrackPointEntity,
         lineStart: TrackPointEntity,
         lineEnd: TrackPointEntity,
     ): Double {
-        val dx = lineEnd.lon - lineStart.lon
-        val dy = lineEnd.lat - lineStart.lat
+        val midLat = (lineStart.lat + lineEnd.lat) / 2.0
+        val cosLat = cos(Math.toRadians(midLat))
+        val mPerDegLat = 111_319.5
+        val mPerDegLon = 111_319.5 * cosLat
+
+        val dx = (lineEnd.lon - lineStart.lon) * mPerDegLon
+        val dy = (lineEnd.lat - lineStart.lat) * mPerDegLat
         if (dx == 0.0 && dy == 0.0) {
-            val pdx = point.lon - lineStart.lon
-            val pdy = point.lat - lineStart.lat
+            val pdx = (point.lon - lineStart.lon) * mPerDegLon
+            val pdy = (point.lat - lineStart.lat) * mPerDegLat
             return sqrt(pdx * pdx + pdy * pdy)
         }
-        val t = ((point.lon - lineStart.lon) * dx + (point.lat - lineStart.lat) * dy) / (dx * dx + dy * dy)
+        val t = (((point.lon - lineStart.lon) * mPerDegLon * dx +
+            (point.lat - lineStart.lat) * mPerDegLat * dy) / (dx * dx + dy * dy))
         val clampedT = t.coerceIn(0.0, 1.0)
-        val closestX = lineStart.lon + clampedT * dx
-        val closestY = lineStart.lat + clampedT * dy
-        val resultDx = point.lon - closestX
-        val resultDy = point.lat - closestY
+        val closestX = lineStart.lon * mPerDegLon + clampedT * dx
+        val closestY = lineStart.lat * mPerDegLat + clampedT * dy
+        val resultDx = point.lon * mPerDegLon - closestX
+        val resultDy = point.lat * mPerDegLat - closestY
         return sqrt(resultDx * resultDx + resultDy * resultDy)
     }
 
@@ -299,49 +311,68 @@ object PaceNoteGenerator {
     // ── Circumscribed Circle Radius ─────────────────────────────────────
 
     /**
-     * For each interpolated point, compute the circumscribed circle radius
-     * through three points: ~neighborM before, the point, ~neighborM after.
+     * Two-pass radius computation:
+     * 1. Coarse pass with fixed [neighborM] — accurate for turns ≥ 10m radius.
+     * 2. Refinement pass — for points where coarse radius < [RADIUS_REFINE_THRESHOLD],
+     *    recompute with a shorter neighbor proportional to the coarse radius so that
+     *    tight hairpins aren't diluted by points outside the turn.
      */
     private fun computeRadii(points: List<InterpPoint>, neighborM: Double): DoubleArray {
-        val radii = DoubleArray(points.size) { MAX_RADIUS_CAP }
-        if (points.size < 3) return radii
+        if (points.size < 3) return DoubleArray(points.size) { MAX_RADIUS_CAP }
 
-        for (i in points.indices) {
-            // Find point ~neighborM before
-            val targetBefore = points[i].cumulativeDistance - neighborM
-            val beforeIdx = findClosestByDistance(points, targetBefore, 0, i)
+        // Pass 1: coarse radii
+        val radii = DoubleArray(points.size) { i ->
+            computeRadiusAtPoint(points, i, neighborM)
+        }
 
-            // Find point ~neighborM after
-            val targetAfter = points[i].cumulativeDistance + neighborM
-            val afterIdx = findClosestByDistance(points, targetAfter, i, points.lastIndex)
-
-            if (beforeIdx == i || afterIdx == i || beforeIdx == afterIdx) {
-                radii[i] = MAX_RADIUS_CAP
-                continue
+        // Pass 2: refine tight turns with adaptive neighbor distance
+        for (i in radii.indices) {
+            if (radii[i] < RADIUS_REFINE_THRESHOLD && radii[i] < MAX_RADIUS_CAP) {
+                val adaptiveNeighbor = (radii[i] * 0.8).coerceIn(MIN_NEIGHBOR_M, neighborM)
+                radii[i] = computeRadiusAtPoint(points, i, adaptiveNeighbor)
             }
-
-            val a = points[beforeIdx]
-            val b = points[i]
-            val c = points[afterIdx]
-
-            radii[i] = circumscribedRadius(a.lat, a.lon, b.lat, b.lon, c.lat, c.lon)
         }
 
         return radii
     }
 
+    /** Circumscribed circle radius at a single point using neighbors at ±[neighborM]. */
+    private fun computeRadiusAtPoint(points: List<InterpPoint>, i: Int, neighborM: Double): Double {
+        val targetBefore = points[i].cumulativeDistance - neighborM
+        val beforeIdx = findClosestByDistance(points, targetBefore, 0, i)
+
+        val targetAfter = points[i].cumulativeDistance + neighborM
+        val afterIdx = findClosestByDistance(points, targetAfter, i, points.lastIndex)
+
+        if (beforeIdx == i || afterIdx == i || beforeIdx == afterIdx) return MAX_RADIUS_CAP
+
+        return circumscribedRadius(
+            points[beforeIdx].lat, points[beforeIdx].lon,
+            points[i].lat, points[i].lon,
+            points[afterIdx].lat, points[afterIdx].lon,
+        )
+    }
+
     /**
      * Compute turn direction using cross product of vectors (before→point, point→after).
-     * Negative = left turn, Positive = right turn.
+     * Uses adaptive neighbor distance matching the radius computation so tight hairpins
+     * get correct direction from nearby points rather than points outside the turn.
      */
-    private fun computeDirections(points: List<InterpPoint>, neighborM: Double): DoubleArray {
+    private fun computeDirections(points: List<InterpPoint>, neighborM: Double, radii: DoubleArray): DoubleArray {
         val dirs = DoubleArray(points.size)
         if (points.size < 3) return dirs
 
         for (i in points.indices) {
-            val targetBefore = points[i].cumulativeDistance - neighborM
+            // Use adaptive neighbor for tight turns (same logic as radius refinement)
+            val effectiveNeighbor = if (radii[i] < RADIUS_REFINE_THRESHOLD && radii[i] < MAX_RADIUS_CAP) {
+                (radii[i] * 0.8).coerceIn(MIN_NEIGHBOR_M, neighborM)
+            } else {
+                neighborM
+            }
+
+            val targetBefore = points[i].cumulativeDistance - effectiveNeighbor
             val beforeIdx = findClosestByDistance(points, targetBefore, 0, i)
-            val targetAfter = points[i].cumulativeDistance + neighborM
+            val targetAfter = points[i].cumulativeDistance + effectiveNeighbor
             val afterIdx = findClosestByDistance(points, targetAfter, i, points.lastIndex)
 
             if (beforeIdx == i || afterIdx == i) continue
@@ -480,7 +511,7 @@ object PaceNoteGenerator {
             val curr = regions[k]
             val gap = points[curr.startIdx].cumulativeDistance - points[prev.endIdx].cumulativeDistance
 
-            if (gap < TURN_MERGE_GAP_M && prev.isLeft == curr.isLeft) {
+            if (gap < TURN_MERGE_GAP_M && prev.isLeft != curr.isLeft) {
                 // Merge: extend the previous region
                 val newApex = if (curr.apexRadiusM < prev.apexRadiusM) curr else prev
                 val newArc = points[curr.endIdx].cumulativeDistance - points[prev.startIdx].cumulativeDistance
