@@ -167,7 +167,8 @@ object PaceNoteIconRenderer {
         // For left turns: start at bottom (90°) and sweep counter-clockwise (negative)
         // For right turns: start at bottom (90°) and sweep clockwise (positive)
         val startAngle = 90f
-        val sweep = if (isLeft) -sweepAngle else sweepAngle
+        // Clockwise (positive) sweeps LEFT on screen; counter-clockwise sweeps RIGHT
+        val sweep = if (isLeft) sweepAngle else -sweepAngle
 
         // Draw the straight entry segment from bottom of icon to arc start
         val arcStartX = arcCx + r * cos(Math.toRadians(startAngle.toDouble())).toFloat()
@@ -175,8 +176,8 @@ object PaceNoteIconRenderer {
         path.moveTo(arcStartX, cy + r * 1.2f) // below arc start
         path.lineTo(arcStartX, arcStartY)
 
-        // Draw the arc
-        path.addArc(arcRect, startAngle, sweep)
+        // Continue the path with the arc (arcTo keeps it connected)
+        path.arcTo(arcRect, startAngle, sweep)
         canvas.drawPath(path, paint)
 
         // Arrowhead at the end of the arc
