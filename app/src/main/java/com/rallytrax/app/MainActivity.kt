@@ -2,6 +2,7 @@ package com.rallytrax.app
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -217,7 +218,7 @@ class MainActivity : ComponentActivity() {
                                 FilledTonalButton(
                                     onClick = {
                                         updateViewModel.dismissUpdate()
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.htmlUrl))
+                                        val intent = Intent(Intent.ACTION_VIEW, release.htmlUrl.toUri())
                                         startActivity(intent)
                                     },
                                 ) {

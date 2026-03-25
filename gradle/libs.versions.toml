@@ -3,35 +3,36 @@ agp = "8.9.1"
 kotlin = "2.1.0"
 ksp = "2.1.0-1.0.29"
 composeBom = "2026.03.00"
-coreKtx = "1.15.0"
-lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.9.3"
-navigationCompose = "2.8.5"
+coreKtx = "1.18.0"
+lifecycleRuntimeKtx = "2.10.0"
+activityCompose = "1.13.0"
+navigationCompose = "2.9.7"
 hilt = "2.53.1"
-hiltNavigationCompose = "1.2.0"
-room = "2.6.1"
+hiltNavigationCompose = "1.3.0"
+room = "2.7.1"
 junit = "4.13.2"
-junitExt = "1.2.1"
-espresso = "3.6.1"
+junitExt = "1.3.0"
+espresso = "3.7.0"
 coroutines = "1.9.0"
 serialization = "1.7.3"
-datastorePreferences = "1.1.1"
+datastorePreferences = "1.2.1"
 playServicesLocation = "21.3.0"
-playServicesMaps = "19.0.0"
+playServicesMaps = "20.0.0"
 mapsCompose = "6.2.1"
 osmdroid = "6.1.18"
-workRuntime = "2.10.0"
-hiltWork = "1.2.0"
-credentials = "1.5.0-rc01"
-googleid = "1.1.1"
-playServicesAuth = "21.3.0"
+workRuntime = "2.11.1"
+hiltWork = "1.3.0"
+credentials = "1.5.0"
+googleid = "1.2.0"
+playServicesAuth = "21.5.1"
 googleApiClient = "2.7.0"
 googleApiServicesDrive = "v3-rev20260220-2.0.0"
 googleHttpClientGson = "1.45.3"
 coil = "2.7.0"
 mlkitBarcodeScanning = "17.3.0"
-camerax = "1.4.1"
+camerax = "1.5.3"
 carApp = "1.7.0"
+firebaseBom = "34.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -84,6 +85,9 @@ camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", vers
 camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 car-app-projected = { group = "androidx.car.app", name = "app-projected", version.ref = "carApp" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

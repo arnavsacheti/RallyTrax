@@ -22,7 +22,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -81,7 +81,7 @@ fun AddServiceSheet(
                     value = category, onValueChange = {}, readOnly = true,
                     label = { Text("Category") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(catExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 )
                 ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
                     ServiceCategories.allCategories.forEach { cat ->
@@ -101,7 +101,7 @@ fun AddServiceSheet(
                         value = serviceType, onValueChange = {}, readOnly = true,
                         label = { Text("Service Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                     )
                     ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
                         ServiceCategories.servicesForCategory(category).forEach { svc ->

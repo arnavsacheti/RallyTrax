@@ -3,8 +3,8 @@ package com.rallytrax.app.car.screen
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
-import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarIcon
+import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Pane
@@ -198,10 +198,10 @@ class MainTabScreen(
         }
 
         val paneTemplate = PaneTemplate.Builder(paneBuilder.build())
-            .setTitle("Drive")
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(
+            .setHeader(
+                Header.Builder()
+                    .setTitle("Drive")
+                    .addEndHeaderAction(
                         Action.Builder()
                             .setTitle("Settings")
                             .setOnClickListener {
@@ -246,10 +246,10 @@ class MainTabScreen(
 
         val listTemplate = ListTemplate.Builder()
             .setSingleList(listBuilder.build())
-            .setTitle("Routes")
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(
+            .setHeader(
+                Header.Builder()
+                    .setTitle("Routes")
+                    .addEndHeaderAction(
                         Action.Builder()
                             .setTitle("Settings")
                             .setOnClickListener {

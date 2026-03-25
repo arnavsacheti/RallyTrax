@@ -2,6 +2,7 @@ package com.rallytrax.app.ui.map
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.core.graphics.createBitmap
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -59,7 +60,7 @@ object PaceNoteIconRenderer {
         val key = IconKey(noteType, severity, modifier, sizePx)
         bitmapCache[key]?.let { return it }
 
-        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(sizePx, sizePx)
         val canvas = Canvas(bitmap)
         drawFullIcon(canvas, noteType, severity, modifier, sizePx.toFloat())
 

@@ -78,10 +78,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -485,8 +486,7 @@ private fun GoogleTrackMap(
                     }
                 }
             // Rally-style icon markers (skip straights)
-            val context = LocalContext.current
-            val density = context.resources.displayMetrics.densityDpi
+            val density = (LocalDensity.current.density * 160f).toInt()
             paceNotes.forEach { note ->
                 if (note.noteType == NoteType.STRAIGHT) return@forEach
                 val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
@@ -524,8 +524,7 @@ private fun OsmTrackMap(
     val lngs = points.map { it.longitude }
     val fitBounds = BoundingBox(lats.max(), lngs.max(), lats.min(), lngs.min())
 
-    val context = LocalContext.current
-    val density = context.resources.displayMetrics.densityDpi
+    val density = (LocalDensity.current.density * 160f).toInt()
     val calloutsActive = MapLayer.CALLOUTS in activeLayers
 
     val polylines = mutableListOf<OsmPolylineData>()

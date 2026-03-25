@@ -53,7 +53,7 @@ afterEvaluate {
 
 android {
     namespace = "com.rallytrax.app"
-    compileSdk = 35
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -102,8 +102,10 @@ android {
                 if (gsFile.exists()) {
                     @Suppress("UNCHECKED_CAST")
                     val json = JsonSlurper().parseText(gsFile.readText()) as Map<String, Any>
+                    @Suppress("UNCHECKED_CAST")
                     val clients = json["client"] as? List<Map<String, Any>> ?: emptyList()
                     clients.firstNotNullOfOrNull { client ->
+                        @Suppress("UNCHECKED_CAST")
                         val oauthClients = client["oauth_client"] as? List<Map<String, Any>> ?: emptyList()
                         oauthClients.firstOrNull { (it["client_type"] as? Number)?.toInt() == 3 }
                             ?.get("client_id") as? String
@@ -185,9 +187,9 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // Firebase
-    implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.auth)
 
     // Google Sign-In (Credential Manager)
     implementation(libs.credentials)

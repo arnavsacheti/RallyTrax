@@ -3,6 +3,7 @@ package com.rallytrax.app.car.screen
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
@@ -71,8 +72,12 @@ class VehiclePickerScreen(
 
         return ListTemplate.Builder()
             .setSingleList(listBuilder.build())
-            .setTitle("Select Vehicle")
-            .setHeaderAction(Action.BACK)
+            .setHeader(
+                Header.Builder()
+                    .setTitle("Select Vehicle")
+                    .setStartHeaderAction(Action.BACK)
+                    .build()
+            )
             .build()
     }
 }

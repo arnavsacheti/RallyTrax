@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.location.Location
-import android.os.Build
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -189,15 +188,11 @@ class TrackingService : LifecycleService() {
 
         // Start foreground immediately (doesn't need DB)
         val notification = notificationManager.createNotification("00:00", formatDistance(0.0, cachedUnitSystem))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                TrackingNotificationManager.NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-            )
-        } else {
-            startForeground(TrackingNotificationManager.NOTIFICATION_ID, notification)
-        }
+        startForeground(
+            TrackingNotificationManager.NOTIFICATION_ID,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+        )
 
         // Insert skeleton track, then start GPS after it's persisted
         lifecycleScope.launch {

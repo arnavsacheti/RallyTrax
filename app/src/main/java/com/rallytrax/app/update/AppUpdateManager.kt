@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
 import androidx.core.content.FileProvider
@@ -61,7 +62,7 @@ class AppUpdateManager @Inject constructor(
 
         _state.value = DownloadState(status = DownloadStatus.DOWNLOADING, progress = 0)
 
-        val request = DownloadManager.Request(Uri.parse(url)).apply {
+        val request = DownloadManager.Request(url.toUri()).apply {
             setTitle("RallyTrax Update")
             setDescription("Downloading v$versionName")
             setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)

@@ -18,7 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
@@ -118,7 +118,7 @@ fun VehicleDetailScreen(
             ) {
                 // Tab row – M3 secondary tabs
                 val tabLabels = listOf("Overview", "Fuel", "Maintenance", "Analytics")
-                ScrollableTabRow(
+                PrimaryScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     edgePadding = 16.dp,
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -164,19 +164,23 @@ fun VehicleDetailScreen(
                     },
                 )
             }
-            if (showAddServiceSheet && vehicle != null) {
-                com.rallytrax.app.ui.maintenance.AddServiceSheet(
-                    vehicleId = vehicle.id,
-                    onSave = { viewModel.addMaintenanceRecord(it) },
-                    onDismiss = { showAddServiceSheet = false },
-                )
+            if (showAddServiceSheet) {
+                vehicle?.let { v ->
+                    com.rallytrax.app.ui.maintenance.AddServiceSheet(
+                        vehicleId = v.id,
+                        onSave = { viewModel.addMaintenanceRecord(it) },
+                        onDismiss = { showAddServiceSheet = false },
+                    )
+                }
             }
-            if (showAddScheduleSheet && vehicle != null) {
-                com.rallytrax.app.ui.maintenance.AddScheduleSheet(
-                    vehicleId = vehicle.id,
-                    onSave = { viewModel.addMaintenanceSchedule(it) },
-                    onDismiss = { showAddScheduleSheet = false },
-                )
+            if (showAddScheduleSheet) {
+                vehicle?.let { v ->
+                    com.rallytrax.app.ui.maintenance.AddScheduleSheet(
+                        vehicleId = v.id,
+                        onSave = { viewModel.addMaintenanceSchedule(it) },
+                        onDismiss = { showAddScheduleSheet = false },
+                    )
+                }
             }
         }
     }

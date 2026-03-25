@@ -59,7 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.theme.rallyTraxColors
@@ -350,8 +350,10 @@ private fun WarningLight(warning: VehicleWarning) {
         VehicleWarning.MAINTENANCE_DUE -> Triple(Icons.Filled.Build, rtColors.maintenanceDue, "Maintenance due")
     }
 
+    @Suppress("DEPRECATION")
+    val tooltipPosition = TooltipDefaults.rememberTooltipPositionProvider()
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+        positionProvider = tooltipPosition,
         tooltip = { PlainTooltip { Text(description) } },
         state = rememberTooltipState(),
     ) {

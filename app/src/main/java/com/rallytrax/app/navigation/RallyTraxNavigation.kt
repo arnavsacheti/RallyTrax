@@ -26,8 +26,8 @@ import com.rallytrax.app.ui.trackdetail.TrackDetailScreen
 @Composable
 fun RallyTraxNavHost(
     navController: NavHostController,
-    startDestination: Any = HomeRoute,
     modifier: Modifier = Modifier,
+    startDestination: Any = HomeRoute,
     authState: AuthState = AuthState.SignedOut,
     isSignedIn: Boolean = false,
     userPhotoUrl: String? = null,

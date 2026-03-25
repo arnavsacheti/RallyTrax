@@ -2,7 +2,9 @@ package com.rallytrax.app.ui.map
 
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import androidx.core.graphics.drawable.toDrawable
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -65,6 +67,8 @@ fun OsmMapView(
     followPosition: GeoPoint? = null,
 ) {
     val context = LocalContext.current
+    @Suppress("LocalContextResourcesRead")
+    val resources = context.resources
 
     // Configure osmdroid once
     remember {
@@ -73,6 +77,7 @@ fun OsmMapView(
         }
     }
 
+    val density = LocalDensity.current.density
     val mapViewRef = remember { MapView(context) }
 
     // Clean up when leaving composition
@@ -130,7 +135,7 @@ fun OsmMapView(
                     val osmPolyline = Polyline(mapView).apply {
                         setPoints(polyData.points)
                         outlinePaint.color = polyData.color.toArgb()
-                        outlinePaint.strokeWidth = polyData.width * context.resources.displayMetrics.density
+                        outlinePaint.strokeWidth = polyData.width * density
                     }
                     mapView.overlays.add(osmPolyline)
                 }
@@ -143,7 +148,7 @@ fun OsmMapView(
                     title = markerData.title
                     alpha = markerData.alpha
                     if (markerData.icon != null) {
-                        icon = android.graphics.drawable.BitmapDrawable(context.resources, markerData.icon)
+                        icon = markerData.icon.toDrawable(resources)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     } else {
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)

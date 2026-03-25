@@ -3,6 +3,7 @@ package com.rallytrax.app.car.screen
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
@@ -118,8 +119,12 @@ class RouteDetailScreen(
         }
 
         return PaneTemplate.Builder(paneBuilder.build())
-            .setTitle(t?.name ?: "Route Detail")
-            .setHeaderAction(Action.BACK)
+            .setHeader(
+                Header.Builder()
+                    .setTitle(t?.name ?: "Route Detail")
+                    .setStartHeaderAction(Action.BACK)
+                    .build()
+            )
             .build()
     }
 }

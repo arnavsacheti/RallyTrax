@@ -1,6 +1,6 @@
 package com.rallytrax.app.ui.replay
 
-import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -56,12 +56,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -111,7 +112,7 @@ fun ReplayHudScreen(
 
     // Force dark status bar
     val view = LocalView.current
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     DisposableEffect(Unit) {
         activity?.window?.let { window ->
             val insetsController = WindowCompat.getInsetsController(window, view)
@@ -417,8 +418,7 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
             Marker(state = driverMarkerState, title = "You", icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_CYAN))
         }
         // Rally-style icons for pace notes (skip straights)
-        val context = LocalContext.current
-        val density = context.resources.displayMetrics.densityDpi
+        val density = (LocalDensity.current.density * 160f).toInt()
         uiState.paceNotes.forEach { note ->
             if (note.noteType == NoteType.STRAIGHT) return@forEach
             val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
@@ -446,8 +446,7 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
 @Composable
 private fun OsmReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
     val driverPos = uiState.driverPosition
-    val context = LocalContext.current
-    val density = context.resources.displayMetrics.densityDpi
+    val density = (LocalDensity.current.density * 160f).toInt()
 
     // Build colored polyline segments
     val allGeoPoints = uiState.polylinePoints.map { GeoPoint(it.latitude, it.longitude) }

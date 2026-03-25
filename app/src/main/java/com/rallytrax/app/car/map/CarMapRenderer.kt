@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import androidx.core.graphics.toColorInt
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -40,7 +41,7 @@ open class CarMapRenderer(
 
     // Paints
     protected val pathPaint = Paint().apply {
-        color = Color.parseColor("#4285F4") // Rally Blue
+        color = "#4285F4".toColorInt() // Rally Blue
         strokeWidth = 6f
         style = Paint.Style.STROKE
         isAntiAlias = true
@@ -49,7 +50,7 @@ open class CarMapRenderer(
     }
 
     protected val positionPaint = Paint().apply {
-        color = Color.parseColor("#1A73E8")
+        color = "#1A73E8".toColorInt()
         style = Paint.Style.FILL
         isAntiAlias = true
     }
@@ -62,7 +63,7 @@ open class CarMapRenderer(
     }
 
     protected val backgroundPaint = Paint().apply {
-        color = Color.parseColor("#111318") // Dark surface color
+        color = "#111318".toColorInt() // Dark surface color
     }
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
@@ -148,7 +149,7 @@ open class CarMapRenderer(
     protected fun drawBackground(canvas: Canvas) {
         // Check if car is in dark mode
         val isDark = carContext.isDarkMode
-        backgroundPaint.color = if (isDark) Color.parseColor("#111318") else Color.parseColor("#FAFBFF")
+        backgroundPaint.color = if (isDark) "#111318".toColorInt() else "#FAFBFF".toColorInt()
         canvas.drawRect(0f, 0f, surfaceWidth.toFloat(), surfaceHeight.toFloat(), backgroundPaint)
     }
 
@@ -156,7 +157,7 @@ open class CarMapRenderer(
         if (segments.isEmpty()) return
 
         val isDark = carContext.isDarkMode
-        pathPaint.color = if (isDark) Color.parseColor("#A8C8FF") else Color.parseColor("#1A73E8")
+        pathPaint.color = if (isDark) "#A8C8FF".toColorInt() else "#1A73E8".toColorInt()
 
         for (segment in segments) {
             if (segment.size < 2) continue

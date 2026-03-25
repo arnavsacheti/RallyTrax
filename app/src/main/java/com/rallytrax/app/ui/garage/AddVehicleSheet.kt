@@ -29,7 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,7 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -250,7 +250,7 @@ private fun YearMakeModelPicker(viewModel: AddVehicleViewModel, state: AddVehicl
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = yearExpanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(expanded = yearExpanded, onDismissRequest = { yearExpanded = false }) {
             (viewModel.currentYear downTo 1981).forEach { year ->
@@ -285,7 +285,7 @@ private fun YearMakeModelPicker(viewModel: AddVehicleViewModel, state: AddVehicl
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             )
             ExposedDropdownMenu(expanded = makeExpanded, onDismissRequest = { makeExpanded = false }) {
                 state.makes.forEach { make ->
@@ -321,7 +321,7 @@ private fun YearMakeModelPicker(viewModel: AddVehicleViewModel, state: AddVehicl
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             )
             ExposedDropdownMenu(expanded = modelExpanded, onDismissRequest = { modelExpanded = false }) {
                 state.models.forEach { model ->

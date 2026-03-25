@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import androidx.core.graphics.toColorInt
 import androidx.car.app.CarContext
 import com.rallytrax.app.car.replay.CarReplayState
 import com.rallytrax.app.data.local.entity.NoteType
@@ -23,7 +24,7 @@ class ReplayMapRenderer(carContext: CarContext) : CarMapRenderer(carContext) {
 
     // Paint for the full track (dimmed for passed portion)
     private val trackPassedPaint = Paint().apply {
-        color = Color.parseColor("#66A8C8FF") // Semi-transparent blue
+        color = "#66A8C8FF".toColorInt() // Semi-transparent blue
         strokeWidth = 5f
         style = Paint.Style.STROKE
         isAntiAlias = true
@@ -32,7 +33,7 @@ class ReplayMapRenderer(carContext: CarContext) : CarMapRenderer(carContext) {
     }
 
     private val trackUpcomingPaint = Paint().apply {
-        color = Color.parseColor("#FFA8C8FF") // Bright blue
+        color = "#FFA8C8FF".toColorInt() // Bright blue
         strokeWidth = 7f
         style = Paint.Style.STROKE
         isAntiAlias = true
@@ -42,19 +43,19 @@ class ReplayMapRenderer(carContext: CarContext) : CarMapRenderer(carContext) {
 
     // Pace note marker paints by severity
     private val notePaintMild = Paint().apply {
-        color = Color.parseColor("#34A853") // Green
+        color = "#34A853".toColorInt() // Green
         style = Paint.Style.FILL
         isAntiAlias = true
     }
 
     private val notePaintModerate = Paint().apply {
-        color = Color.parseColor("#FBBC04") // Amber
+        color = "#FBBC04".toColorInt() // Amber
         style = Paint.Style.FILL
         isAntiAlias = true
     }
 
     private val notePaintSevere = Paint().apply {
-        color = Color.parseColor("#EA4335") // Red
+        color = "#EA4335".toColorInt() // Red
         style = Paint.Style.FILL
         isAntiAlias = true
     }
@@ -101,14 +102,14 @@ class ReplayMapRenderer(carContext: CarContext) : CarMapRenderer(carContext) {
         val isDark = carContext.isDarkMode
 
         trackPassedPaint.color = if (isDark) {
-            Color.parseColor("#4DA8C8FF")
+            "#4DA8C8FF".toColorInt()
         } else {
-            Color.parseColor("#4D1A73E8")
+            "#4D1A73E8".toColorInt()
         }
         trackUpcomingPaint.color = if (isDark) {
-            Color.parseColor("#FFA8C8FF")
+            "#FFA8C8FF".toColorInt()
         } else {
-            Color.parseColor("#FF1A73E8")
+            "#FF1A73E8".toColorInt()
         }
 
         val splitIndex = (trackPolyline.size * progressFraction).toInt()
@@ -183,7 +184,7 @@ class ReplayMapRenderer(carContext: CarContext) : CarMapRenderer(carContext) {
         val (x, y) = latLonToScreen(pos.latitude, pos.longitude)
 
         // Larger driver marker for replay
-        positionPaint.color = Color.parseColor("#1A73E8")
+        positionPaint.color = "#1A73E8".toColorInt()
         canvas.drawCircle(x, y, 14f, positionPaint)
         canvas.drawCircle(x, y, 14f, positionBorderPaint)
 

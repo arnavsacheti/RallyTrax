@@ -70,7 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
@@ -402,10 +402,10 @@ private fun TrackListItem(
     track: TrackEntity,
     isSelected: Boolean,
     isMultiSelectMode: Boolean,
-    unitSystem: UnitSystem = UnitSystem.METRIC,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
 ) {
     val containerColor = if (isSelected) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
