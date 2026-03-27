@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew *)",
+      "Bash(adb *)",
+      "Bash($HOME/Library/Android/sdk/platform-tools/adb *)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb *)",
+      "Bash($HOME/Library/Android/sdk/emulator/emulator *)",
+      "Bash(~/Library/Android/sdk/emulator/emulator *)",
+      "Bash(export JAVA_HOME=*)",
+      "Bash(export ANDROID_HOME=*)",
+      "Bash(export ANDROID_SDK_ROOT=*)",
+      "Bash(export PATH=*)",
+      "Bash(export ADB=*)",
+      "Bash(java *)",
+      "Bash(javac *)",
+      "Bash(/usr/libexec/java_home *)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git remote *)",
+      "Bash(git rm *)",
+      "Bash(sqlite3 /tmp/*.db *)",
+      "Bash(keytool *)",
+      "Bash(python3 *)",
+      "Bash(curl *)",
+      "Read(/Users/arnavsacheti/Library/Android/**)",
+      "Read(/opt/**)",
+      "Read(/tmp/**)",
+      "WebSearch",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}
