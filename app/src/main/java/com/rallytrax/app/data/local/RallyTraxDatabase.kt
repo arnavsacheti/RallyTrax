@@ -45,7 +45,7 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         SegmentEntity::class,
         SegmentRunEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -327,6 +327,22 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_vehicleId` ON `tracks` (`vehicleId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_fuel_logs_vehicleId` ON `fuel_logs` (`vehicleId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_maintenance_records_vehicleId` ON `maintenance_records` (`vehicleId`)")
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Check if column already exists (may have been added by a prior dev build)
+                val cursor = db.query("PRAGMA table_info(track_points)")
+                val columns = mutableListOf<String>()
+                val nameIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    columns.add(cursor.getString(nameIndex))
+                }
+                cursor.close()
+                if ("rollRateDegPerS" !in columns) {
+                    db.execSQL("ALTER TABLE track_points ADD COLUMN rollRateDegPerS REAL DEFAULT NULL")
+                }
             }
         }
 

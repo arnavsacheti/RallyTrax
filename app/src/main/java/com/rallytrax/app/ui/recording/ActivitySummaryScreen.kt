@@ -177,14 +177,31 @@ fun ActivitySummaryScreen(
                                 )
                             }
                         }
-                        state.sensorStats.maxYawRateDegPerS?.let { yaw ->
+                        val hasYawOrRoll = state.sensorStats.maxYawRateDegPerS != null ||
+                            state.sensorStats.maxRollRateDegPerS != null
+                        if (hasYawOrRoll) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            HeroStatCard(
-                                icon = Icons.Filled.Speed,
-                                label = "Max Yaw Rate",
-                                value = "${"%.1f".format(yaw)}\u00B0/s",
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                            )
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                state.sensorStats.maxYawRateDegPerS?.let { yaw ->
+                                    HeroStatCard(
+                                        icon = Icons.Filled.Speed,
+                                        label = "Max Yaw Rate",
+                                        value = "${"%.1f".format(yaw)}\u00B0/s",
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                state.sensorStats.maxRollRateDegPerS?.let { roll ->
+                                    HeroStatCard(
+                                        icon = Icons.Filled.Speed,
+                                        label = "Max Roll Rate",
+                                        value = "${"%.1f".format(roll)}\u00B0/s",
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                            }
                         }
                     }
 

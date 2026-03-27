@@ -466,6 +466,7 @@ class TrackingService : LifecycleService() {
             lateralAccelMps2 = sensorSnapshot?.lateralAccelMps2,
             verticalAccelMps2 = sensorSnapshot?.verticalAccelMps2,
             yawRateDegPerS = sensorSnapshot?.yawRateDegPerS,
+            rollRateDegPerS = sensorSnapshot?.rollRateDegPerS,
             barometerAltitudeM = sensorSnapshot?.barometerAltitudeM,
         )
         pointBuffer.add(point)

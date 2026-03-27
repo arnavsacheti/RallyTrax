@@ -34,5 +34,6 @@ data class TrackPointEntity(
     val lateralAccelMps2: Double? = null, // phone sensor: lateral acceleration
     val verticalAccelMps2: Double? = null, // phone sensor: vertical acceleration
     val yawRateDegPerS: Double? = null, // phone sensor: gyroscope yaw rate
+    val rollRateDegPerS: Double? = null, // phone sensor: gyroscope roll rate
     val barometerAltitudeM: Double? = null, // phone sensor: barometric altitude
 )

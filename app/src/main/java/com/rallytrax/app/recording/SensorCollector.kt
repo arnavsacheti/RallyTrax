@@ -19,6 +19,7 @@ class SensorCollector(context: Context) : SensorEventListener {
         val lateralAccelMps2: Double?, // y-axis linear acceleration
         val verticalAccelMps2: Double?, // z-axis linear acceleration
         val yawRateDegPerS: Double?, // z-axis gyroscope (yaw rate)
+        val rollRateDegPerS: Double?, // x-axis gyroscope (roll rate)
         val barometerAltitudeM: Double?, // altitude from pressure sensor
     )
 
@@ -32,6 +33,7 @@ class SensorCollector(context: Context) : SensorEventListener {
     @Volatile private var latestLateralAccel: Double? = null
     @Volatile private var latestVerticalAccel: Double? = null
     @Volatile private var latestYawRate: Double? = null
+    @Volatile private var latestRollRate: Double? = null
     @Volatile private var latestPressureHpa: Float? = null
 
     val isAccelerometerAvailable: Boolean get() = accelerometer != null
@@ -55,6 +57,7 @@ class SensorCollector(context: Context) : SensorEventListener {
         latestLateralAccel = null
         latestVerticalAccel = null
         latestYawRate = null
+        latestRollRate = null
         latestPressureHpa = null
     }
 
@@ -67,6 +70,7 @@ class SensorCollector(context: Context) : SensorEventListener {
             lateralAccelMps2 = latestLateralAccel,
             verticalAccelMps2 = latestVerticalAccel,
             yawRateDegPerS = latestYawRate,
+            rollRateDegPerS = latestRollRate,
             barometerAltitudeM = altitudeM,
         )
     }
@@ -83,7 +87,8 @@ class SensorCollector(context: Context) : SensorEventListener {
                 latestVerticalAccel = event.values[2].toDouble()
             }
             Sensor.TYPE_GYROSCOPE -> {
-                // z-axis rotation = yaw rate (rad/s → deg/s)
+                // x-axis rotation = roll rate, z-axis rotation = yaw rate (rad/s → deg/s)
+                latestRollRate = Math.toDegrees(event.values[0].toDouble())
                 latestYawRate = Math.toDegrees(event.values[2].toDouble())
             }
             Sensor.TYPE_PRESSURE -> {

@@ -31,6 +31,7 @@ data class SensorStats(
     val peakLateralG: Double? = null, // peak lateral acceleration in G
     val peakVerticalG: Double? = null, // peak vertical acceleration in G
     val maxYawRateDegPerS: Double? = null, // max yaw rate
+    val maxRollRateDegPerS: Double? = null, // max roll rate
     val hasSensorData: Boolean = false,
 )
 
@@ -119,6 +120,7 @@ class ActivitySummaryViewModel @Inject constructor(
         val lateralAccels = points.mapNotNull { it.lateralAccelMps2 }
         val verticalAccels = points.mapNotNull { it.verticalAccelMps2 }
         val yawRates = points.mapNotNull { it.yawRateDegPerS }
+        val rollRates = points.mapNotNull { it.rollRateDegPerS }
         val hasSensorData = lateralAccels.isNotEmpty() || verticalAccels.isNotEmpty()
 
         val sensorStats = SensorStats(
@@ -130,6 +132,9 @@ class ActivitySummaryViewModel @Inject constructor(
             } else null,
             maxYawRateDegPerS = if (yawRates.isNotEmpty()) {
                 yawRates.maxOfOrNull { kotlin.math.abs(it) }
+            } else null,
+            maxRollRateDegPerS = if (rollRates.isNotEmpty()) {
+                rollRates.maxOfOrNull { kotlin.math.abs(it) }
             } else null,
             hasSensorData = hasSensorData,
         )
