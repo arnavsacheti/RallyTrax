@@ -25,6 +25,7 @@ import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import com.rallytrax.app.data.preferences.UnitSystem
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -322,9 +324,13 @@ class TrackingService : LifecycleService() {
             val savedId = trackId
             var allPoints = trackPointDao.getPointsForTrackOnce(savedId)
             try {
-                val enrichedPoints = com.rallytrax.app.pacenotes.TrackPointComputer.computeFields(allPoints)
+                val enrichedPoints = withContext(Dispatchers.Default) {
+                    com.rallytrax.app.pacenotes.TrackPointComputer.computeFields(allPoints)
+                }
                 if (enrichedPoints.isNotEmpty()) {
-                    trackPointDao.insertPoints(enrichedPoints) // REPLACE via OnConflictStrategy
+                    enrichedPoints.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
                     allPoints = enrichedPoints
                 }
             } catch (_: Exception) {
@@ -335,12 +341,14 @@ class TrackingService : LifecycleService() {
             try {
                 val driverProfile = com.rallytrax.app.pacenotes.DriverProfileUpdater.loadProfile(driverProfileDao)
                 val hasSpeedData = allPoints.any { (it.speed ?: 0.0) > 0.0 }
-                val paceNotes = PaceNoteGenerator.generate(
-                    trackId = savedId,
-                    points = allPoints,
-                    useSpeedCalibration = hasSpeedData,
-                    driverProfile = driverProfile.ifEmpty { null },
-                )
+                val paceNotes = withContext(Dispatchers.Default) {
+                    PaceNoteGenerator.generate(
+                        trackId = savedId,
+                        points = allPoints,
+                        useSpeedCalibration = hasSpeedData,
+                        driverProfile = driverProfile.ifEmpty { null },
+                    )
+                }
                 if (paceNotes.isNotEmpty()) {
                     paceNoteDao.deleteNotesForTrack(savedId)
                     paceNoteDao.insertNotes(paceNotes)

@@ -6,13 +6,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.gpx.GpxParser
+import com.rallytrax.app.data.local.GridCellComputer
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class SortOption(val label: String) {
@@ -61,6 +65,7 @@ class LibraryViewModel @Inject constructor(
     private val paceNoteDao: PaceNoteDao,
     private val gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao,
     preferencesRepository: UserPreferencesRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
@@ -200,7 +205,9 @@ class LibraryViewModel @Inject constructor(
         val ids = _selectedTrackIds.value.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            trackDao.deleteTracks(ids)
+            withContext(ioDispatcher) {
+                trackDao.deleteTracks(ids)
+            }
             _snackbarMessage.tryEmit("${ids.size} track(s) deleted")
             recomputeGridCells()
         }
@@ -214,7 +221,9 @@ class LibraryViewModel @Inject constructor(
         val current = _pendingDeletes.value
         if (current.isNotEmpty()) {
             viewModelScope.launch {
-                current.forEach { trackDao.deleteTrack(it.id) }
+                withContext(ioDispatcher) {
+                    current.forEach { trackDao.deleteTrack(it.id) }
+                }
             }
         }
         // Set the new one as the only pending (gets the snackbar)
@@ -225,7 +234,9 @@ class LibraryViewModel @Inject constructor(
         val pending = _pendingDeletes.value
         if (pending.isEmpty()) return
         viewModelScope.launch {
-            pending.forEach { trackDao.deleteTrack(it.id) }
+            withContext(ioDispatcher) {
+                pending.forEach { trackDao.deleteTrack(it.id) }
+            }
             recomputeGridCells()
         }
         _pendingDeletes.value = emptyList()
@@ -240,7 +251,9 @@ class LibraryViewModel @Inject constructor(
         // Confirm all prior ones, undo the last
         if (rest.isNotEmpty()) {
             viewModelScope.launch {
-                rest.forEach { trackDao.deleteTrack(it.id) }
+                withContext(ioDispatcher) {
+                    rest.forEach { trackDao.deleteTrack(it.id) }
+                }
             }
         }
         _pendingDeletes.value = emptyList()
@@ -249,9 +262,11 @@ class LibraryViewModel @Inject constructor(
     private fun recomputeGridCells() {
         viewModelScope.launch {
             try {
-                val allTracks = trackDao.getAllTracksOnce()
-                val allPoints = allTracks.flatMap { trackPointDao.getPointsForTrackOnce(it.id) }
-                com.rallytrax.app.data.local.GridCellComputer.fullRecompute(allPoints, gridCellDao)
+                withContext(ioDispatcher) {
+                    val allTracks = trackDao.getAllTracksOnce()
+                    val allPoints = allTracks.flatMap { trackPointDao.getPointsForTrackOnce(it.id) }
+                    GridCellComputer.fullRecompute(allPoints, gridCellDao)
+                }
             } catch (_: Exception) {
                 // Non-critical
             }
@@ -263,19 +278,41 @@ class LibraryViewModel @Inject constructor(
     fun importGpx(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: throw GpxParseException("Could not open file")
-                val result = inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
-                trackDao.insertTrack(result.track.copy(trackCategory = "route"))
-                trackPointDao.insertPoints(result.points)
-                if (result.paceNotes.isNotEmpty()) {
-                    paceNoteDao.insertNotes(result.paceNotes)
+                val result = withContext(ioDispatcher) {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                        ?: throw GpxParseException("Could not open file")
+                    inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
+                }
+                withContext(ioDispatcher) {
+                    trackDao.insertTrack(result.track.copy(trackCategory = "route"))
+                    // Insert points in chunks to avoid large single transactions
+                    result.points.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
+                    if (result.paceNotes.isNotEmpty()) {
+                        paceNoteDao.insertNotes(result.paceNotes)
+                    }
                 }
                 _snackbarMessage.tryEmit("Imported: ${result.track.name}")
+                // Incremental grid cell update instead of full recompute
+                updateGridCellsForTrack(result.track.id)
             } catch (e: GpxParseException) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")
             } catch (e: Exception) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun updateGridCellsForTrack(trackId: String) {
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) {
+                    val points = trackPointDao.getLatLonForTrack(trackId)
+                    GridCellComputer.updateForLatLon(points, gridCellDao)
+                }
+            } catch (_: Exception) {
+                // Non-critical
             }
         }
     }

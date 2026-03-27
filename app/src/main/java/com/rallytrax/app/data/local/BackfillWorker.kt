@@ -9,6 +9,8 @@ import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.pacenotes.TrackPointComputer
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Backfills accelMps2 and curvatureDegPerM for existing tracks
@@ -31,9 +33,13 @@ class BackfillWorker @AssistedInject constructor(
                 // Skip if already backfilled (first non-edge point has accel data)
                 if (points.size >= 3 && points[1].accelMps2 != null) continue
 
-                val enriched = TrackPointComputer.computeFields(points)
+                val enriched = withContext(Dispatchers.Default) {
+                    TrackPointComputer.computeFields(points)
+                }
                 if (enriched.isNotEmpty()) {
-                    trackPointDao.insertPoints(enriched)
+                    enriched.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
                 }
             }
             Result.success()

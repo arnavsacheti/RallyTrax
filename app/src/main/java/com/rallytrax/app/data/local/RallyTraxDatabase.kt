@@ -45,7 +45,7 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         SegmentEntity::class,
         SegmentRunEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -318,6 +318,15 @@ abstract class RallyTraxDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pace_notes ADD COLUMN segmentStartIndex INTEGER DEFAULT NULL")
                 db.execSQL("ALTER TABLE pace_notes ADD COLUMN segmentEndIndex INTEGER DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_recordedAt` ON `tracks` (`recordedAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_vehicleId` ON `tracks` (`vehicleId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_fuel_logs_vehicleId` ON `fuel_logs` (`vehicleId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_maintenance_records_vehicleId` ON `maintenance_records` (`vehicleId`)")
             }
         }
 

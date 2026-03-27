@@ -10,14 +10,17 @@ import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.di.IoDispatcher
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class ExploreLayer {
@@ -48,6 +51,7 @@ class ExploreViewModel @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val gridCellDao: GridCellDao,
     preferencesRepository: UserPreferencesRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
@@ -66,26 +70,28 @@ class ExploreViewModel @Inject constructor(
 
     private fun loadData() {
         viewModelScope.launch {
-            val tracks = trackDao.getStintsOnce()
-            val polylines = tracks.map { track ->
-                val points = trackPointDao.getPointsForTrackOnce(track.id)
-                TrackPolyline(
-                    trackId = track.id,
-                    trackName = track.name,
-                    recordedAt = track.recordedAt,
-                    points = points.map { LatLng(it.lat, it.lon) },
-                    speeds = points.mapNotNull { it.speed },
-                    elevations = points.mapNotNull { it.elevation },
-                )
-            }.filter { it.points.size >= 2 }
-
-            val gridCells = gridCellDao.getAllCellsOnce()
+            val (polylines, gridCells, trackCount) = withContext(ioDispatcher) {
+                val tracks = trackDao.getStintsOnce()
+                val polys = tracks.map { track ->
+                    val points = trackPointDao.getPointsForTrackOnce(track.id)
+                    TrackPolyline(
+                        trackId = track.id,
+                        trackName = track.name,
+                        recordedAt = track.recordedAt,
+                        points = points.map { LatLng(it.lat, it.lon) },
+                        speeds = points.mapNotNull { it.speed },
+                        elevations = points.mapNotNull { it.elevation },
+                    )
+                }.filter { it.points.size >= 2 }
+                val cells = gridCellDao.getAllCellsOnce()
+                Triple(polys, cells, tracks.size)
+            }
 
             _uiState.value = ExploreUiState(
                 trackPolylines = polylines,
                 gridCells = gridCells,
                 isLoading = false,
-                trackCount = tracks.size,
+                trackCount = trackCount,
             )
         }
     }
@@ -99,7 +105,7 @@ class ExploreViewModel @Inject constructor(
 
     fun selectTrack(trackId: String) {
         viewModelScope.launch {
-            val track = trackDao.getTrackById(trackId)
+            val track = withContext(ioDispatcher) { trackDao.getTrackById(trackId) }
             _uiState.value = _uiState.value.copy(selectedTrack = track)
         }
     }
