@@ -25,6 +25,7 @@ import com.rallytrax.app.di.IoDispatcher
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.pacenotes.SegmentMatcher
 import com.rallytrax.app.recording.LatLng
+import com.rallytrax.app.ui.recording.SensorStats
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
@@ -48,6 +49,21 @@ data class ElevationPoint(
 data class SpeedPoint(
     val distanceFromStart: Double,
     val speedMps: Double,
+)
+
+data class LateralGPoint(
+    val distanceFromStart: Double,
+    val lateralG: Double,
+)
+
+data class YawRatePoint(
+    val distanceFromStart: Double,
+    val yawRateDegPerS: Double,
+)
+
+data class RollRatePoint(
+    val distanceFromStart: Double,
+    val rollRateDegPerS: Double,
 )
 
 data class CurvatureDistribution(
@@ -90,6 +106,11 @@ data class TrackDetailUiState(
     val isDetectingSegments: Boolean = false,
     val suggestedSegments: List<SegmentMatcher.OverlapCandidate> = emptyList(),
     val paceNotesStale: Boolean = false, // true when pace notes lack segment data and need regeneration
+    // Sensor data
+    val sensorStats: SensorStats = SensorStats(),
+    val lateralGProfile: List<LateralGPoint> = emptyList(),
+    val yawRateProfile: List<YawRatePoint> = emptyList(),
+    val rollRateProfile: List<RollRatePoint> = emptyList(),
 )
 
 enum class MapLayer {
@@ -139,6 +160,10 @@ class TrackDetailViewModel @Inject constructor(
             val elevationDeferred = async(defaultDispatcher) { buildElevationProfile(points) }
             val speedDeferred = async(defaultDispatcher) { buildSpeedProfile(points) }
             val curvatureDeferred = async(defaultDispatcher) { buildCurvatureDistribution(points) }
+            val sensorStatsDeferred = async(defaultDispatcher) { buildSensorStats(points) }
+            val lateralGDeferred = async(defaultDispatcher) { buildLateralGProfile(points) }
+            val yawRateDeferred = async(defaultDispatcher) { buildYawRateProfile(points) }
+            val rollRateDeferred = async(defaultDispatcher) { buildRollRateProfile(points) }
 
             // Parallelize independent DB queries on IO dispatcher
             val paceNotesDeferred = async(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
@@ -154,6 +179,10 @@ class TrackDetailViewModel @Inject constructor(
             val elevationProfile = elevationDeferred.await()
             val speedProfile = speedDeferred.await()
             val curvatureDistribution = curvatureDeferred.await()
+            val sensorStats = sensorStatsDeferred.await()
+            val lateralGProfile = lateralGDeferred.await()
+            val yawRateProfile = yawRateDeferred.await()
+            val rollRateProfile = rollRateDeferred.await()
 
             val tags = track?.tags
                 ?.split(",")
@@ -202,6 +231,10 @@ class TrackDetailViewModel @Inject constructor(
                 personalBestMs = personalBest,
                 averageTimeMs = averageTime,
                 segments = segmentUi,
+                sensorStats = sensorStats,
+                lateralGProfile = lateralGProfile,
+                yawRateProfile = yawRateProfile,
+                rollRateProfile = rollRateProfile,
             )
         }
     }
@@ -346,6 +379,84 @@ class TrackDetailViewModel @Inject constructor(
             tight = tight / total,
             hairpin = hairpin / total,
         )
+    }
+
+    private fun buildSensorStats(points: List<TrackPointEntity>): SensorStats {
+        val lateralAccels = points.mapNotNull { it.lateralAccelMps2 }
+        val verticalAccels = points.mapNotNull { it.verticalAccelMps2 }
+        val yawRates = points.mapNotNull { it.yawRateDegPerS }
+        val rollRates = points.mapNotNull { it.rollRateDegPerS }
+        val hasSensorData = lateralAccels.isNotEmpty() || verticalAccels.isNotEmpty()
+
+        return SensorStats(
+            peakLateralG = if (lateralAccels.isNotEmpty()) {
+                lateralAccels.maxOfOrNull { abs(it) }?.let { it / 9.81 }
+            } else null,
+            peakVerticalG = if (verticalAccels.isNotEmpty()) {
+                verticalAccels.maxOfOrNull { abs(it) }?.let { it / 9.81 }
+            } else null,
+            maxYawRateDegPerS = if (yawRates.isNotEmpty()) {
+                yawRates.maxOfOrNull { abs(it) }
+            } else null,
+            maxRollRateDegPerS = if (rollRates.isNotEmpty()) {
+                rollRates.maxOfOrNull { abs(it) }
+            } else null,
+            hasSensorData = hasSensorData,
+        )
+    }
+
+    private fun buildLateralGProfile(points: List<TrackPointEntity>): List<LateralGPoint> {
+        val result = mutableListOf<LateralGPoint>()
+        var cumulativeDistance = 0.0
+        var prevLat: Double? = null
+        var prevLon: Double? = null
+
+        for (point in points) {
+            val lateral = point.lateralAccelMps2 ?: continue
+            if (prevLat != null && prevLon != null) {
+                cumulativeDistance += haversine(prevLat, prevLon, point.lat, point.lon)
+            }
+            prevLat = point.lat
+            prevLon = point.lon
+            result.add(LateralGPoint(cumulativeDistance, abs(lateral) / 9.81))
+        }
+        return result
+    }
+
+    private fun buildYawRateProfile(points: List<TrackPointEntity>): List<YawRatePoint> {
+        val result = mutableListOf<YawRatePoint>()
+        var cumulativeDistance = 0.0
+        var prevLat: Double? = null
+        var prevLon: Double? = null
+
+        for (point in points) {
+            val yaw = point.yawRateDegPerS ?: continue
+            if (prevLat != null && prevLon != null) {
+                cumulativeDistance += haversine(prevLat, prevLon, point.lat, point.lon)
+            }
+            prevLat = point.lat
+            prevLon = point.lon
+            result.add(YawRatePoint(cumulativeDistance, abs(yaw)))
+        }
+        return result
+    }
+
+    private fun buildRollRateProfile(points: List<TrackPointEntity>): List<RollRatePoint> {
+        val result = mutableListOf<RollRatePoint>()
+        var cumulativeDistance = 0.0
+        var prevLat: Double? = null
+        var prevLon: Double? = null
+
+        for (point in points) {
+            val roll = point.rollRateDegPerS ?: continue
+            if (prevLat != null && prevLon != null) {
+                cumulativeDistance += haversine(prevLat, prevLon, point.lat, point.lon)
+            }
+            prevLat = point.lat
+            prevLon = point.lon
+            result.add(RollRatePoint(cumulativeDistance, abs(roll)))
+        }
+        return result
     }
 
     fun regeneratePaceNotes() {
