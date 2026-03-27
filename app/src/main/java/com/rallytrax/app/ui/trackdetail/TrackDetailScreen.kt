@@ -404,9 +404,14 @@ private fun GoogleTrackMap(
         uiSettings = MapUiSettings(zoomControlsEnabled = true, scrollGesturesEnabled = true, zoomGesturesEnabled = true),
         contentPadding = contentPadding,
     ) {
-        // Base route polyline (dimmed when callouts layer active with colored segments)
+        // Base route polyline (dimmed when callouts layer active or segment highlighted)
+        val hasHighlight = highlightedSegmentPoints.size >= 2
         if (points.size >= 2) {
-            val baseColor = if (MapLayer.CALLOUTS in activeLayers) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
+            val baseColor = when {
+                hasHighlight -> Color(0xFF1A73E8).copy(alpha = 0.15f)
+                MapLayer.CALLOUTS in activeLayers -> Color(0xFF1A73E8).copy(alpha = 0.3f)
+                else -> Color(0xFF1A73E8)
+            }
             Polyline(
                 points = points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
                 color = baseColor, width = 8f,
@@ -550,11 +555,11 @@ private fun GoogleTrackMap(
             }
         }
 
-        // Highlighted suggested segment overlay
-        if (highlightedSegmentPoints.size >= 2) {
+        // Highlighted suggested segment — full opacity over dimmed base
+        if (hasHighlight) {
             Polyline(
                 points = highlightedSegmentPoints.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
-                color = Color(0xFFFF6D00), width = 14f,
+                color = Color(0xFF1A73E8), width = 10f,
             )
         }
     }
@@ -576,11 +581,16 @@ private fun OsmTrackMap(
     val density = (LocalDensity.current.density * 160f).toInt()
     val calloutsActive = MapLayer.CALLOUTS in activeLayers
 
+    val hasHighlight = highlightedSegmentPoints.size >= 2
     val polylines = mutableListOf<OsmPolylineData>()
     if (points.size >= 2) {
         val hasOverlay = setOf(MapLayer.SPEED, MapLayer.ACCEL, MapLayer.ELEVATION, MapLayer.CURVATURE, MapLayer.SURFACE)
             .any { it in activeLayers }
-        val baseColor = if (calloutsActive || hasOverlay) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
+        val baseColor = when {
+            hasHighlight -> Color(0xFF1A73E8).copy(alpha = 0.15f)
+            calloutsActive || hasOverlay -> Color(0xFF1A73E8).copy(alpha = 0.3f)
+            else -> Color(0xFF1A73E8)
+        }
         polylines.add(OsmPolylineData(points = points.map { GeoPoint(it.latitude, it.longitude) }, color = baseColor, width = 8f))
     }
 
@@ -708,11 +718,11 @@ private fun OsmTrackMap(
         }
     }
 
-    // Highlighted suggested segment overlay
-    if (highlightedSegmentPoints.size >= 2) {
+    // Highlighted suggested segment — full opacity over dimmed base
+    if (hasHighlight) {
         polylines.add(OsmPolylineData(
             points = highlightedSegmentPoints.map { GeoPoint(it.latitude, it.longitude) },
-            color = Color(0xFFFF6D00), width = 14f,
+            color = Color(0xFF1A73E8), width = 10f,
         ))
     }
 
@@ -1570,7 +1580,7 @@ private fun SegmentsCard(
                                 if (isHighlighted) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                                 contentDescription = if (isHighlighted) "Hide on map" else "Show on map",
                                 modifier = Modifier.size(20.dp),
-                                tint = if (isHighlighted) Color(0xFFFF6D00) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Spacer(modifier = Modifier.width(4.dp))
