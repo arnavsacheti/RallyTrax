@@ -95,8 +95,7 @@ class SegmentRepository @Inject constructor(
             // Load reference polyline from the first run of this segment
             val refRun = segmentDao.getRunsForSegmentOnce(segment.id).firstOrNull()
             val refPoints = if (refRun != null) {
-                val allRefPoints = trackPointDao.getPointsForTrackOnce(refRun.trackId)
-                allRefPoints.filter { it.index in refRun.startPointIndex..refRun.endPointIndex }
+                trackPointDao.getPointsInRange(refRun.trackId, refRun.startPointIndex, refRun.endPointIndex)
             } else {
                 // No reference run yet — skip (shouldn't happen for existing segments)
                 continue
@@ -180,11 +179,14 @@ class SegmentRepository @Inject constructor(
         endIndex: Int,
     ): SegmentEntity? {
         val track = trackDao.getTrackById(trackId) ?: return null
-        val points = trackPointDao.getPointsForTrackOnce(trackId)
-        if (startIndex < 0 || endIndex >= points.size || startIndex >= endIndex) return null
+        val pointCount = trackPointDao.getPointCountForTrack(trackId)
+        if (startIndex < 0 || endIndex >= pointCount || startIndex >= endIndex) return null
 
-        val startPt = points[startIndex]
-        val endPt = points[endIndex]
+        val points = trackPointDao.getPointsInRange(trackId, startIndex, endIndex)
+        if (points.size < 2) return null
+
+        val startPt = points.first()
+        val endPt = points.last()
 
         // Compute distance and bounding box
         var dist = 0.0
@@ -193,7 +195,7 @@ class SegmentRepository @Inject constructor(
         var eastLon = startPt.lon
         var westLon = startPt.lon
 
-        for (i in startIndex until endIndex) {
+        for (i in 0 until points.size - 1) {
             dist += haversine(points[i].lat, points[i].lon, points[i + 1].lat, points[i + 1].lon)
             northLat = max(northLat, points[i + 1].lat)
             southLat = min(southLat, points[i + 1].lat)
@@ -216,8 +218,8 @@ class SegmentRepository @Inject constructor(
         )
         segmentDao.insertSegment(segment)
 
-        // Insert the initial run
-        val runStats = SegmentMatcher.computeRunStats(points, startIndex, endIndex)
+        // Insert the initial run (points is already the subset, so use 0-based indices)
+        val runStats = SegmentMatcher.computeRunStats(points, 0, points.size - 1)
         segmentDao.insertRun(
             SegmentRunEntity(
                 segmentId = segment.id,
@@ -263,8 +265,8 @@ class SegmentRepository @Inject constructor(
         segmentDao.insertSegment(segment)
 
         // Insert the source track's run
-        val points = trackPointDao.getPointsForTrackOnce(sourceTrackId)
-        val runStats = SegmentMatcher.computeRunStats(points, candidate.startIdxA, candidate.endIdxA)
+        val points = trackPointDao.getPointsInRange(sourceTrackId, candidate.startIdxA, candidate.endIdxA)
+        val runStats = SegmentMatcher.computeRunStats(points, 0, points.size - 1)
         segmentDao.insertRun(
             SegmentRunEntity(
                 segmentId = segment.id,
@@ -294,8 +296,7 @@ class SegmentRepository @Inject constructor(
 
         // Get reference polyline from first run
         val refRun = existingRuns.firstOrNull() ?: return
-        val refPoints = trackPointDao.getPointsForTrackOnce(refRun.trackId)
-            .filter { it.index in refRun.startPointIndex..refRun.endPointIndex }
+        val refPoints = trackPointDao.getPointsInRange(refRun.trackId, refRun.startPointIndex, refRun.endPointIndex)
         if (refPoints.size < 5) return
 
         // Find overlapping tracks

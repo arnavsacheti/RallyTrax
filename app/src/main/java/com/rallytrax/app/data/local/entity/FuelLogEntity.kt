@@ -1,10 +1,14 @@
 package com.rallytrax.app.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.UUID
 
-@Entity(tableName = "fuel_logs")
+@Entity(
+    tableName = "fuel_logs",
+    indices = [Index("vehicleId")],
+)
 data class FuelLogEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val vehicleId: String,

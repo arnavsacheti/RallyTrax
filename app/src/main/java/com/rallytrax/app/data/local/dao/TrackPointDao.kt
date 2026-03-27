@@ -7,6 +7,8 @@ import androidx.room.Query
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import kotlinx.coroutines.flow.Flow
 
+data class LatLonProjection(val lat: Double, val lon: Double)
+
 @Dao
 interface TrackPointDao {
 
@@ -15,6 +17,15 @@ interface TrackPointDao {
 
     @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY `index` ASC")
     suspend fun getPointsForTrackOnce(trackId: String): List<TrackPointEntity>
+
+    @Query("SELECT COUNT(*) FROM track_points WHERE trackId = :trackId")
+    suspend fun getPointCountForTrack(trackId: String): Int
+
+    @Query("SELECT lat, lon FROM track_points WHERE trackId = :trackId ORDER BY `index` ASC")
+    suspend fun getLatLonForTrack(trackId: String): List<LatLonProjection>
+
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId AND `index` BETWEEN :startIndex AND :endIndex ORDER BY `index` ASC")
+    suspend fun getPointsInRange(trackId: String, startIndex: Int, endIndex: Int): List<TrackPointEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPoints(points: List<TrackPointEntity>)

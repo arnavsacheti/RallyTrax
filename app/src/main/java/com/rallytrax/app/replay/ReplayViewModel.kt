@@ -24,10 +24,13 @@ import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.di.DefaultDispatcher
+import com.rallytrax.app.di.IoDispatcher
 import com.rallytrax.app.recording.GpsKalmanFilter
 import com.rallytrax.app.recording.LatLng
 import com.rallytrax.app.recording.TrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class ReplayUiState(
@@ -73,6 +77,8 @@ class ReplayViewModel @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
     private val preferencesRepository: UserPreferencesRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val trackId: String = checkNotNull(savedStateHandle["trackId"])
@@ -97,16 +103,20 @@ class ReplayViewModel @Inject constructor(
     private fun loadTrackData() {
         viewModelScope.launch {
             try {
-                val track = trackDao.getTrackById(trackId)
-                val points = trackPointDao.getPointsForTrackOnce(trackId)
-                var notes = paceNoteDao.getNotesForTrackOnce(trackId)
-                val polyline = points.map { LatLng(it.lat, it.lon) }
+                val track = withContext(ioDispatcher) { trackDao.getTrackById(trackId) }
+                val points = withContext(ioDispatcher) { trackPointDao.getPointsForTrackOnce(trackId) }
+                var notes = withContext(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
+                val polyline = withContext(defaultDispatcher) { points.map { LatLng(it.lat, it.lon) } }
 
                 // Auto-regenerate pace notes if missing segment indices (migration from v12)
                 if (notes.isNotEmpty() && notes.any { it.segmentStartIndex == null } && points.isNotEmpty()) {
-                    val generated = PaceNoteGenerator.generate(trackId, points)
-                    paceNoteDao.deleteNotesForTrack(trackId)
-                    paceNoteDao.insertNotes(generated)
+                    val generated = withContext(defaultDispatcher) {
+                        PaceNoteGenerator.generate(trackId, points)
+                    }
+                    withContext(ioDispatcher) {
+                        paceNoteDao.deleteNotesForTrack(trackId)
+                        paceNoteDao.insertNotes(generated)
+                    }
                     notes = generated
                 }
 
@@ -118,7 +128,7 @@ class ReplayViewModel @Inject constructor(
                     return@launch
                 }
 
-                val prefs = preferencesRepository.preferences.first()
+                val prefs = withContext(ioDispatcher) { preferencesRepository.preferences.first() }
                 replayEngine = ReplayEngine(
                     trackPoints = points,
                     paceNotes = notes,
@@ -146,64 +156,66 @@ class ReplayViewModel @Inject constructor(
         val engine = replayEngine ?: return
         engine.reset()
 
-        // Init audio with user preferences
-        val prefs = kotlinx.coroutines.runBlocking {
-            preferencesRepository.preferences.first()
-        }
-        audioManager = ReplayAudioManager(application).also {
-            it.initialize(prefs.ttsRate, prefs.ttsPitch)
-        }
+        viewModelScope.launch {
+            // Read preferences on IO instead of runBlocking on Main
+            val prefs = withContext(ioDispatcher) {
+                preferencesRepository.preferences.first()
+            }
+            audioManager = ReplayAudioManager(application).also {
+                it.initialize(prefs.ttsRate, prefs.ttsPitch)
+            }
 
-        // Start GPS tracking
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
+            // Start GPS tracking
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
 
-        val locationRequest = when (prefs.gpsAccuracy) {
-            GpsAccuracy.HIGH -> LocationRequest.Builder(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                GpsIntervalConfig.HIGH_INTERVAL_MS,
-            )
-                .setMinUpdateIntervalMillis(GpsIntervalConfig.HIGH_MIN_INTERVAL_MS)
-                .setMinUpdateDistanceMeters(GpsIntervalConfig.HIGH_MIN_DISTANCE_M)
-                .build()
+            val locationRequest = when (prefs.gpsAccuracy) {
+                GpsAccuracy.HIGH -> LocationRequest.Builder(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    GpsIntervalConfig.HIGH_INTERVAL_MS,
+                )
+                    .setMinUpdateIntervalMillis(GpsIntervalConfig.HIGH_MIN_INTERVAL_MS)
+                    .setMinUpdateDistanceMeters(GpsIntervalConfig.HIGH_MIN_DISTANCE_M)
+                    .build()
 
-            GpsAccuracy.BATTERY_SAVER -> LocationRequest.Builder(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                GpsIntervalConfig.SAVER_INTERVAL_MS,
-            )
-                .setMinUpdateIntervalMillis(GpsIntervalConfig.SAVER_MIN_INTERVAL_MS)
-                .setMinUpdateDistanceMeters(GpsIntervalConfig.SAVER_MIN_DISTANCE_M)
-                .build()
-        }
+                GpsAccuracy.BATTERY_SAVER -> LocationRequest.Builder(
+                    Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                    GpsIntervalConfig.SAVER_INTERVAL_MS,
+                )
+                    .setMinUpdateIntervalMillis(GpsIntervalConfig.SAVER_MIN_INTERVAL_MS)
+                    .setMinUpdateDistanceMeters(GpsIntervalConfig.SAVER_MIN_DISTANCE_M)
+                    .build()
+            }
 
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { location ->
-                    onLocationUpdate(location)
+            locationCallback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    result.lastLocation?.let { location ->
+                        onLocationUpdate(location)
+                    }
                 }
             }
+
+            fusedLocationClient?.requestLocationUpdates(
+                locationRequest,
+                locationCallback!!,
+                Looper.getMainLooper(),
+            )
+
+            replayKalmanFilter.reset()
+            startReplayPredictionJob()
+
+            // Start TrackingService to record a new stint from the live GPS
+            val startIntent = Intent(application, TrackingService::class.java).apply {
+                action = TrackingService.ACTION_START
+            }
+            application.startForegroundService(startIntent)
+
+            _uiState.value = _uiState.value.copy(
+                isActive = true,
+                isFinished = false,
+                isOffRoute = false,
+                progressFraction = 0f,
+            )
         }
-
-        fusedLocationClient?.requestLocationUpdates(
-            locationRequest,
-            locationCallback!!,
-            Looper.getMainLooper(),
-        )
-
-        replayKalmanFilter.reset()
-        startReplayPredictionJob()
-
-        // Start TrackingService to record a new stint from the live GPS
-        val startIntent = Intent(application, TrackingService::class.java).apply {
-            action = TrackingService.ACTION_START
-        }
-        application.startForegroundService(startIntent)
-
-        _uiState.value = _uiState.value.copy(
-            isActive = true,
-            isFinished = false,
-            isOffRoute = false,
-            progressFraction = 0f,
-        )
     }
 
     private fun onLocationUpdate(location: Location) {

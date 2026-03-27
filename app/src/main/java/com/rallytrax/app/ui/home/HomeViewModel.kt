@@ -12,7 +12,9 @@ import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -67,6 +70,7 @@ class HomeViewModel @Inject constructor(
     private val maintenanceDao: com.rallytrax.app.data.local.dao.MaintenanceDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     preferencesRepository: UserPreferencesRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
@@ -157,13 +161,19 @@ class HomeViewModel @Inject constructor(
         var importedTrackId: String? = null
         viewModelScope.launch {
             try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: throw GpxParseException("Could not open file")
-                val result = inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
-                trackDao.insertTrack(result.track.copy(trackCategory = "route"))
-                trackPointDao.insertPoints(result.points)
-                if (result.paceNotes.isNotEmpty()) {
-                    paceNoteDao.insertNotes(result.paceNotes)
+                val result = withContext(ioDispatcher) {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                        ?: throw GpxParseException("Could not open file")
+                    inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
+                }
+                withContext(ioDispatcher) {
+                    trackDao.insertTrack(result.track.copy(trackCategory = "route"))
+                    result.points.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
+                    if (result.paceNotes.isNotEmpty()) {
+                        paceNoteDao.insertNotes(result.paceNotes)
+                    }
                 }
                 importedTrackId = result.track.id
                 _snackbarMessage.tryEmit("Imported: ${result.track.name}")

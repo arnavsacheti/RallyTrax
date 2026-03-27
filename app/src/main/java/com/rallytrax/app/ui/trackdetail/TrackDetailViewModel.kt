@@ -20,10 +20,14 @@ import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.SegmentRepository
 import com.rallytrax.app.data.repository.TrackSegmentMatch
+import com.rallytrax.app.di.DefaultDispatcher
+import com.rallytrax.app.di.IoDispatcher
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.pacenotes.SegmentMatcher
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +36,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.math.abs
 
@@ -101,6 +106,8 @@ class TrackDetailViewModel @Inject constructor(
     private val segmentRepository: SegmentRepository,
     private val valhallaRouteClient: ValhallaRouteClient,
     preferencesRepository: UserPreferencesRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
@@ -122,14 +129,31 @@ class TrackDetailViewModel @Inject constructor(
 
     private fun loadTrack() {
         viewModelScope.launch {
-            val track = trackDao.getTrackById(trackId)
-            val points = trackPointDao.getPointsForTrackOnce(trackId)
+            // Load core data from DB on IO dispatcher
+            val track = withContext(ioDispatcher) { trackDao.getTrackById(trackId) }
+            val points = withContext(ioDispatcher) { trackPointDao.getPointsForTrackOnce(trackId) }
             cachedPoints = points
-            val polyline = points.map { LatLng(it.lat, it.lon) }
 
-            val elevationProfile = buildElevationProfile(points)
-            val speedProfile = buildSpeedProfile(points)
-            val curvatureDistribution = buildCurvatureDistribution(points)
+            // Parallelize CPU-bound profile building on Default dispatcher
+            val polylineDeferred = async(defaultDispatcher) { points.map { LatLng(it.lat, it.lon) } }
+            val elevationDeferred = async(defaultDispatcher) { buildElevationProfile(points) }
+            val speedDeferred = async(defaultDispatcher) { buildSpeedProfile(points) }
+            val curvatureDeferred = async(defaultDispatcher) { buildCurvatureDistribution(points) }
+
+            // Parallelize independent DB queries on IO dispatcher
+            val paceNotesDeferred = async(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
+            val routeTracksDeferred = async(ioDispatcher) {
+                if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()
+            }
+            val segmentMatchesDeferred = async(ioDispatcher) {
+                try { segmentRepository.detectSegmentsForTrack(trackId) }
+                catch (_: Exception) { emptyList() }
+            }
+
+            val polyline = polylineDeferred.await()
+            val elevationProfile = elevationDeferred.await()
+            val speedProfile = speedDeferred.await()
+            val curvatureDistribution = curvatureDeferred.await()
 
             val tags = track?.tags
                 ?.split(",")
@@ -137,11 +161,10 @@ class TrackDetailViewModel @Inject constructor(
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
 
-            val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
+            val paceNotes = paceNotesDeferred.await()
             val paceNotesStale = paceNotes.isNotEmpty() && paceNotes.any { it.segmentStartIndex == null }
 
-            // Route history (previous attempts)
-            val routeTracks = if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()
+            val routeTracks = routeTracksDeferred.await()
             val completionCount = routeTracks.size
             val personalBest = if (completionCount >= 2) {
                 routeTracks.filter { it.durationMs > 0 }.minOfOrNull { it.durationMs }
@@ -151,11 +174,7 @@ class TrackDetailViewModel @Inject constructor(
                 if (validTimes.isNotEmpty()) validTimes.average().toLong() else null
             } else null
 
-            // Detect segments that appear in this track
-            val segmentMatches = try {
-                segmentRepository.detectSegmentsForTrack(trackId)
-            } catch (_: Exception) { emptyList() }
-
+            val segmentMatches = segmentMatchesDeferred.await()
             val segmentUi = segmentMatches.map { match ->
                 TrackSegmentUi(
                     segmentId = match.segment.id,
@@ -191,7 +210,9 @@ class TrackDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isDetectingSegments = true)
         viewModelScope.launch {
             try {
-                val candidates = segmentRepository.findNewSegmentCandidates(trackId)
+                val candidates = withContext(ioDispatcher) {
+                    segmentRepository.findNewSegmentCandidates(trackId)
+                }
                 _uiState.value = _uiState.value.copy(
                     isDetectingSegments = false,
                     suggestedSegments = candidates,
@@ -211,7 +232,7 @@ class TrackDetailViewModel @Inject constructor(
     fun saveSegmentSuggestion(candidate: SegmentMatcher.OverlapCandidate, name: String) {
         viewModelScope.launch {
             try {
-                segmentRepository.saveOverlapAsSegment(name, candidate, trackId)
+                withContext(ioDispatcher) { segmentRepository.saveOverlapAsSegment(name, candidate, trackId) }
                 // Remove from suggestions and reload segments
                 val remaining = _uiState.value.suggestedSegments - candidate
                 _uiState.value = _uiState.value.copy(suggestedSegments = remaining)
@@ -230,7 +251,7 @@ class TrackDetailViewModel @Inject constructor(
     fun createUserSegment(name: String, startIndex: Int, endIndex: Int) {
         viewModelScope.launch {
             try {
-                segmentRepository.createUserSegment(name, trackId, startIndex, endIndex)
+                withContext(ioDispatcher) { segmentRepository.createUserSegment(name, trackId, startIndex, endIndex) }
                 reloadSegments()
                 _snackbarMessage.tryEmit("Segment '$name' created")
             } catch (e: Exception) {
@@ -241,7 +262,7 @@ class TrackDetailViewModel @Inject constructor(
 
     private suspend fun reloadSegments() {
         val matches = try {
-            segmentRepository.detectSegmentsForTrack(trackId)
+            withContext(ioDispatcher) { segmentRepository.detectSegmentsForTrack(trackId) }
         } catch (_: Exception) { emptyList() }
 
         _uiState.value = _uiState.value.copy(
@@ -341,16 +362,20 @@ class TrackDetailViewModel @Inject constructor(
                 val prefs = preferences.value
                 val hasSpeedData = points.any { (it.speed ?: 0.0) > 0.0 }
 
-                val notes = PaceNoteGenerator.generate(
-                    trackId = trackId,
-                    points = points,
-                    halfStepEnabled = prefs.halfStepSeverityEnabled,
-                    useSpeedCalibration = hasSpeedData,
-                )
+                val notes = withContext(defaultDispatcher) {
+                    PaceNoteGenerator.generate(
+                        trackId = trackId,
+                        points = points,
+                        halfStepEnabled = prefs.halfStepSeverityEnabled,
+                        useSpeedCalibration = hasSpeedData,
+                    )
+                }
 
-                paceNoteDao.deleteNotesForTrack(trackId)
-                if (notes.isNotEmpty()) {
-                    paceNoteDao.insertNotes(notes)
+                withContext(ioDispatcher) {
+                    paceNoteDao.deleteNotesForTrack(trackId)
+                    if (notes.isNotEmpty()) {
+                        paceNoteDao.insertNotes(notes)
+                    }
                 }
 
                 _uiState.value = _uiState.value.copy(
@@ -373,7 +398,7 @@ class TrackDetailViewModel @Inject constructor(
         if (trimmed.isBlank() || trimmed == track.name) return
         val updated = track.copy(name = trimmed)
         viewModelScope.launch {
-            trackDao.updateTrack(updated)
+            withContext(ioDispatcher) { trackDao.updateTrack(updated) }
             _uiState.value = _uiState.value.copy(track = updated)
         }
     }
@@ -390,7 +415,7 @@ class TrackDetailViewModel @Inject constructor(
         val updatedTrack = track.copy(tags = newTagString)
 
         viewModelScope.launch {
-            trackDao.updateTrack(updatedTrack)
+            withContext(ioDispatcher) { trackDao.updateTrack(updatedTrack) }
             _uiState.value = _uiState.value.copy(
                 track = updatedTrack,
                 tags = newTags,
@@ -405,7 +430,7 @@ class TrackDetailViewModel @Inject constructor(
         val updatedTrack = track.copy(tags = newTagString)
 
         viewModelScope.launch {
-            trackDao.updateTrack(updatedTrack)
+            withContext(ioDispatcher) { trackDao.updateTrack(updatedTrack) }
             _uiState.value = _uiState.value.copy(
                 track = updatedTrack,
                 tags = newTags,
@@ -415,7 +440,7 @@ class TrackDetailViewModel @Inject constructor(
 
     fun deleteTrack(onDeleted: () -> Unit) {
         viewModelScope.launch {
-            trackDao.deleteTrack(trackId)
+            withContext(ioDispatcher) { trackDao.deleteTrack(trackId) }
             onDeleted()
         }
     }
@@ -431,7 +456,7 @@ class TrackDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val fileName = "${track.name.replace(Regex("[^a-zA-Z0-9_ -]"), "_")}.gpx"
-                val paceNotes = paceNoteDao.getNotesForTrackOnce(trackId)
+                val paceNotes = withContext(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
 
                 val contentValues = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, fileName)
@@ -446,8 +471,10 @@ class TrackDetailViewModel @Inject constructor(
                     return@launch
                 }
 
-                resolver.openOutputStream(uri)?.use { outputStream ->
-                    GpxExporter.export(track, points, outputStream, paceNotes)
+                withContext(ioDispatcher) {
+                    resolver.openOutputStream(uri)?.use { outputStream ->
+                        GpxExporter.export(track, points, outputStream, paceNotes)
+                    }
                 }
 
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -491,7 +518,9 @@ class TrackDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val latLngs = points.map { LatLng(it.lat, it.lon) }
-                val withElevation = valhallaRouteClient.fetchHeight(latLngs)
+                val withElevation = withContext(ioDispatcher) {
+                    valhallaRouteClient.fetchHeight(latLngs)
+                }
 
                 // Check if we actually got elevation data
                 val hasElevation = withElevation.any { it.elevation != null }
@@ -505,7 +534,11 @@ class TrackDetailViewModel @Inject constructor(
                 val updatedPoints = points.mapIndexed { i, pt ->
                     pt.copy(elevation = withElevation[i].elevation ?: pt.elevation)
                 }
-                trackPointDao.insertPoints(updatedPoints) // upsert
+                withContext(ioDispatcher) {
+                    updatedPoints.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
+                }
                 cachedPoints = updatedPoints
 
                 // Compute cumulative elevation gain
@@ -524,7 +557,7 @@ class TrackDetailViewModel @Inject constructor(
                 val track = _uiState.value.track
                 if (track != null) {
                     val updatedTrack = track.copy(elevationGainM = elevationGain)
-                    trackDao.updateTrack(updatedTrack)
+                    withContext(ioDispatcher) { trackDao.updateTrack(updatedTrack) }
                     _uiState.value = _uiState.value.copy(
                         track = updatedTrack,
                         trackPoints = updatedPoints,
@@ -556,7 +589,7 @@ class TrackDetailViewModel @Inject constructor(
         val track = _uiState.value.track ?: return
         viewModelScope.launch {
             val updated = track.copy(vehicleId = vehicleId)
-            trackDao.updateTrack(updated)
+            withContext(ioDispatcher) { trackDao.updateTrack(updated) }
             _uiState.value = _uiState.value.copy(track = updated)
             _snackbarMessage.tryEmit("Vehicle assigned")
         }
@@ -566,7 +599,7 @@ class TrackDetailViewModel @Inject constructor(
         val track = _uiState.value.track ?: return
         viewModelScope.launch {
             val updated = track.copy(vehicleId = null)
-            trackDao.updateTrack(updated)
+            withContext(ioDispatcher) { trackDao.updateTrack(updated) }
             _uiState.value = _uiState.value.copy(track = updated)
             _snackbarMessage.tryEmit("Vehicle removed")
         }
