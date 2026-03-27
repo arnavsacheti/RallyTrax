@@ -98,6 +98,7 @@ import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.rallytrax.app.data.local.entity.NoteModifier
+import com.rallytrax.app.ui.recording.SensorStats
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
@@ -201,6 +202,16 @@ fun TrackDetailScreen(
                                 },
                                 enabled = !uiState.isFetchingElevation,
                                 leadingIcon = { Icon(Icons.Filled.Refresh, null) },
+                            )
+                            val noteLabel = if (uiState.paceNotes.isEmpty()) "Generate Pace Notes" else "Regenerate Pace Notes"
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (uiState.isGeneratingNotes) "Generating…" else noteLabel) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.regeneratePaceNotes()
+                                },
+                                enabled = !uiState.isGeneratingNotes,
+                                leadingIcon = { Icon(Icons.Default.Refresh, null) },
                             )
                         }
                     }
@@ -1273,6 +1284,12 @@ private fun ViewTab(
             CurvatureDistributionCard(cd)
         }
 
+        // Sensor stats (Lateral G, Vertical G, Yaw Rate, Roll Rate)
+        if (uiState.sensorStats.hasSensorData) {
+            Spacer(modifier = Modifier.height(16.dp))
+            SensorStatsCard(uiState.sensorStats, uiState.lateralGProfile, uiState.yawRateProfile, uiState.rollRateProfile)
+        }
+
         // Pace notes
         if (CardType.PACE_NOTES in visible && uiState.paceNotes.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -1753,4 +1770,158 @@ private fun formatCurvature(trackPoints: List<TrackPointEntity>): String {
     if (withCurvature.isEmpty()) return "N/A"
     val avg = withCurvature.map { abs(it) }.average()
     return "%.1f deg/m".format(avg)
+}
+
+// ── Sensor Stats Card ──────────────────────────────────────────────────
+
+@Composable
+private fun SensorStatsCard(
+    sensorStats: SensorStats,
+    lateralGProfile: List<LateralGPoint>,
+    yawRateProfile: List<YawRatePoint>,
+    rollRateProfile: List<RollRatePoint>,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Sensor Data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+            // Lateral G chart
+            if (lateralGProfile.size >= 2) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Lateral G-Force", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(4.dp))
+                LateralGChart(data = lateralGProfile, modifier = Modifier.fillMaxWidth().height(150.dp))
+            }
+
+            // Roll rate chart
+            if (rollRateProfile.size >= 2) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Roll Rate", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(4.dp))
+                RollRateChart(data = rollRateProfile, modifier = Modifier.fillMaxWidth().height(150.dp))
+            }
+
+            // Hero stats
+            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                sensorStats.peakLateralG?.let { g ->
+                    StatItem("Peak Lateral G", "${"%.2f".format(g)}g")
+                }
+                sensorStats.peakVerticalG?.let { g ->
+                    StatItem("Peak Vertical G", "${"%.2f".format(g)}g")
+                }
+            }
+            val hasYawOrRoll = sensorStats.maxYawRateDegPerS != null || sensorStats.maxRollRateDegPerS != null
+            if (hasYawOrRoll) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    sensorStats.maxYawRateDegPerS?.let { yaw ->
+                        StatItem("Max Yaw Rate", "${"%.1f".format(yaw)}\u00B0/s")
+                    }
+                    sensorStats.maxRollRateDegPerS?.let { roll ->
+                        StatItem("Max Roll Rate", "${"%.1f".format(roll)}\u00B0/s")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LateralGChart(data: List<LateralGPoint>, modifier: Modifier = Modifier) {
+    val lineColor = MaterialTheme.colorScheme.tertiary
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelTextSize = with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toPx() }
+    val leftPadding = with(androidx.compose.ui.platform.LocalDensity.current) { 36.dp.toPx() }
+    Canvas(modifier = modifier) {
+        if (data.size < 2) return@Canvas
+        val maxDist = data.last().distanceFromStart
+        val maxG = data.maxOf { it.lateralG }.coerceAtLeast(0.1)
+        val paddingTop = 4f
+        val chartLeft = leftPadding
+        val chartWidth = size.width - chartLeft
+        val h = size.height - paddingTop
+
+        fun xFor(d: Double) = (chartLeft + (d / maxDist) * chartWidth).toFloat()
+        fun yFor(g: Double) = (paddingTop + h - (g / maxG) * h).toFloat()
+
+        // Y-axis labels
+        val paint = android.graphics.Paint().apply {
+            color = labelColor.toArgb()
+            textSize = labelTextSize
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        val labels = listOf(
+            "0g" to yFor(0.0),
+            "${"%.1f".format(maxG / 2)}g" to yFor(maxG / 2),
+            "${"%.1f".format(maxG)}g" to yFor(maxG),
+        )
+        drawIntoCanvas { canvas ->
+            for ((text, y) in labels) {
+                canvas.nativeCanvas.drawText(text, chartLeft - 4f, y + labelTextSize / 3f, paint)
+            }
+        }
+
+        // Draw line
+        for (i in 0 until data.size - 1) {
+            drawLine(
+                color = lineColor,
+                start = Offset(xFor(data[i].distanceFromStart), yFor(data[i].lateralG)),
+                end = Offset(xFor(data[i + 1].distanceFromStart), yFor(data[i + 1].lateralG)),
+                strokeWidth = 2f,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RollRateChart(data: List<RollRatePoint>, modifier: Modifier = Modifier) {
+    val lineColor = MaterialTheme.colorScheme.secondary
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelTextSize = with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toPx() }
+    val leftPadding = with(androidx.compose.ui.platform.LocalDensity.current) { 36.dp.toPx() }
+    Canvas(modifier = modifier) {
+        if (data.size < 2) return@Canvas
+        val maxDist = data.last().distanceFromStart
+        val maxRate = data.maxOf { it.rollRateDegPerS }.coerceAtLeast(1.0)
+        val paddingTop = 4f
+        val chartLeft = leftPadding
+        val chartWidth = size.width - chartLeft
+        val h = size.height - paddingTop
+
+        fun xFor(d: Double) = (chartLeft + (d / maxDist) * chartWidth).toFloat()
+        fun yFor(r: Double) = (paddingTop + h - (r / maxRate) * h).toFloat()
+
+        // Y-axis labels
+        val paint = android.graphics.Paint().apply {
+            color = labelColor.toArgb()
+            textSize = labelTextSize
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        val labels = listOf(
+            "0\u00B0/s" to yFor(0.0),
+            "${"%.0f".format(maxRate / 2)}\u00B0/s" to yFor(maxRate / 2),
+            "${"%.0f".format(maxRate)}\u00B0/s" to yFor(maxRate),
+        )
+        drawIntoCanvas { canvas ->
+            for ((text, y) in labels) {
+                canvas.nativeCanvas.drawText(text, chartLeft - 4f, y + labelTextSize / 3f, paint)
+            }
+        }
+
+        // Draw line
+        for (i in 0 until data.size - 1) {
+            drawLine(
+                color = lineColor,
+                start = Offset(xFor(data[i].distanceFromStart), yFor(data[i].rollRateDegPerS)),
+                end = Offset(xFor(data[i + 1].distanceFromStart), yFor(data[i + 1].rollRateDegPerS)),
+                strokeWidth = 2f,
+            )
+        }
+    }
 }
