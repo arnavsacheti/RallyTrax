@@ -471,13 +471,16 @@ class MainActivity : ComponentActivity() {
         navigateToTrack: (String) -> Unit,
     ) {
         try {
-            val inputStream = contentResolver.openInputStream(uri)
-                ?: throw GpxParseException("Could not open file")
-            val result = inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
-            trackDao.insertTrack(result.track.copy(trackCategory = "route"))
-            trackPointDao.insertPoints(result.points)
-            if (result.paceNotes.isNotEmpty()) {
-                paceNoteDao.insertNotes(result.paceNotes)
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val inputStream = contentResolver.openInputStream(uri)
+                    ?: throw GpxParseException("Could not open file")
+                val parsed = inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
+                trackDao.insertTrack(parsed.track.copy(trackCategory = "route"))
+                trackPointDao.insertPoints(parsed.points)
+                if (parsed.paceNotes.isNotEmpty()) {
+                    paceNoteDao.insertNotes(parsed.paceNotes)
+                }
+                parsed
             }
             snackbarHostState.showSnackbar("Imported: ${result.track.name}")
             navigateToTrack(result.track.id)
