@@ -156,55 +156,52 @@ object PaceNoteIconRenderer {
         isLeft: Boolean,
         sweepAngle: Float,
     ) {
-        // Draw a path: straight entry from bottom, then arc curve
-        val path = Path()
+        val arcRect = RectF(cx - r, cy - r, cx + r, cy + r)
 
-        // Arc center is offset so the arrow enters from below
-        val arcCx = cx
-        val arcCy = cy
-        val arcRect = RectF(arcCx - r, arcCy - r, arcCx + r, arcCy + r)
-
-        // For left turns: start at bottom (90°) and sweep counter-clockwise (negative)
-        // For right turns: start at bottom (90°) and sweep clockwise (positive)
+        // In Android Canvas (Y-down): positive sweep = clockwise
+        // From 90° (bottom): clockwise goes toward 180° (left), counter-clockwise toward 0° (right)
         val startAngle = 90f
-        // Clockwise (positive) sweeps LEFT on screen; counter-clockwise sweeps RIGHT
         val sweep = if (isLeft) sweepAngle else -sweepAngle
 
-        // Draw the straight entry segment from bottom of icon to arc start
-        val arcStartX = arcCx + r * cos(Math.toRadians(startAngle.toDouble())).toFloat()
-        val arcStartY = arcCy + r * sin(Math.toRadians(startAngle.toDouble())).toFloat()
-        path.moveTo(arcStartX, cy + r * 1.2f) // below arc start
-        path.lineTo(arcStartX, arcStartY)
+        // Straight entry from bottom edge up to arc start at 90° (bottom of circle)
+        val arcStartX = cx + r * cos(Math.toRadians(startAngle.toDouble())).toFloat()
+        val arcStartY = cy + r * sin(Math.toRadians(startAngle.toDouble())).toFloat()
+        val arcPath = Path().apply {
+            moveTo(arcStartX, cy + r * 1.2f)
+            lineTo(arcStartX, arcStartY)
+            arcTo(arcRect, startAngle, sweep)
+        }
+        canvas.drawPath(arcPath, paint)
 
-        // Continue the path with the arc (arcTo keeps it connected)
-        path.arcTo(arcRect, startAngle, sweep)
-        canvas.drawPath(path, paint)
+        // Filled arrowhead at arc tip
+        val endAngleRad = Math.toRadians((startAngle + sweep).toDouble())
+        val tipX = cx + r * cos(endAngleRad).toFloat()
+        val tipY = cy + r * sin(endAngleRad).toFloat()
 
-        // Arrowhead at the end of the arc
-        val endAngleDeg = startAngle + sweep
-        val endAngleRad = Math.toRadians(endAngleDeg.toDouble())
-        val tipX = arcCx + r * cos(endAngleRad).toFloat()
-        val tipY = arcCy + r * sin(endAngleRad).toFloat()
+        // Tangent = direction of travel at arc end
+        // Clockwise (positive sweep): tangent = endAngle + π/2
+        // Counter-clockwise (negative sweep): tangent = endAngle - π/2
+        val tangentAngle = if (isLeft) endAngleRad + PI / 2 else endAngleRad - PI / 2
+        val arrowLen = r * 0.55f
+        val arrowSpread = PI / 5 // 36°
 
-        // Tangent direction at the arc end
-        val tangentAngle = if (isLeft) endAngleRad - PI / 2 else endAngleRad + PI / 2
-        val arrowLen = r * 0.5f
-        val arrowSpread = PI / 6 // 30 degrees
+        val baseAngle = tangentAngle + PI // point backward from direction of travel
+        val p1x = tipX + arrowLen * cos(baseAngle + arrowSpread).toFloat()
+        val p1y = tipY + arrowLen * sin(baseAngle + arrowSpread).toFloat()
+        val p2x = tipX + arrowLen * cos(baseAngle - arrowSpread).toFloat()
+        val p2y = tipY + arrowLen * sin(baseAngle - arrowSpread).toFloat()
 
-        val arrow1Angle = tangentAngle + PI + arrowSpread
-        val arrow2Angle = tangentAngle + PI - arrowSpread
-
-        val arrowPath = Path()
-        arrowPath.moveTo(
-            tipX + arrowLen * cos(arrow1Angle).toFloat(),
-            tipY + arrowLen * sin(arrow1Angle).toFloat(),
-        )
-        arrowPath.lineTo(tipX, tipY)
-        arrowPath.lineTo(
-            tipX + arrowLen * cos(arrow2Angle).toFloat(),
-            tipY + arrowLen * sin(arrow2Angle).toFloat(),
-        )
-        canvas.drawPath(arrowPath, paint)
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = paint.color
+            style = Paint.Style.FILL
+        }
+        val arrowPath = Path().apply {
+            moveTo(tipX, tipY)
+            lineTo(p1x, p1y)
+            lineTo(p2x, p2y)
+            close()
+        }
+        canvas.drawPath(arrowPath, fillPaint)
     }
 
     private fun drawSquareTurn(
@@ -226,20 +223,24 @@ object PaceNoteIconRenderer {
         path.lineTo(endX, cornerY)
         canvas.drawPath(path, paint)
 
-        // Arrowhead
-        val arrowLen = r * 0.45f
-        val arrowPath = Path()
-        arrowPath.moveTo(endX, cornerY)
-        if (isLeft) {
-            arrowPath.lineTo(endX + arrowLen * 0.7f, cornerY - arrowLen * 0.5f)
-            arrowPath.moveTo(endX, cornerY)
-            arrowPath.lineTo(endX + arrowLen * 0.7f, cornerY + arrowLen * 0.5f)
-        } else {
-            arrowPath.lineTo(endX - arrowLen * 0.7f, cornerY - arrowLen * 0.5f)
-            arrowPath.moveTo(endX, cornerY)
-            arrowPath.lineTo(endX - arrowLen * 0.7f, cornerY + arrowLen * 0.5f)
+        // Filled arrowhead
+        val arrowLen = r * 0.5f
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = paint.color
+            style = Paint.Style.FILL
         }
-        canvas.drawPath(arrowPath, paint)
+        val arrowPath = Path().apply {
+            moveTo(endX, cornerY)
+            if (isLeft) {
+                lineTo(endX + arrowLen * 0.7f, cornerY - arrowLen * 0.55f)
+                lineTo(endX + arrowLen * 0.7f, cornerY + arrowLen * 0.55f)
+            } else {
+                lineTo(endX - arrowLen * 0.7f, cornerY - arrowLen * 0.55f)
+                lineTo(endX - arrowLen * 0.7f, cornerY + arrowLen * 0.55f)
+            }
+            close()
+        }
+        canvas.drawPath(arrowPath, fillPaint)
     }
 
     private fun drawStraightArrow(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float) {
@@ -249,10 +250,19 @@ object PaceNoteIconRenderer {
         // Vertical line
         canvas.drawLine(cx, bottom, cx, top, paint)
 
-        // Arrowhead
-        val arrowLen = r * 0.5f
-        canvas.drawLine(cx, top, cx - arrowLen * 0.7f, top + arrowLen, paint)
-        canvas.drawLine(cx, top, cx + arrowLen * 0.7f, top + arrowLen, paint)
+        // Filled arrowhead
+        val arrowLen = r * 0.55f
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = paint.color
+            style = Paint.Style.FILL
+        }
+        val arrowPath = Path().apply {
+            moveTo(cx, top)
+            lineTo(cx - arrowLen * 0.65f, top + arrowLen)
+            lineTo(cx + arrowLen * 0.65f, top + arrowLen)
+            close()
+        }
+        canvas.drawPath(arrowPath, fillPaint)
     }
 
     private fun drawCrest(canvas: Canvas, paint: Paint, cx: Float, cy: Float, r: Float, type: NoteType) {
