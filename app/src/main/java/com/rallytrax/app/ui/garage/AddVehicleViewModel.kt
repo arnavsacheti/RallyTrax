@@ -35,6 +35,9 @@ data class AddVehicleUiState(
     val isDecodingVin: Boolean = false,
     val vinError: String? = null,
 
+    // Vehicle type
+    val vehicleType: String = "CAR",
+
     // Spec fields (populated from API or VIN decode)
     val name: String = "",
     val trim: String? = null,
@@ -167,6 +170,10 @@ class AddVehicleViewModel @Inject constructor(
         }
     }
 
+    fun updateVehicleType(type: String) {
+        _uiState.update { it.copy(vehicleType = type) }
+    }
+
     fun updateName(name: String) {
         _uiState.update { it.copy(name = name) }
     }
@@ -252,6 +259,7 @@ class AddVehicleViewModel @Inject constructor(
                     year = year,
                     make = make,
                     model = model,
+                    vehicleType = state.vehicleType,
                     trim = state.trim ?: state.selectedTrim?.displayName,
                     vin = state.vinInput.takeIf { it.length == 17 },
                     engineDisplacementL = state.engineDisplacementL,

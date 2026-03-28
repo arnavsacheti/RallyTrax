@@ -101,6 +101,23 @@ fun AddVehicleSheet(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
+            // Vehicle type selector
+            Text("Vehicle Type", style = MaterialTheme.typography.labelLarge)
+            Spacer(modifier = Modifier.height(4.dp))
+            val vehicleTypes = listOf("CAR", "MOTORCYCLE", "TRUCK", "SUV", "OTHER")
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                vehicleTypes.forEachIndexed { index, type ->
+                    SegmentedButton(
+                        selected = uiState.vehicleType == type,
+                        onClick = { viewModel.updateVehicleType(type) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = vehicleTypes.size),
+                        icon = { Icon(vehicleTypeIcon(type), null, Modifier.size(18.dp)) },
+                    ) { Text(type.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Mode selector
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
