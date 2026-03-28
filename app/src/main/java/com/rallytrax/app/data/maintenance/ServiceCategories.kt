@@ -48,4 +48,43 @@ object ServiceCategories {
 
     fun getPresetInterval(serviceType: String): PresetInterval? =
         presetIntervals.find { it.serviceType.equals(serviceType, ignoreCase = true) }
+
+    val motorcycleCategories: Map<String, List<String>> = linkedMapOf(
+        "Engine" to listOf("Oil change", "Spark plugs", "Valve adjustment", "Air filter", "Fuel filter", "Carb sync/clean"),
+        "Drive" to listOf("Chain adjustment", "Chain replacement", "Sprocket replacement", "Belt replacement", "Shaft drive fluid"),
+        "Brakes" to listOf("Pad replacement", "Rotor replacement", "Fluid flush", "Caliper service", "Brake line"),
+        "Tires & Wheels" to listOf("Front tire", "Rear tire", "Wheel bearing", "Spoke tensioning", "Balancing"),
+        "Suspension" to listOf("Fork oil change", "Fork seal replacement", "Rear shock service", "Linkage bearings"),
+        "Electrical" to listOf("Battery", "Stator/alternator", "Starter", "Lights", "Fuses", "Wiring"),
+        "Cooling" to listOf("Coolant flush", "Radiator", "Thermostat", "Water pump", "Hose replacement"),
+        "Exhaust" to listOf("Header/pipe", "Muffler", "O2 sensor", "Exhaust gasket"),
+        "Controls & Cables" to listOf("Clutch cable", "Throttle cable", "Brake lever", "Clutch lever", "Grip replacement"),
+        "Body & Cosmetic" to listOf("Fairing repair", "Paint", "Windscreen", "Seat", "Detailing"),
+        "Inspections" to listOf("Annual inspection", "Pre-ride check", "Track day prep"),
+    )
+
+    val motorcyclePresetIntervals = listOf(
+        PresetInterval("Oil change", 5_000.0, 6),
+        PresetInterval("Chain adjustment", 1_000.0, null),
+        PresetInterval("Air filter", 15_000.0, 12),
+        PresetInterval("Valve adjustment", 25_000.0, null),
+        PresetInterval("Brake fluid", 30_000.0, 24),
+        PresetInterval("Coolant flush", 30_000.0, 24),
+        PresetInterval("Fork oil change", 20_000.0, 24),
+        PresetInterval("Spark plugs", 20_000.0, null),
+    )
+
+    fun categoriesForVehicleType(vehicleType: String?): Map<String, List<String>> {
+        return when (vehicleType?.uppercase()) {
+            "MOTORCYCLE" -> motorcycleCategories
+            else -> categories
+        }
+    }
+
+    fun presetsForVehicleType(vehicleType: String?): List<PresetInterval> {
+        return when (vehicleType?.uppercase()) {
+            "MOTORCYCLE" -> motorcyclePresetIntervals
+            else -> presetIntervals
+        }
+    }
 }

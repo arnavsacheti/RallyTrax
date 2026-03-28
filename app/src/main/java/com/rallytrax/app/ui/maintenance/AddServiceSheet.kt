@@ -46,6 +46,7 @@ fun AddServiceSheet(
     vehicleId: String,
     onSave: (MaintenanceRecordEntity) -> Unit,
     onDismiss: () -> Unit,
+    vehicleType: String? = null,
 ) {
     var category by remember { mutableStateOf("") }
     var serviceType by remember { mutableStateOf("") }
@@ -84,7 +85,7 @@ fun AddServiceSheet(
                     modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 )
                 ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
-                    ServiceCategories.allCategories.forEach { cat ->
+                    ServiceCategories.categoriesForVehicleType(vehicleType).keys.forEach { cat ->
                         DropdownMenuItem(text = { Text(cat) }, onClick = {
                             category = cat; serviceType = ""; catExpanded = false
                         })
@@ -104,7 +105,7 @@ fun AddServiceSheet(
                         modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                     )
                     ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
-                        ServiceCategories.servicesForCategory(category).forEach { svc ->
+                        (ServiceCategories.categoriesForVehicleType(vehicleType)[category] ?: emptyList()).forEach { svc ->
                             DropdownMenuItem(text = { Text(svc) }, onClick = {
                                 serviceType = svc; typeExpanded = false
                             })
