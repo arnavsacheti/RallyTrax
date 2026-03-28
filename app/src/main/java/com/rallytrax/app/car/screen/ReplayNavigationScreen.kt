@@ -1,5 +1,6 @@
 package com.rallytrax.app.car.screen
 
+import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
@@ -7,6 +8,8 @@ import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.Distance
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.NavigationManager
+import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.RoutingInfo
 import androidx.car.app.navigation.model.Step
@@ -38,6 +41,7 @@ class ReplayNavigationScreen(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mapRenderer = ReplayMapRenderer(carContext)
+    private val navigationManager = carContext.getCarService(NavigationManager::class.java)
     private val replayManager = CarReplayManager(
         context = carContext,
         trackPointDao = session.trackPointDao,
@@ -48,9 +52,25 @@ class ReplayNavigationScreen(
     private var refreshJob: Job? = null
 
     init {
+        // Register map surface callback so the host delivers surface events
+        carContext.getCarService(AppManager::class.java).setSurfaceCallback(mapRenderer)
+
+        // Start navigation session (required before returning NavigationTemplate)
+        navigationManager.setNavigationManagerCallback(object : NavigationManagerCallback {
+            override fun onStopNavigation() {
+                replayManager.stopReplay()
+                screenManager.pop()
+            }
+            override fun onAutoDriveEnabled() { }
+        })
+        navigationManager.navigationStarted()
+
         lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
                 refreshJob?.cancel()
+                navigationManager.navigationEnded()
+                navigationManager.clearNavigationManagerCallback()
+                carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
                 replayManager.destroy()
                 scope.cancel()
                 mapRenderer.destroy()
@@ -189,8 +209,19 @@ class ReplayNavigationScreen(
             )
         }
 
-        // Action strip
+        // Action strip — always include Back so it's never empty (avoids crash)
         val actionStripBuilder = ActionStrip.Builder()
+
+        actionStripBuilder.addAction(
+            Action.Builder()
+                .setTitle("Back")
+                .setOnClickListener {
+                    replayManager.stopReplay()
+                    navigationManager.navigationEnded()
+                    screenManager.pop()
+                }
+                .build()
+        )
 
         if (state.isActive) {
             actionStripBuilder.addAction(
@@ -209,6 +240,7 @@ class ReplayNavigationScreen(
                     .setBackgroundColor(CarColor.RED)
                     .setOnClickListener {
                         replayManager.stopReplay()
+                        navigationManager.navigationEnded()
                         screenManager.pop()
                     }
                     .build()
@@ -218,17 +250,9 @@ class ReplayNavigationScreen(
                 Action.Builder()
                     .setTitle("Done")
                     .setOnClickListener {
+                        navigationManager.navigationEnded()
                         screenManager.pop()
                     }
-                    .build()
-            )
-        }
-
-        state.error?.let {
-            actionStripBuilder.addAction(
-                Action.Builder()
-                    .setTitle("Back")
-                    .setOnClickListener { screenManager.pop() }
                     .build()
             )
         }

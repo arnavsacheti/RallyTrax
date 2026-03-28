@@ -1,6 +1,7 @@
 package com.rallytrax.app.car.screen
 
 import android.content.Intent
+import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
@@ -8,6 +9,8 @@ import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.Distance
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.NavigationManager
+import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.RoutingInfo
 import androidx.car.app.navigation.model.Step
@@ -39,13 +42,29 @@ class RecordingScreen(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mapRenderer = CarMapRenderer(carContext)
+    private val navigationManager = carContext.getCarService(NavigationManager::class.java)
     private var prefs: UserPreferencesData = UserPreferencesData()
     private var refreshJob: Job? = null
 
     init {
+        // Register map surface callback so the host delivers surface events
+        carContext.getCarService(AppManager::class.java).setSurfaceCallback(mapRenderer)
+
+        // Start navigation session (required before returning NavigationTemplate)
+        navigationManager.setNavigationManagerCallback(object : NavigationManagerCallback {
+            override fun onStopNavigation() {
+                stopRecording()
+            }
+            override fun onAutoDriveEnabled() { }
+        })
+        navigationManager.navigationStarted()
+
         lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
                 refreshJob?.cancel()
+                navigationManager.navigationEnded()
+                navigationManager.clearNavigationManagerCallback()
+                carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
                 scope.cancel()
                 mapRenderer.destroy()
             }
@@ -221,6 +240,7 @@ class RecordingScreen(
             action = TrackingService.ACTION_STOP
         }
         carContext.startService(intent)
+        navigationManager.navigationEnded()
         scope.launch {
             delay(500)
             screenManager.pop()
