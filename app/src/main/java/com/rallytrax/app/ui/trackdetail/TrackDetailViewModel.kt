@@ -106,6 +106,8 @@ data class TrackDetailUiState(
     val isDetectingSegments: Boolean = false,
     val suggestedSegments: List<SegmentMatcher.OverlapCandidate> = emptyList(),
     val paceNotesStale: Boolean = false, // true when pace notes lack segment data and need regeneration
+    // Highlighted suggested segment (eye toggle — only one at a time)
+    val highlightedSuggestionIndex: Int? = null,
     // Sensor data
     val sensorStats: SensorStats = SensorStats(),
     val lateralGProfile: List<LateralGPoint> = emptyList(),
@@ -268,7 +270,7 @@ class TrackDetailViewModel @Inject constructor(
                 withContext(ioDispatcher) { segmentRepository.saveOverlapAsSegment(name, candidate, trackId) }
                 // Remove from suggestions and reload segments
                 val remaining = _uiState.value.suggestedSegments - candidate
-                _uiState.value = _uiState.value.copy(suggestedSegments = remaining)
+                _uiState.value = _uiState.value.copy(suggestedSegments = remaining, highlightedSuggestionIndex = null)
                 reloadSegments()
                 _snackbarMessage.tryEmit("Segment '$name' saved")
             } catch (e: Exception) {
@@ -278,7 +280,14 @@ class TrackDetailViewModel @Inject constructor(
     }
 
     fun clearSuggestions() {
-        _uiState.value = _uiState.value.copy(suggestedSegments = emptyList())
+        _uiState.value = _uiState.value.copy(suggestedSegments = emptyList(), highlightedSuggestionIndex = null)
+    }
+
+    fun toggleHighlightedSuggestion(index: Int) {
+        val current = _uiState.value.highlightedSuggestionIndex
+        _uiState.value = _uiState.value.copy(
+            highlightedSuggestionIndex = if (current == index) null else index,
+        )
     }
 
     fun createUserSegment(name: String, startIndex: Int, endIndex: Int) {

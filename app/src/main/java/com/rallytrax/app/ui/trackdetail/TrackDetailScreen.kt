@@ -43,6 +43,8 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 // ButtonDefaults removed — moved to EditTrackScreen
@@ -231,6 +233,14 @@ fun TrackDetailScreen(
             ) {
                 // ── Map with Layer Toolbar ────────────────────────────
                 val points = uiState.polylinePoints
+                // Compute highlighted segment points from suggestion index
+                val highlightedSegmentPoints = remember(uiState.highlightedSuggestionIndex, uiState.suggestedSegments, points) {
+                    val idx = uiState.highlightedSuggestionIndex ?: return@remember emptyList()
+                    val candidate = uiState.suggestedSegments.getOrNull(idx) ?: return@remember emptyList()
+                    val start = candidate.startIdxA.coerceIn(0, points.size - 1)
+                    val end = candidate.endIdxA.coerceIn(0, points.size - 1)
+                    if (end > start) points.subList(start, end + 1) else emptyList()
+                }
                 if (points.isNotEmpty()) {
                     Box {
                         TrackMap(
@@ -240,6 +250,7 @@ fun TrackDetailScreen(
                             activeLayers = uiState.activeLayers,
                             useGoogleMaps = MapProvider.useGoogleMaps(preferences.mapProvider),
                             modifier = Modifier.fillMaxWidth().height(300.dp),
+                            highlightedSegmentPoints = highlightedSegmentPoints,
                         )
 
                         // Gradient legend
@@ -313,6 +324,7 @@ fun TrackDetailScreen(
                         onRegeneratePaceNotes = { viewModel.regeneratePaceNotes() },
                         onSaveSegment = viewModel::saveSegmentSuggestion,
                         onDismissSuggestions = { viewModel.clearSuggestions() },
+                        onToggleHighlightSuggestion = { viewModel.toggleHighlightedSuggestion(it) },
                     )
                 }
             }
@@ -348,11 +360,12 @@ private fun TrackMap(
     useGoogleMaps: Boolean,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 100.dp),
+    highlightedSegmentPoints: List<LatLng> = emptyList(),
 ) {
     if (useGoogleMaps) {
-        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding)
+        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding, highlightedSegmentPoints)
     } else {
-        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier)
+        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, highlightedSegmentPoints)
     }
 }
 
@@ -364,6 +377,7 @@ private fun GoogleTrackMap(
     activeLayers: Set<MapLayer>,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 100.dp),
+    highlightedSegmentPoints: List<LatLng> = emptyList(),
 ) {
     val cameraPositionState = rememberCameraPositionState()
     val bounds = remember(points) {
@@ -375,6 +389,14 @@ private fun GoogleTrackMap(
     LaunchedEffect(bounds) {
         cameraPositionState.move(CameraUpdateFactory.newLatLngBounds(bounds, 64))
     }
+    // Animate camera to highlighted segment bounds
+    LaunchedEffect(highlightedSegmentPoints) {
+        if (highlightedSegmentPoints.size >= 2) {
+            val segBoundsBuilder = LatLngBounds.builder()
+            highlightedSegmentPoints.forEach { segBoundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(segBoundsBuilder.build(), 96))
+        }
+    }
 
     GoogleMap(
         modifier = modifier,
@@ -382,9 +404,14 @@ private fun GoogleTrackMap(
         uiSettings = MapUiSettings(zoomControlsEnabled = true, scrollGesturesEnabled = true, zoomGesturesEnabled = true),
         contentPadding = contentPadding,
     ) {
-        // Base route polyline (dimmed when callouts layer active with colored segments)
+        // Base route polyline (dimmed when callouts layer active or segment highlighted)
+        val hasHighlight = highlightedSegmentPoints.size >= 2
         if (points.size >= 2) {
-            val baseColor = if (MapLayer.CALLOUTS in activeLayers) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
+            val baseColor = when {
+                hasHighlight -> Color(0xFF1A73E8).copy(alpha = 0.15f)
+                MapLayer.CALLOUTS in activeLayers -> Color(0xFF1A73E8).copy(alpha = 0.3f)
+                else -> Color(0xFF1A73E8)
+            }
             Polyline(
                 points = points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
                 color = baseColor, width = 8f,
@@ -527,6 +554,14 @@ private fun GoogleTrackMap(
                 }
             }
         }
+
+        // Highlighted suggested segment — full opacity over dimmed base
+        if (hasHighlight) {
+            Polyline(
+                points = highlightedSegmentPoints.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
+                color = Color(0xFF1A73E8), width = 10f,
+            )
+        }
     }
 }
 
@@ -537,6 +572,7 @@ private fun OsmTrackMap(
     paceNotes: List<PaceNoteEntity>,
     activeLayers: Set<MapLayer>,
     modifier: Modifier = Modifier,
+    highlightedSegmentPoints: List<LatLng> = emptyList(),
 ) {
     val lats = points.map { it.latitude }
     val lngs = points.map { it.longitude }
@@ -545,11 +581,16 @@ private fun OsmTrackMap(
     val density = (LocalDensity.current.density * 160f).toInt()
     val calloutsActive = MapLayer.CALLOUTS in activeLayers
 
+    val hasHighlight = highlightedSegmentPoints.size >= 2
     val polylines = mutableListOf<OsmPolylineData>()
     if (points.size >= 2) {
         val hasOverlay = setOf(MapLayer.SPEED, MapLayer.ACCEL, MapLayer.ELEVATION, MapLayer.CURVATURE, MapLayer.SURFACE)
             .any { it in activeLayers }
-        val baseColor = if (calloutsActive || hasOverlay) Color(0xFF1A73E8).copy(alpha = 0.3f) else Color(0xFF1A73E8)
+        val baseColor = when {
+            hasHighlight -> Color(0xFF1A73E8).copy(alpha = 0.15f)
+            calloutsActive || hasOverlay -> Color(0xFF1A73E8).copy(alpha = 0.3f)
+            else -> Color(0xFF1A73E8)
+        }
         polylines.add(OsmPolylineData(points = points.map { GeoPoint(it.latitude, it.longitude) }, color = baseColor, width = 8f))
     }
 
@@ -677,9 +718,25 @@ private fun OsmTrackMap(
         }
     }
 
+    // Highlighted suggested segment — full opacity over dimmed base
+    if (hasHighlight) {
+        polylines.add(OsmPolylineData(
+            points = highlightedSegmentPoints.map { GeoPoint(it.latitude, it.longitude) },
+            color = Color(0xFF1A73E8), width = 10f,
+        ))
+    }
+
+    val osmFitBounds = if (highlightedSegmentPoints.size >= 2) {
+        val hLats = highlightedSegmentPoints.map { it.latitude }
+        val hLngs = highlightedSegmentPoints.map { it.longitude }
+        BoundingBox(hLats.max(), hLngs.max(), hLats.min(), hLngs.min())
+    } else {
+        fitBounds
+    }
+
     OsmMapView(
         modifier = modifier,
-        fitBounds = fitBounds, polylines = polylines, markers = markers, zoomControlsEnabled = true,
+        fitBounds = osmFitBounds, polylines = polylines, markers = markers, zoomControlsEnabled = true,
     )
 }
 
@@ -1244,6 +1301,7 @@ private fun ViewTab(
     onRegeneratePaceNotes: () -> Unit = {},
     onSaveSegment: (SegmentMatcher.OverlapCandidate, String) -> Unit = { _, _ -> },
     onDismissSuggestions: () -> Unit = {},
+    onToggleHighlightSuggestion: (Int) -> Unit = {},
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1308,11 +1366,13 @@ private fun ViewTab(
             segments = uiState.segments,
             isDetecting = uiState.isDetectingSegments,
             suggestedSegments = uiState.suggestedSegments,
+            highlightedSuggestionIndex = uiState.highlightedSuggestionIndex,
             onDetectSegments = onDetectSegments,
             onSegmentClick = onSegmentClick,
             onViewAllSegments = onViewAllSegments,
             onSaveSegment = onSaveSegment,
             onDismissSuggestions = onDismissSuggestions,
+            onToggleHighlight = onToggleHighlightSuggestion,
             unitSystem = unitSystem,
         )
 
@@ -1336,11 +1396,13 @@ private fun SegmentsCard(
     segments: List<TrackSegmentUi>,
     isDetecting: Boolean,
     suggestedSegments: List<SegmentMatcher.OverlapCandidate>,
+    highlightedSuggestionIndex: Int?,
     onDetectSegments: () -> Unit,
     onSegmentClick: (String) -> Unit,
     onViewAllSegments: () -> Unit,
     onSaveSegment: (SegmentMatcher.OverlapCandidate, String) -> Unit,
     onDismissSuggestions: () -> Unit,
+    onToggleHighlight: (Int) -> Unit,
     unitSystem: UnitSystem,
 ) {
     Card(
@@ -1509,7 +1571,19 @@ private fun SegmentsCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        val isHighlighted = highlightedSuggestionIndex == index
+                        IconButton(
+                            onClick = { onToggleHighlight(index) },
+                        ) {
+                            Icon(
+                                if (isHighlighted) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                contentDescription = if (isHighlighted) "Hide on map" else "Show on map",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
                         FilledTonalButton(
                             onClick = { onSaveSegment(candidate, segmentName) },
                         ) {
