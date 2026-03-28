@@ -75,6 +75,26 @@ interface SegmentDao {
     @Query("SELECT AVG(durationMs) FROM segment_runs WHERE segmentId = :segmentId AND durationMs > 0")
     suspend fun getAverageTimeMs(segmentId: String): Double?
 
+    // ── Vehicle-specific queries ──────────────────────────────────────
+
+    @Query("""
+        SELECT s.* FROM segments s
+        INNER JOIN segment_runs sr ON sr.segmentId = s.id
+        INNER JOIN tracks t ON t.id = sr.trackId
+        WHERE t.vehicleId = :vehicleId AND s.isFavorite = 1
+        GROUP BY s.id
+        ORDER BY COUNT(sr.id) DESC
+    """)
+    suspend fun getFavoriteSegmentsForVehicle(vehicleId: String): List<SegmentEntity>
+
+    @Query("""
+        SELECT sr.* FROM segment_runs sr
+        INNER JOIN tracks t ON t.id = sr.trackId
+        WHERE sr.segmentId = :segmentId AND t.vehicleId = :vehicleId
+        ORDER BY sr.timestamp DESC
+    """)
+    suspend fun getRunsForSegmentAndVehicle(segmentId: String, vehicleId: String): List<SegmentRunEntity>
+
     // ── Cleanup ─────────────────────────────────────────────────────────
 
     @Query("DELETE FROM segment_runs WHERE segmentId = :segmentId")
