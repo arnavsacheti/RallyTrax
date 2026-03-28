@@ -40,6 +40,7 @@ fun AddScheduleSheet(
     vehicleId: String,
     onSave: (MaintenanceScheduleEntity) -> Unit,
     onDismiss: () -> Unit,
+    vehicleType: String? = null,
 ) {
     var serviceType by remember { mutableStateOf("") }
     var intervalKmInput by remember { mutableStateOf("") }
@@ -48,7 +49,8 @@ fun AddScheduleSheet(
 
     // Auto-fill from presets when service type changes
     LaunchedEffect(serviceType) {
-        val preset = ServiceCategories.getPresetInterval(serviceType)
+        val preset = ServiceCategories.presetsForVehicleType(vehicleType)
+            .find { it.serviceType.equals(serviceType, ignoreCase = true) }
         if (preset != null) {
             intervalKmInput = preset.intervalKm?.toInt()?.toString() ?: ""
             intervalMonthsInput = preset.intervalMonths?.toString() ?: ""
@@ -86,7 +88,7 @@ fun AddScheduleSheet(
             // Preset suggestions
             if (serviceType.isBlank()) {
                 Text(
-                    text = "Common: ${ServiceCategories.presetIntervals.joinToString(", ") { it.serviceType }}",
+                    text = "Common: ${ServiceCategories.presetsForVehicleType(vehicleType).joinToString(", ") { it.serviceType }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
