@@ -46,7 +46,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -56,8 +58,18 @@ import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.ui.theme.DifficultyAmber
+import com.rallytrax.app.ui.theme.DifficultyGreen
+import com.rallytrax.app.ui.theme.DifficultyOrange
+import com.rallytrax.app.ui.theme.DifficultyRed
+import com.rallytrax.app.ui.theme.SurfaceCobblestone
+import com.rallytrax.app.ui.theme.SurfaceDirt
+import com.rallytrax.app.ui.theme.SurfaceGravel
+import com.rallytrax.app.ui.theme.SurfacePaved
+import com.rallytrax.app.ui.theme.SurfaceUnknown
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatDate
+import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
 
@@ -761,6 +773,45 @@ private fun AnalyticsTab(
             BreakdownCard(analytics.curvinessDistribution)
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+        FavoriteSegmentsCard(analytics.favoriteSegments, unitSystem)
+
+        if (analytics.performanceByDifficulty.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            PerformanceByCategoryCard(
+                title = "Performance by Difficulty",
+                categories = analytics.performanceByDifficulty,
+                colorForCategory = { category ->
+                    when (category.lowercase()) {
+                        "casual", "easy" -> DifficultyGreen
+                        "moderate" -> DifficultyAmber
+                        "spirited", "hard" -> DifficultyOrange
+                        "expert" -> DifficultyRed
+                        else -> DifficultyGreen
+                    }
+                },
+                unitSystem = unitSystem,
+            )
+        }
+
+        if (analytics.performanceBySurface.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            PerformanceByCategoryCard(
+                title = "Performance by Surface",
+                categories = analytics.performanceBySurface,
+                colorForCategory = { category ->
+                    when (category.lowercase()) {
+                        "paved", "tarmac", "asphalt" -> SurfacePaved
+                        "gravel" -> SurfaceGravel
+                        "dirt" -> SurfaceDirt
+                        "cobblestone" -> SurfaceCobblestone
+                        else -> SurfaceUnknown
+                    }
+                },
+                unitSystem = unitSystem,
+            )
+        }
+
         Spacer(modifier = Modifier.height(80.dp))
     }
 }
@@ -868,6 +919,184 @@ private fun SpecsGrid(vehicle: VehicleEntity, totalDistanceM: Double, unitSystem
             // Fill empty space if odd number of specs in the row
             if (row.size == 1) {
                 Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteSegmentsCard(
+    segments: List<VehicleSegmentInfo>,
+    unitSystem: UnitSystem,
+) {
+    Text(
+        text = "Favorite Segments",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    if (segments.isEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        ) {
+            Text(
+                text = "No favorite segments yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+    } else {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                segments.forEachIndexed { index, info ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(
+                            text = info.segment.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = "${info.runCount} runs",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            info.bestTimeMs?.let { bestMs ->
+                                Text(
+                                    text = "Best: ${formatElapsedTime(bestMs)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = "Avg: ${formatSpeed(info.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (index < segments.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PerformanceByCategoryCard(
+    title: String,
+    categories: List<PerformanceByCategory>,
+    colorForCategory: (String) -> Color,
+    unitSystem: UnitSystem,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            ) {
+                Text(
+                    text = "Category",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1.2f),
+                )
+                Text(
+                    text = "Tracks",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(0.6f),
+                )
+                Text(
+                    text = "Avg",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "Top",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            categories.forEach { category ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1.2f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    colorForCategory(category.category),
+                                    androidx.compose.foundation.shape.CircleShape,
+                                ),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = category.category,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        text = "${category.trackCount}",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(0.6f),
+                    )
+                    Text(
+                        text = "${formatSpeed(category.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${formatSpeed(category.topSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }

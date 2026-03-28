@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.fuel.MpgCalculator
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
+import com.rallytrax.app.data.local.dao.SegmentDao
+import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.FuelLogEntity
 import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
@@ -24,6 +26,21 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class PerformanceByCategory(
+    val category: String,
+    val trackCount: Int,
+    val avgSpeedMps: Double,
+    val topSpeedMps: Double,
+    val totalDistanceM: Double,
+)
+
+data class VehicleSegmentInfo(
+    val segment: SegmentEntity,
+    val runCount: Int,
+    val bestTimeMs: Long?,
+    val avgSpeedMps: Double,
+)
+
 data class VehicleAnalytics(
     val totalDistanceM: Double = 0.0,
     val totalTimeMs: Long = 0L,
@@ -34,6 +51,9 @@ data class VehicleAnalytics(
     val surfaceBreakdown: Map<String, Int> = emptyMap(),
     val curvinessDistribution: Map<String, Int> = emptyMap(), // Casual/Moderate/Spirited/Expert
     val monthlyDistances: Map<String, Double> = emptyMap(), // "2026-01" -> meters
+    val favoriteSegments: List<VehicleSegmentInfo> = emptyList(),
+    val performanceByDifficulty: List<PerformanceByCategory> = emptyList(),
+    val performanceBySurface: List<PerformanceByCategory> = emptyList(),
 )
 
 data class VehicleDetailUiState(
@@ -52,6 +72,7 @@ class VehicleDetailViewModel @Inject constructor(
     private val vehicleRepository: VehicleRepository,
     private val fuelLogDao: FuelLogDao,
     private val maintenanceDao: MaintenanceDao,
+    private val segmentDao: SegmentDao,
     private val syncManager: SyncManager,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
@@ -134,6 +155,21 @@ class VehicleDetailViewModel @Inject constructor(
             }
             .mapValues { (_, tracks) -> tracks.sumOf { it.distanceMeters } }
 
+        // Favorite segments for this vehicle
+        val favoriteSegments = segmentDao.getFavoriteSegmentsForVehicle(vehicleId).map { segment ->
+            val runs = segmentDao.getRunsForSegmentAndVehicle(segment.id, vehicleId)
+            VehicleSegmentInfo(
+                segment = segment,
+                runCount = runs.size,
+                bestTimeMs = runs.filter { it.durationMs > 0 }.minOfOrNull { it.durationMs },
+                avgSpeedMps = if (runs.isNotEmpty()) runs.map { it.avgSpeedMps }.average() else 0.0,
+            )
+        }
+
+        // Performance breakdowns by difficulty and surface
+        val performanceByDifficulty = groupTracksByCategory(tracksList) { it.difficultyRating }
+        val performanceBySurface = groupTracksByCategory(tracksList) { it.primarySurface }
+
         return VehicleAnalytics(
             totalDistanceM = totalDistance,
             totalTimeMs = totalTime,
@@ -144,8 +180,29 @@ class VehicleDetailViewModel @Inject constructor(
             surfaceBreakdown = surfaces,
             curvinessDistribution = difficulties,
             monthlyDistances = monthlyDistances,
+            favoriteSegments = favoriteSegments,
+            performanceByDifficulty = performanceByDifficulty,
+            performanceBySurface = performanceBySurface,
         )
     }
+
+    private fun groupTracksByCategory(
+        tracksList: List<TrackEntity>,
+        selector: (TrackEntity) -> String?,
+    ): List<PerformanceByCategory> =
+        tracksList
+            .mapNotNull { track -> selector(track)?.let { it to track } }
+            .groupBy({ it.first }, { it.second })
+            .map { (category, group) ->
+                PerformanceByCategory(
+                    category = category,
+                    trackCount = group.size,
+                    avgSpeedMps = group.map { it.avgSpeedMps }.average(),
+                    topSpeedMps = group.maxOf { it.maxSpeedMps },
+                    totalDistanceM = group.sumOf { it.distanceMeters },
+                )
+            }
+            .sortedByDescending { it.trackCount }
 
     fun toggleActive() {
         viewModelScope.launch {
