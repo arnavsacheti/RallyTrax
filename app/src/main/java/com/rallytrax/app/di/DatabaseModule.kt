@@ -14,6 +14,7 @@ import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.dao.VehicleDao
+import com.rallytrax.app.data.local.dao.WeatherDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -48,6 +49,8 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_12_13,
                 RallyTraxDatabase.MIGRATION_13_14,
                 RallyTraxDatabase.MIGRATION_14_15,
+                RallyTraxDatabase.MIGRATION_15_16,
+                RallyTraxDatabase.MIGRATION_16_17,
             )
             .build()
     }
@@ -105,5 +108,10 @@ object DatabaseModule {
     @Provides
     fun provideSegmentDao(database: RallyTraxDatabase): SegmentDao {
         return database.segmentDao()
+    }
+
+    @Provides
+    fun provideWeatherDao(database: RallyTraxDatabase): WeatherDao {
+        return database.weatherDao()
     }
 }
