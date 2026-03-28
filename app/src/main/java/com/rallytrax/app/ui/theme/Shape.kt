@@ -17,3 +17,12 @@ val ShapeLargeIncreased = RoundedCornerShape(20.dp)
 val ShapeExtraLargeIncreased = RoundedCornerShape(32.dp)
 val ShapeExtraExtraLarge = RoundedCornerShape(48.dp)
 val ShapeFullRound = RoundedCornerShape(50)
+
+// ── Rugged Mode: Larger corner radii for easier visual parsing ───────────────
+val RuggedShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(28.dp),
+)

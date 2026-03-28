@@ -23,6 +23,15 @@ enum class UnitSystem { METRIC, IMPERIAL }
 enum class GpsAccuracy { HIGH, BATTERY_SAVER }
 enum class MapProviderPreference { AUTO, GOOGLE_MAPS, OPENSTREETMAP }
 
+enum class RuggedModeDuration(val label: String, val hours: Int?) {
+    OFF("Off", null),
+    ONE_HOUR("1 hour", 1),
+    TWO_HOURS("2 hours", 2),
+    FOUR_HOURS("4 hours", 4),
+    EIGHT_HOURS("8 hours", 8),
+    UNTIL_OFF("Until turned off", null),
+}
+
 object GpsIntervalConfig {
     // HIGH accuracy: rally/motorsport — aggressive updates for smooth tracking
     const val HIGH_INTERVAL_MS = 200L
@@ -57,6 +66,12 @@ data class UserPreferencesData(
     val backupTracksEnabled: Boolean = false,
     val drivePageToken: String? = null,
     val signedInEmail: String? = null,
+    // Rugged mode
+    val ruggedModeEnabled: Boolean = false,
+    val ruggedModeExpiresAt: Long? = null, // epoch millis, null = "until turned off"
+    // Weather
+    val weatherApiKey: String? = null,
+    val weatherAdjustmentsEnabled: Boolean = true,
 )
 
 class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
@@ -83,6 +98,12 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val BACKUP_TRACKS_ENABLED = booleanPreferencesKey("backup_tracks_enabled")
         val DRIVE_PAGE_TOKEN = stringPreferencesKey("drive_page_token")
         val SIGNED_IN_EMAIL = stringPreferencesKey("signed_in_email")
+        // Rugged mode
+        val RUGGED_MODE_ENABLED = booleanPreferencesKey("rugged_mode_enabled")
+        val RUGGED_MODE_EXPIRES_AT = longPreferencesKey("rugged_mode_expires_at")
+        // Weather
+        val WEATHER_API_KEY = stringPreferencesKey("weather_api_key")
+        val WEATHER_ADJUSTMENTS_ENABLED = booleanPreferencesKey("weather_adjustments_enabled")
         // Per-field modification timestamps for sync conflict resolution
         val THEME_MODE_MODIFIED_AT = longPreferencesKey("theme_mode_modified_at")
         val UNIT_SYSTEM_MODIFIED_AT = longPreferencesKey("unit_system_modified_at")
@@ -122,6 +143,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             backupTracksEnabled = prefs[Keys.BACKUP_TRACKS_ENABLED] ?: false,
             drivePageToken = prefs[Keys.DRIVE_PAGE_TOKEN],
             signedInEmail = prefs[Keys.SIGNED_IN_EMAIL],
+            ruggedModeEnabled = prefs[Keys.RUGGED_MODE_ENABLED] ?: false,
+            ruggedModeExpiresAt = prefs[Keys.RUGGED_MODE_EXPIRES_AT],
+            weatherApiKey = prefs[Keys.WEATHER_API_KEY],
+            weatherAdjustmentsEnabled = prefs[Keys.WEATHER_ADJUSTMENTS_ENABLED] ?: true,
         )
     }
 
@@ -305,6 +330,34 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 it.remove(Keys.WEEKLY_DISTANCE_GOAL_KM)
             }
         }
+    }
+
+    suspend fun setRuggedModeEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.RUGGED_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun setRuggedModeExpiresAt(expiresAt: Long?) {
+        dataStore.edit {
+            if (expiresAt != null) {
+                it[Keys.RUGGED_MODE_EXPIRES_AT] = expiresAt
+            } else {
+                it.remove(Keys.RUGGED_MODE_EXPIRES_AT)
+            }
+        }
+    }
+
+    suspend fun setWeatherApiKey(key: String?) {
+        dataStore.edit {
+            if (key != null) {
+                it[Keys.WEATHER_API_KEY] = key
+            } else {
+                it.remove(Keys.WEATHER_API_KEY)
+            }
+        }
+    }
+
+    suspend fun setWeatherAdjustmentsEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.WEATHER_ADJUSTMENTS_ENABLED] = enabled }
     }
 
     suspend fun clearAllPreferences() {

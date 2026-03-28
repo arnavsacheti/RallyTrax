@@ -27,7 +27,9 @@ import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.SegmentRunEntity
+import com.rallytrax.app.data.local.dao.WeatherDao
 import com.rallytrax.app.data.local.entity.VehicleEntity
+import com.rallytrax.app.data.local.entity.WeatherEntity
 
 @Database(
     entities = [
@@ -44,8 +46,9 @@ import com.rallytrax.app.data.local.entity.VehicleEntity
         DriverProfileEntity::class,
         SegmentEntity::class,
         SegmentRunEntity::class,
+        WeatherEntity::class,
     ],
-    version = 15,
+    version = 17,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -60,6 +63,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun achievementDao(): AchievementDao
     abstract fun driverProfileDao(): DriverProfileDao
     abstract fun segmentDao(): SegmentDao
+    abstract fun weatherDao(): WeatherDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -343,6 +347,44 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                 if ("rollRateDegPerS" !in columns) {
                     db.execSQL("ALTER TABLE track_points ADD COLUMN rollRateDegPerS REAL DEFAULT NULL")
                 }
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Cross-sensor analytics cached fields
+                db.execSQL("ALTER TABLE tracks ADD COLUMN peakCorneringG REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN avgCorneringG REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN smoothnessScore INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN roadRoughnessIndex REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN brakingEfficiencyScore INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN elevationAdjustedAvgSpeedMps REAL DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Weather records table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `weather_records` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `trackId` TEXT NOT NULL,
+                        `fetchedAt` INTEGER NOT NULL,
+                        `conditionCode` INTEGER NOT NULL,
+                        `conditionGroup` TEXT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `temperatureC` REAL NOT NULL,
+                        `humidity` INTEGER NOT NULL,
+                        `windSpeedMps` REAL NOT NULL,
+                        `windDirectionDeg` REAL NOT NULL,
+                        `visibility` INTEGER NOT NULL,
+                        `precipitationMmH` REAL,
+                        FOREIGN KEY(`trackId`) REFERENCES `tracks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_weather_records_trackId` ON `weather_records` (`trackId`)")
             }
         }
 

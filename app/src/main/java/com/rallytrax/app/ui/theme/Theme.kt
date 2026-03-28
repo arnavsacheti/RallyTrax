@@ -93,6 +93,7 @@ private val DarkColorScheme = darkColorScheme(
 fun RallyTraxTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = true,
+    ruggedMode: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (themeMode) {
@@ -112,11 +113,14 @@ fun RallyTraxTheme(
 
     val rallyTraxColors = if (darkTheme) DarkRallyTraxColors else LightRallyTraxColors
 
-    CompositionLocalProvider(LocalRallyTraxColors provides rallyTraxColors) {
+    CompositionLocalProvider(
+        LocalRallyTraxColors provides rallyTraxColors,
+        LocalRuggedMode provides ruggedMode,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            shapes = RallyTraxShapes,
-            typography = RallyTraxTypography,
+            shapes = if (ruggedMode) RuggedShapes else RallyTraxShapes,
+            typography = if (ruggedMode) RuggedTypography else RallyTraxTypography,
             content = content,
         )
     }

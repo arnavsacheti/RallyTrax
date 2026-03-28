@@ -39,4 +39,11 @@ data class TrackEntity(
     val primarySurface: String? = null,
     val surfaceBreakdown: String? = null,
     val trackCategory: String = "stint", // "route" or "stint"
+    // Cross-sensor insight cache (computed post-recording)
+    val peakCorneringG: Double? = null,
+    val avgCorneringG: Double? = null,
+    val smoothnessScore: Int? = null,
+    val roadRoughnessIndex: Double? = null,
+    val brakingEfficiencyScore: Int? = null,
+    val elevationAdjustedAvgSpeedMps: Double? = null,
 )

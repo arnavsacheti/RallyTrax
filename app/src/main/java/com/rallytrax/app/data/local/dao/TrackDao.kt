@@ -103,4 +103,35 @@ interface TrackDao {
         eastLon: Double,
         westLon: Double,
     ): List<TrackEntity>
+
+    // --- Cross-sensor analytics ---
+
+    @Query("""
+        UPDATE tracks SET
+            peakCorneringG = :peakCorneringG,
+            avgCorneringG = :avgCorneringG,
+            smoothnessScore = :smoothnessScore,
+            roadRoughnessIndex = :roadRoughnessIndex,
+            brakingEfficiencyScore = :brakingEfficiencyScore,
+            elevationAdjustedAvgSpeedMps = :elevationAdjustedAvgSpeedMps
+        WHERE id = :trackId
+    """)
+    suspend fun updateInsights(
+        trackId: String,
+        peakCorneringG: Double?,
+        avgCorneringG: Double?,
+        smoothnessScore: Int?,
+        roadRoughnessIndex: Double?,
+        brakingEfficiencyScore: Int?,
+        elevationAdjustedAvgSpeedMps: Double?,
+    )
+
+    @Query("SELECT AVG(smoothnessScore) FROM tracks WHERE smoothnessScore IS NOT NULL")
+    suspend fun getAvgSmoothnessScore(): Double?
+
+    @Query("SELECT MAX(peakCorneringG) FROM tracks WHERE peakCorneringG IS NOT NULL")
+    suspend fun getLifetimePeakCorneringG(): Double?
+
+    @Query("SELECT AVG(brakingEfficiencyScore) FROM tracks WHERE brakingEfficiencyScore IS NOT NULL")
+    suspend fun getAvgBrakingEfficiency(): Double?
 }
