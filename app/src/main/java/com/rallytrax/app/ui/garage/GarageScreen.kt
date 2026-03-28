@@ -23,8 +23,13 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -65,6 +70,14 @@ import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.data.preferences.UserPreferencesData
+
+internal fun vehicleTypeIcon(vehicleType: String): ImageVector = when (vehicleType) {
+    "MOTORCYCLE" -> Icons.Filled.TwoWheeler
+    "TRUCK" -> Icons.Filled.LocalShipping
+    "SUV" -> Icons.Filled.Terrain
+    "OTHER" -> Icons.Filled.MoreHoriz
+    else -> Icons.Filled.DirectionsCar
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -272,6 +285,15 @@ private fun VehicleCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    }
+                    if (vehicle.vehicleType != "CAR") {
+                        Icon(
+                            imageVector = vehicleTypeIcon(vehicle.vehicleType),
+                            contentDescription = vehicle.vehicleType,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                     }
                     if (vehicle.isActive) {
                         Icon(

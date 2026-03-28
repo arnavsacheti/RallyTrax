@@ -236,7 +236,7 @@ private fun OverviewTab(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.DirectionsCar,
+                            imageVector = vehicleTypeIcon(vehicle.vehicleType),
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -875,6 +875,7 @@ private fun SpecsGrid(vehicle: VehicleEntity, totalDistanceM: Double, unitSystem
         add("Make" to vehicle.make)
         add("Model" to vehicle.model)
         vehicle.trim?.let { add("Trim" to it) }
+        if (vehicle.vehicleType != "CAR") add("Type" to vehicle.vehicleType.lowercase().replaceFirstChar { it.uppercase() })
         vehicle.engineDisplacementL?.let { add("Engine" to "${it}L") }
         vehicle.cylinders?.let { add("Cylinders" to it.toString()) }
         vehicle.horsePower?.let { add("Horsepower" to "${it} hp") }
@@ -887,6 +888,9 @@ private fun SpecsGrid(vehicle: VehicleEntity, totalDistanceM: Double, unitSystem
         vehicle.epaHwyMpg?.let { add("EPA Hwy" to "${it.toInt()} mpg") }
         vehicle.epaCombinedMpg?.let { add("EPA Combined" to "${it.toInt()} mpg") }
         vehicle.curbWeightKg?.let { add("Weight" to "${it.toInt()} kg") }
+        vehicle.oilType?.let { add("Oil" to it) }
+        vehicle.engineConfiguration?.let { add("Engine Config" to it) }
+        vehicle.wheelDiameter?.let { add("Wheels" to "${it}\"") }
         vehicle.tireSize?.let { add("Tires" to it) }
         add("Odometer" to formatDistance(vehicle.odometerKm * 1000, unitSystem))
         if (totalDistanceM > 0) {

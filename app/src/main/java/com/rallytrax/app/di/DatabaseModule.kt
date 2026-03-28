@@ -51,6 +51,7 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_14_15,
                 RallyTraxDatabase.MIGRATION_15_16,
                 RallyTraxDatabase.MIGRATION_16_17,
+                RallyTraxDatabase.MIGRATION_17_18,
             )
             .build()
     }
