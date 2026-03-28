@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,6 +66,7 @@ import com.rallytrax.app.util.speedUnit
 fun VehicleDetailScreen(
     onBack: () -> Unit = {},
     onTrackClick: (String) -> Unit = {},
+    onEdit: (String) -> Unit = {},
     viewModel: VehicleDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,6 +92,12 @@ fun VehicleDetailScreen(
                 },
                 actions = {
                     if (vehicle != null) {
+                        IconButton(onClick = { onEdit(vehicle.id) }) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Edit vehicle",
+                            )
+                        }
                         IconButton(onClick = { viewModel.toggleActive() }) {
                             Icon(
                                 imageVector = if (vehicle.isActive) Icons.Filled.Star else Icons.Outlined.StarOutline,

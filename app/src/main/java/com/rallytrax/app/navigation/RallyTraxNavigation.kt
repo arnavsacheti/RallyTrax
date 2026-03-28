@@ -9,6 +9,7 @@ import androidx.navigation.toRoute
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.ui.explore.ExploreScreen
 import com.rallytrax.app.ui.garage.GarageScreen
+import com.rallytrax.app.ui.garage.EditVehicleScreen
 import com.rallytrax.app.ui.garage.VehicleDetailScreen
 import com.rallytrax.app.ui.home.HomeScreen
 import com.rallytrax.app.ui.library.LibraryScreen
@@ -154,6 +155,14 @@ fun RallyTraxNavHost(
                 onTrackClick = { trackId ->
                     navController.navigate(TrackDetailRoute(trackId))
                 },
+                onEdit = { vehicleId ->
+                    navController.navigate(EditVehicleRoute(vehicleId))
+                },
+            )
+        }
+        composable<EditVehicleRoute> {
+            EditVehicleScreen(
+                onBack = { navController.popBackStack() },
             )
         }
         composable<ReplayRoute> {
