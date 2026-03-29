@@ -268,12 +268,13 @@ fun ReplayHudScreen(
                 if (uiState.isActive && uiState.nextNote != null && !uiState.isFinished) {
                     val note = uiState.nextNote!!
                     val severityBg = PaceNoteIconRenderer.severityColor(note.noteType, note.severity).copy(alpha = 0.15f)
+                    val noteTopPadding = if (uiState.isOffRoute) 160.dp else 100.dp
 
                     Card(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 100.dp),
+                            .padding(start = 16.dp, end = 16.dp, top = noteTopPadding),
                         colors = CardDefaults.cardColors(containerColor = severityBg),
                         shape = RoundedCornerShape(16.dp),
                     ) {
