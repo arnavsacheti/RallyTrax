@@ -109,6 +109,8 @@ import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.pacenotes.SegmentMatcher
 import com.rallytrax.app.recording.LatLng
 import com.rallytrax.app.ui.components.GoalRing
+import com.rallytrax.app.ui.components.Sparkline
+import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
@@ -1571,50 +1573,103 @@ private fun SegmentsCard(
             // Segment list (show first 5)
             for (segment in segments.take(5)) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onSegmentClick(segment.segmentId) }
                         .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (segment.isFavorite) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (segment.isFavorite) {
+                                    Text(
+                                        text = "\u2605 ",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
                                 Text(
-                                    text = "\u2605 ",
-                                    color = MaterialTheme.colorScheme.primary,
+                                    text = segment.name,
                                     style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                             }
                             Text(
-                                text = segment.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                text = "${formatDistance(segment.distanceMeters, unitSystem)} \u2022 ${segment.runCount} run${if (segment.runCount != 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Text(
-                            text = "${formatDistance(segment.distanceMeters, unitSystem)} \u2022 ${segment.runCount} run${if (segment.runCount != 1) "s" else ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = formatElapsedTime(segment.thisRunDurationMs),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        segment.bestTimeMs?.let { best ->
+                        Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "Best: ${formatElapsedTime(best)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (segment.thisRunDurationMs <= best) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                                text = formatElapsedTime(segment.thisRunDurationMs),
+                                style = MaterialTheme.typography.bodyMedium,
                             )
+                            segment.bestTimeMs?.let { best ->
+                                Text(
+                                    text = "Best: ${formatElapsedTime(best)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (segment.thisRunDurationMs <= best) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    if (segment.recentRunTimesMs.size >= 2 || segment.consistencyScore != null || segment.latestDeltaFromBest != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (segment.recentRunTimesMs.size >= 2) {
+                                Sparkline(
+                                    data = segment.recentRunTimesMs.map { it.toFloat() },
+                                    modifier = Modifier
+                                        .width(60.dp)
+                                        .height(24.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fillAlpha = 0.15f,
+                                )
+                            }
+
+                            segment.consistencyScore?.let { score ->
+                                val badgeColor = when {
+                                    score >= 80 -> MaterialTheme.rallyTraxColors.speedSafe
+                                    score >= 55 -> MaterialTheme.rallyTraxColors.fuelWarning
+                                    else -> MaterialTheme.rallyTraxColors.speedDanger
+                                }
+                                ColorBadge(text = "${score}%", color = badgeColor)
+                            }
+
+                            segment.latestDeltaFromBest?.let { delta ->
+                                if (delta != 0L) {
+                                    val isImprovement = delta < 0
+                                    val deltaColor = if (isImprovement) {
+                                        MaterialTheme.rallyTraxColors.speedSafe
+                                    } else {
+                                        MaterialTheme.rallyTraxColors.speedDanger
+                                    }
+                                    val sign = if (isImprovement) "-" else "+"
+                                    val absDelta = abs(delta)
+                                    val deltaSeconds = absDelta / 1000.0
+                                    val deltaText = if (deltaSeconds < 60) {
+                                        "${sign}${String.format(java.util.Locale.US, "%.1f", deltaSeconds)}s"
+                                    } else {
+                                        "${sign}${formatElapsedTime(absDelta)}"
+                                    }
+                                    ColorBadge(text = deltaText, color = deltaColor)
+                                }
+                            }
                         }
                     }
                 }
@@ -2303,4 +2358,20 @@ private fun RollRateChart(data: List<RollRatePoint>, modifier: Modifier = Modifi
             )
         }
     }
+}
+
+@Composable
+private fun ColorBadge(text: String, color: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .background(
+                color = color.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(4.dp),
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
