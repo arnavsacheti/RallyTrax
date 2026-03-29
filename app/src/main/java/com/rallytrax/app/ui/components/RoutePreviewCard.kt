@@ -24,6 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.ui.theme.DifficultyAmber
+import com.rallytrax.app.ui.theme.DifficultyGreen
+import com.rallytrax.app.ui.theme.DifficultyOrange
+import com.rallytrax.app.ui.theme.DifficultyRed
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 
@@ -88,12 +92,12 @@ fun RoutePreviewCard(
 }
 
 @Composable
-private fun DifficultyChip(difficulty: String) {
+internal fun DifficultyChip(difficulty: String) {
     val color = when (difficulty) {
-        "Casual" -> Color(0xFF34A853)
-        "Moderate" -> Color(0xFFFBBC04)
-        "Spirited" -> Color(0xFFE8710A)
-        "Expert" -> Color(0xFFEA4335)
+        "Casual" -> DifficultyGreen
+        "Moderate" -> DifficultyAmber
+        "Spirited" -> DifficultyOrange
+        "Expert" -> DifficultyRed
         else -> Color.Gray
     }
     Box(
@@ -111,7 +115,7 @@ private fun DifficultyChip(difficulty: String) {
 }
 
 @Composable
-private fun StatLabel(label: String, value: String) {
+internal fun StatLabel(label: String, value: String) {
     Column {
         Text(
             text = value,
@@ -127,7 +131,7 @@ private fun StatLabel(label: String, value: String) {
 }
 
 @Composable
-private fun SurfaceBreakdownBar(breakdown: String) {
+internal fun SurfaceBreakdownBar(breakdown: String) {
     // Parse "Paved:72,Gravel:20,Dirt:8"
     val segments = breakdown.split(",").mapNotNull { segment ->
         val parts = segment.trim().split(":")
@@ -149,11 +153,11 @@ private fun SurfaceBreakdownBar(breakdown: String) {
     ) {
         segments.forEach { (type, pct) ->
             val color = when (type.lowercase()) {
-                "paved", "tarmac" -> Color(0xFF607D8B)
-                "gravel" -> Color(0xFFD4A574)
-                "dirt" -> Color(0xFF8B6914)
-                "cobblestone" -> Color(0xFF9E9E9E)
-                else -> Color(0xFFBDBDBD)
+                "paved", "tarmac" -> com.rallytrax.app.ui.theme.SurfacePaved
+                "gravel" -> com.rallytrax.app.ui.theme.SurfaceGravel
+                "dirt" -> com.rallytrax.app.ui.theme.SurfaceDirt
+                "cobblestone" -> com.rallytrax.app.ui.theme.SurfaceCobblestone
+                else -> com.rallytrax.app.ui.theme.SurfaceUnknown
             }
             val fraction = (pct / totalPct).toFloat()
             Box(

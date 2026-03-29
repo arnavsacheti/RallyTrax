@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.gpx.GpxParseException
-import com.rallytrax.app.data.gpx.GpxParser
 import com.rallytrax.app.data.local.GridCellComputer
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
@@ -25,7 +24,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,6 +36,10 @@ enum class SortOption(val label: String) {
     DISTANCE_SHORTEST("Shortest distance"),
     DURATION_LONGEST("Longest duration"),
     DURATION_SHORTEST("Shortest duration"),
+    ELEVATION_MOST("Most elevation"),
+    ELEVATION_LEAST("Least elevation"),
+    DIFFICULTY_HARDEST("Hardest first"),
+    DIFFICULTY_EASIEST("Easiest first"),
 }
 
 data class LibraryUiState(
@@ -48,13 +50,45 @@ data class LibraryUiState(
     val availableTags: Set<String> = emptySet(),
     val selectedTrackIds: Set<String> = emptySet(),
     val isMultiSelectMode: Boolean = false,
-    // Route classification filters
+    // Category filters
     val selectedRouteTypes: Set<String> = emptySet(),
     val selectedDifficulties: Set<String> = emptySet(),
     val selectedSurfaces: Set<String> = emptySet(),
     val availableRouteTypes: Set<String> = emptySet(),
     val availableDifficulties: Set<String> = emptySet(),
     val availableSurfaces: Set<String> = emptySet(),
+    // Range filters
+    val distanceRange: ClosedFloatingPointRange<Float>? = null,
+    val elevationRange: ClosedFloatingPointRange<Float>? = null,
+    val durationRange: ClosedFloatingPointRange<Float>? = null,
+    val maxDistance: Float = 0f,
+    val maxElevation: Float = 0f,
+    val maxDuration: Float = 0f,
+    // Proximity
+    val nearMeFilter: NearMeFilter? = null,
+    // Attempt counts
+    val attemptCounts: Map<String, Int> = emptyMap(),
+    // Active filter summary
+    val activeFilterCount: Int = 0,
+)
+
+private data class CategoryFilters(
+    val selectedTags: Set<String>,
+    val selectedRouteTypes: Set<String>,
+    val selectedDifficulties: Set<String>,
+    val selectedSurfaces: Set<String>,
+)
+
+private data class RangeFilters(
+    val distanceRange: ClosedFloatingPointRange<Float>?,
+    val elevationRange: ClosedFloatingPointRange<Float>?,
+    val durationRange: ClosedFloatingPointRange<Float>?,
+    val nearMeFilter: NearMeFilter?,
+)
+
+private data class SelectionState(
+    val selectedTrackIds: Set<String>,
+    val isMultiSelectMode: Boolean,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -79,6 +113,10 @@ class LibraryViewModel @Inject constructor(
     private val _selectedRouteTypes = MutableStateFlow<Set<String>>(emptySet())
     private val _selectedDifficulties = MutableStateFlow<Set<String>>(emptySet())
     private val _selectedSurfaces = MutableStateFlow<Set<String>>(emptySet())
+    private val _distanceRange = MutableStateFlow<ClosedFloatingPointRange<Float>?>(null)
+    private val _elevationRange = MutableStateFlow<ClosedFloatingPointRange<Float>?>(null)
+    private val _durationRange = MutableStateFlow<ClosedFloatingPointRange<Float>?>(null)
+    private val _nearMeFilter = MutableStateFlow<NearMeFilter?>(null)
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()
@@ -95,47 +133,153 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    private val categoryFilters = combine(
+        _selectedTags,
+        _selectedRouteTypes,
+        _selectedDifficulties,
+        _selectedSurfaces,
+        ::CategoryFilters,
+    )
+
+    private val rangeFilters = combine(
+        _distanceRange,
+        _elevationRange,
+        _durationRange,
+        _nearMeFilter,
+        ::RangeFilters,
+    )
+
+    private val selectionState = combine(
+        _selectedTrackIds,
+        _isMultiSelectMode,
+        ::SelectionState,
+    )
+
     val uiState: StateFlow<LibraryUiState> = combine(
         allTracks,
         _searchQuery,
-        _sortOption,
-        _selectedTags,
-        _selectedTrackIds,
-    ) { tracks, query, sort, tags, selectedIds ->
-        // Collect all available tags
+        combine(_sortOption, selectionState, ::Pair),
+        categoryFilters,
+        rangeFilters,
+    ) { tracks, query, (sort, selection), catFilters, rngFilters ->
+        // Compute available values from ALL tracks (before filtering)
         val availableTags = tracks
             .flatMap { it.tags.split(",").map { t -> t.trim() } }
             .filter { it.isNotBlank() }
             .toSet()
+        val availableRouteTypes = tracks.mapNotNull { it.routeType }.filter { it.isNotBlank() }.toSortedSet()
+        val availableDifficulties = tracks.mapNotNull { it.difficultyRating }.filter { it.isNotBlank() }.toSortedSet()
+        val availableSurfaces = tracks.mapNotNull { it.primarySurface }.filter { it.isNotBlank() }.toSortedSet()
 
-        // Filter by selected tags
-        val filteredByTags = if (tags.isEmpty()) {
-            tracks
-        } else {
-            tracks.filter { track ->
+        // Compute range bounds
+        val maxDistance = tracks.maxOfOrNull { it.distanceMeters.toFloat() } ?: 0f
+        val maxElevation = tracks.maxOfOrNull { it.elevationGainM.toFloat() } ?: 0f
+        val maxDuration = tracks.maxOfOrNull { it.durationMs.toFloat() } ?: 0f
+
+        // Compute attempt counts (group by name)
+        val attemptCounts = tracks.groupingBy { it.name }.eachCount()
+
+        // Sequential filter pipeline
+        var filtered = tracks
+
+        // Tag filter
+        if (catFilters.selectedTags.isNotEmpty()) {
+            filtered = filtered.filter { track ->
                 val trackTags = track.tags.split(",").map { it.trim() }.toSet()
-                tags.any { it in trackTags }
+                catFilters.selectedTags.any { it in trackTags }
+            }
+        }
+
+        // Route type filter
+        if (catFilters.selectedRouteTypes.isNotEmpty()) {
+            filtered = filtered.filter { it.routeType in catFilters.selectedRouteTypes }
+        }
+
+        // Difficulty filter
+        if (catFilters.selectedDifficulties.isNotEmpty()) {
+            filtered = filtered.filter { it.difficultyRating in catFilters.selectedDifficulties }
+        }
+
+        // Surface filter
+        if (catFilters.selectedSurfaces.isNotEmpty()) {
+            filtered = filtered.filter { it.primarySurface in catFilters.selectedSurfaces }
+        }
+
+        // Distance range filter
+        rngFilters.distanceRange?.let { range ->
+            filtered = filtered.filter { it.distanceMeters.toFloat() in range }
+        }
+
+        // Elevation range filter
+        rngFilters.elevationRange?.let { range ->
+            filtered = filtered.filter { it.elevationGainM.toFloat() in range }
+        }
+
+        // Duration range filter
+        rngFilters.durationRange?.let { range ->
+            filtered = filtered.filter { it.durationMs.toFloat() in range }
+        }
+
+        // Near Me proximity filter
+        rngFilters.nearMeFilter?.let { nearMe ->
+            val bbox = nearMe.toBoundingBox()
+            filtered = filtered.filter { track ->
+                bbox.overlaps(
+                    track.boundingBoxNorthLat, track.boundingBoxSouthLat,
+                    track.boundingBoxEastLon, track.boundingBoxWestLon,
+                )
             }
         }
 
         // Sort
         val sorted = when (sort) {
-            SortOption.DATE_NEWEST -> filteredByTags.sortedByDescending { it.recordedAt }
-            SortOption.DATE_OLDEST -> filteredByTags.sortedBy { it.recordedAt }
-            SortOption.DISTANCE_LONGEST -> filteredByTags.sortedByDescending { it.distanceMeters }
-            SortOption.DISTANCE_SHORTEST -> filteredByTags.sortedBy { it.distanceMeters }
-            SortOption.DURATION_LONGEST -> filteredByTags.sortedByDescending { it.durationMs }
-            SortOption.DURATION_SHORTEST -> filteredByTags.sortedBy { it.durationMs }
+            SortOption.DATE_NEWEST -> filtered.sortedByDescending { it.recordedAt }
+            SortOption.DATE_OLDEST -> filtered.sortedBy { it.recordedAt }
+            SortOption.DISTANCE_LONGEST -> filtered.sortedByDescending { it.distanceMeters }
+            SortOption.DISTANCE_SHORTEST -> filtered.sortedBy { it.distanceMeters }
+            SortOption.DURATION_LONGEST -> filtered.sortedByDescending { it.durationMs }
+            SortOption.DURATION_SHORTEST -> filtered.sortedBy { it.durationMs }
+            SortOption.ELEVATION_MOST -> filtered.sortedByDescending { it.elevationGainM }
+            SortOption.ELEVATION_LEAST -> filtered.sortedBy { it.elevationGainM }
+            SortOption.DIFFICULTY_HARDEST -> filtered.sortedByDescending { com.rallytrax.app.data.classification.RouteClassifier.difficultyOrdinal(it.difficultyRating) }
+            SortOption.DIFFICULTY_EASIEST -> filtered.sortedBy { com.rallytrax.app.data.classification.RouteClassifier.difficultyOrdinal(it.difficultyRating) }
         }
+
+        // Active filter count
+        val activeFilterCount = listOf(
+            catFilters.selectedTags.isNotEmpty(),
+            catFilters.selectedRouteTypes.isNotEmpty(),
+            catFilters.selectedDifficulties.isNotEmpty(),
+            catFilters.selectedSurfaces.isNotEmpty(),
+            rngFilters.distanceRange != null,
+            rngFilters.elevationRange != null,
+            rngFilters.durationRange != null,
+            rngFilters.nearMeFilter != null,
+        ).count { it }
 
         LibraryUiState(
             tracks = sorted,
             searchQuery = query,
             sortOption = sort,
-            selectedTags = tags,
+            selectedTags = catFilters.selectedTags,
             availableTags = availableTags,
-            selectedTrackIds = selectedIds,
-            isMultiSelectMode = _isMultiSelectMode.value,
+            selectedTrackIds = selection.selectedTrackIds,
+            isMultiSelectMode = selection.isMultiSelectMode,
+            selectedRouteTypes = catFilters.selectedRouteTypes,
+            selectedDifficulties = catFilters.selectedDifficulties,
+            selectedSurfaces = catFilters.selectedSurfaces,
+            availableRouteTypes = availableRouteTypes,
+            availableDifficulties = availableDifficulties,
+            availableSurfaces = availableSurfaces,
+            distanceRange = rngFilters.distanceRange,
+            elevationRange = rngFilters.elevationRange,
+            durationRange = rngFilters.durationRange,
+            maxDistance = maxDistance,
+            maxElevation = maxElevation,
+            maxDuration = maxDuration,
+            nearMeFilter = rngFilters.nearMeFilter,
+            attemptCounts = attemptCounts,
+            activeFilterCount = activeFilterCount,
         )
     }.stateIn(
         viewModelScope,
@@ -177,6 +321,33 @@ class LibraryViewModel @Inject constructor(
         _selectedSurfaces.value = _selectedSurfaces.value.let { current ->
             if (surface in current) current - surface else current + surface
         }
+    }
+
+    fun updateDistanceRange(range: ClosedFloatingPointRange<Float>?) {
+        _distanceRange.value = range
+    }
+
+    fun updateElevationRange(range: ClosedFloatingPointRange<Float>?) {
+        _elevationRange.value = range
+    }
+
+    fun updateDurationRange(range: ClosedFloatingPointRange<Float>?) {
+        _durationRange.value = range
+    }
+
+    fun updateNearMeFilter(filter: NearMeFilter?) {
+        _nearMeFilter.value = filter
+    }
+
+    fun clearAllFilters() {
+        _selectedTags.value = emptySet()
+        _selectedRouteTypes.value = emptySet()
+        _selectedDifficulties.value = emptySet()
+        _selectedSurfaces.value = emptySet()
+        _distanceRange.value = null
+        _elevationRange.value = null
+        _durationRange.value = null
+        _nearMeFilter.value = null
     }
 
     // --- Multi-select ---
@@ -246,7 +417,6 @@ class LibraryViewModel @Inject constructor(
         // Undo only the most recent (last) pending delete
         val pending = _pendingDeletes.value
         if (pending.isEmpty()) return
-        val restored = pending.last()
         val rest = pending.dropLast(1)
         // Confirm all prior ones, undo the last
         if (rest.isNotEmpty()) {
@@ -316,4 +486,5 @@ class LibraryViewModel @Inject constructor(
             }
         }
     }
+
 }
