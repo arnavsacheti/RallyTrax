@@ -7,9 +7,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -18,10 +16,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,21 +28,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,13 +47,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,11 +63,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -81,11 +75,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
-import com.rallytrax.app.ui.components.GoalRing
-import com.rallytrax.app.ui.components.Sparkline
 import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.theme.rallyTraxColors
-import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 
@@ -104,7 +95,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val dashboard by viewModel.dashboardState.collectAsStateWithLifecycle()
+    val feedState by viewModel.feedState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -138,6 +129,21 @@ fun HomeScreen(
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
+    fun requestRecording() {
+        if (hasLocationPermission) {
+            onStartRecording()
+        } else {
+            val perms = mutableListOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            permissionLauncher.launch(perms.toTypedArray())
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
             snackbarHostState.showSnackbar(message)
@@ -163,18 +169,7 @@ fun HomeScreen(
                 onToggle = { isFabMenuExpanded = !isFabMenuExpanded },
                 onRecord = {
                     isFabMenuExpanded = false
-                    if (hasLocationPermission) {
-                        onStartRecording()
-                    } else {
-                        val permissions = mutableListOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION,
-                        )
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                        permissionLauncher.launch(permissions.toTypedArray())
-                    }
+                    requestRecording()
                 },
                 onReplay = {
                     isFabMenuExpanded = false
@@ -194,140 +189,97 @@ fun HomeScreen(
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Sign in card (shown when not signed in)
+                // Sign-in card
                 if (!isSignedIn) {
-                    GoogleSignInCard(authState = authState, onClick = onSignIn)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    item(key = "sign_in") {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        GoogleSignInCard(authState = authState, onClick = onSignIn)
+                    }
                 }
 
                 // Vehicle filter chip
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    androidx.compose.material3.FilterChip(
-                        selected = dashboard.showActiveVehicleOnly,
-                        onClick = { viewModel.toggleVehicleFilter() },
-                        label = {
-                            Text(
-                                text = if (dashboard.showActiveVehicleOnly) {
-                                    dashboard.activeVehicleName ?: "Active Vehicle"
-                                } else {
-                                    "All Vehicles"
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        },
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 1. Focus Metrics Row (horizontal scroll)
-                FocusMetricsRow(
-                    totalDistance = formatDistance(dashboard.totalDistanceMeters, preferences.unitSystem),
-                    tracksThisWeek = dashboard.tracksThisWeek,
-                    longestRoute = formatDistance(dashboard.longestRouteMeters, preferences.unitSystem),
-                    sparklineData = dashboard.sparklineData,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Maintenance due warning — dashboard indicator light style
-                if (dashboard.maintenanceDueCount > 0) {
-                    Card(
+                item(key = "vehicle_filter") {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ),
+                        horizontalArrangement = Arrangement.End,
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            // Warning light indicator
-                            val maintenanceColor = MaterialTheme.rallyTraxColors.maintenanceDue
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(
-                                        maintenanceColor.copy(alpha = 0.15f),
-                                        androidx.compose.foundation.shape.CircleShape,
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Build,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = maintenanceColor,
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
+                        androidx.compose.material3.FilterChip(
+                            selected = feedState.showActiveVehicleOnly,
+                            onClick = { viewModel.toggleVehicleFilter() },
+                            label = {
                                 Text(
-                                    text = "Maintenance Due",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
+                                    text = if (feedState.showActiveVehicleOnly) {
+                                        feedState.activeVehicleName ?: "Active Vehicle"
+                                    } else {
+                                        "All Vehicles"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
                                 )
-                                Text(
-                                    text = "${dashboard.maintenanceDueCount} service${if (dashboard.maintenanceDueCount != 1) "s" else ""} due or overdue",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                            },
+                        )
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // 2. Motivational card (< 3 tracks) OR Recent Drives + Weekly Chart
-                if (dashboard.totalTrackCount < 3) {
-                    MotivationalCard(onRecord = {
-                        if (hasLocationPermission) {
-                            onStartRecording()
-                        } else {
-                            val perms = mutableListOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            )
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                perms.add(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                            permissionLauncher.launch(perms.toTypedArray())
-                        }
-                    })
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // 3. Recent Drives Card
-                if (dashboard.recentTracks.isNotEmpty()) {
-                    RecentDrivesCard(
-                        tracks = dashboard.recentTracks,
-                        unitSystem = preferences.unitSystem,
-                        onTrackClick = onTrackClick,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // 4. Weekly Summary Bar Chart
-                if (dashboard.dailyDistances.any { it.distanceMeters > 0 }) {
-                    WeeklyDistanceChart(
-                        dailyDistances = dashboard.dailyDistances,
+                // Weekly summary strip
+                item(key = "weekly_summary") {
+                    WeeklySummaryStrip(
+                        summary = feedState.weeklySummary,
                         unitSystem = preferences.unitSystem,
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+                // Maintenance warning
+                if (feedState.maintenanceDueCount > 0) {
+                    item(key = "maintenance") {
+                        MaintenanceWarningCard(dueCount = feedState.maintenanceDueCount)
+                    }
+                }
+
+                // Motivational card for new users
+                if (feedState.totalStintCount < 3) {
+                    item(key = "motivational") {
+                        MotivationalCard(onRecord = { requestRecording() })
+                    }
+                }
+
+                // Activity feed
+                if (feedState.feedItems.isEmpty() && feedState.totalStintCount >= 3) {
+                    item(key = "empty_feed") {
+                        Text(
+                            text = "No drives match the current filter",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                        )
+                    }
+                }
+
+                items(
+                    items = feedState.feedItems,
+                    key = { it.track.id },
+                ) { feedItem ->
+                    ActivityFeedCard(
+                        feedItem = feedItem,
+                        unitSystem = preferences.unitSystem,
+                        onClick = { onTrackClick(feedItem.track.id) },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                // Bottom spacer for FAB
+                item(key = "fab_spacer") {
+                    Spacer(modifier = Modifier.height(72.dp))
+                }
             }
 
             // Scrim when FAB menu is expanded
@@ -357,89 +309,128 @@ fun HomeScreen(
     }
 }
 
-// ── Focus Metrics Row ────────────────────────────────────────────────────────
+// ── Weekly Summary Strip ──────────────────────────────────────────────────────
 
 @Composable
-private fun FocusMetricsRow(
-    totalDistance: String,
-    tracksThisWeek: Int,
-    longestRoute: String,
-    sparklineData: List<Float> = emptyList(),
+private fun WeeklySummaryStrip(
+    summary: WeeklySummary,
+    unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        shape = MaterialTheme.shapes.medium,
     ) {
-        FocusMetricCard(
-            icon = Icons.Filled.Route,
-            label = "Total Distance",
-            value = totalDistance,
-            sparklineData = sparklineData,
-        )
-        FocusMetricCard(
-            icon = Icons.Filled.Speed,
-            label = "This Week",
-            value = "$tracksThisWeek track${if (tracksThisWeek != 1) "s" else ""}",
-        )
-        FocusMetricCard(
-            icon = Icons.Filled.Straighten,
-            label = "Longest Route",
-            value = longestRoute,
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SummaryMetric(
+                label = "This Week",
+                value = formatDistance(summary.totalDistanceMeters, unitSystem),
+                modifier = Modifier.weight(1f),
+            )
+            VerticalDivider(
+                modifier = Modifier.height(32.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+            )
+            SummaryMetric(
+                label = "Drives",
+                value = summary.driveCount.toString(),
+                modifier = Modifier.weight(1f),
+            )
+            VerticalDivider(
+                modifier = Modifier.height(32.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+            )
+            SummaryMetric(
+                label = "Time",
+                value = formatElapsedTime(summary.totalDurationMs),
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
 @Composable
-private fun FocusMetricCard(
-    icon: ImageVector,
+private fun SummaryMetric(
     label: String,
     value: String,
-    sparklineData: List<Float>? = null,
+    modifier: Modifier = Modifier,
 ) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+        )
+    }
+}
+
+// ── Maintenance Warning Card ──────────────────────────────────────────────────
+
+@Composable
+private fun MaintenanceWarningCard(dueCount: Int) {
     Card(
-        modifier = Modifier.width(160.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-            )
-            if (sparklineData != null && sparklineData.size >= 2 && sparklineData.any { it > 0f }) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Sparkline(
-                    data = sparklineData,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fillAlpha = 0.15f,
+            val maintenanceColor = MaterialTheme.rallyTraxColors.maintenanceDue
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(
+                        maintenanceColor.copy(alpha = 0.15f),
+                        androidx.compose.foundation.shape.CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Build,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = maintenanceColor,
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Maintenance Due",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "$dueCount service${if (dueCount != 1) "s" else ""} due or overdue",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
 }
 
-// ── Motivational Card (< 3 tracks) ──────────────────────────────────────────
+// ── Motivational Card ─────────────────────────────────────────────────────────
 
 @Composable
 private fun MotivationalCard(onRecord: () -> Unit) {
@@ -484,174 +475,7 @@ private fun MotivationalCard(onRecord: () -> Unit) {
     }
 }
 
-// ── Recent Drives Card ──────────────────────────────────────────────────────
-
-@Composable
-private fun RecentDrivesCard(
-    tracks: List<com.rallytrax.app.data.local.entity.TrackEntity>,
-    unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
-    onTrackClick: (String) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Recent Drives",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            tracks.forEachIndexed { index, track ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onTrackClick(track.id) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = track.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text(
-                                text = formatDistance(track.distanceMeters, unitSystem),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = formatElapsedTime(track.durationMs),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = formatDate(track.recordedAt),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Icon(
-                        imageVector = Icons.Filled.ChevronRight,
-                        contentDescription = "View",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (index < tracks.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Weekly Distance Bar Chart ───────────────────────────────────────────────
-
-@Composable
-private fun WeeklyDistanceChart(
-    dailyDistances: List<DailyDistance>,
-    unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
-) {
-    val maxDistance = dailyDistances.maxOfOrNull { it.distanceMeters } ?: 1.0
-    val totalWeekly = dailyDistances.sumOf { it.distanceMeters }
-
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "This Week",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = formatDistance(totalWeekly, unitSystem),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Bar chart
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                dailyDistances.forEach { day ->
-                    val fraction = if (maxDistance > 0) {
-                        (day.distanceMeters / maxDistance).toFloat().coerceIn(0f, 1f)
-                    } else {
-                        0f
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        // Bar
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(0.5f),
-                            contentAlignment = Alignment.BottomCenter,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxSize(fraction.coerceAtLeast(0.02f))
-                                    .background(
-                                        if (fraction > 0f) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outlineVariant,
-                                        MaterialTheme.shapes.small,
-                                    ),
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        // Day label
-                        Text(
-                            text = day.dayLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── FAB Menu ────────────────────────────────────────────────────────────────
+// ── FAB Menu ──────────────────────────────────────────────────────────────────
 
 @Composable
 private fun RallyTraxFabMenu(

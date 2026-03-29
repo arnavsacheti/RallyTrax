@@ -79,3 +79,27 @@ fun formatDateTime(epochMs: Long): String {
     val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a", Locale.US)
     return formatter.format(dateTime)
 }
+
+fun formatRelativeTime(epochMs: Long): String {
+    val now = Instant.now()
+    val zone = ZoneId.systemDefault()
+    val diffMs = now.toEpochMilli() - epochMs
+    val diffMinutes = diffMs / 60_000
+    val diffHours = diffMs / 3_600_000
+
+    val recordedDate = Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
+    val today = now.atZone(zone).toLocalDate()
+
+    return when {
+        diffMinutes < 1 -> "Just now"
+        diffMinutes < 60 -> "${diffMinutes}m ago"
+        recordedDate == today -> "${diffHours}h ago"
+        recordedDate == today.minusDays(1) -> "Yesterday"
+        recordedDate.year == today.year -> {
+            recordedDate.format(DateTimeFormatter.ofPattern("MMM d", Locale.US))
+        }
+        else -> {
+            recordedDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
+        }
+    }
+}

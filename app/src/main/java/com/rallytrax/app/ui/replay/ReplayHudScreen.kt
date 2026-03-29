@@ -1,7 +1,12 @@
 package com.rallytrax.app.ui.replay
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -109,6 +114,25 @@ fun ReplayHudScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     var showExitDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissions ->
+        hasLocationPermission = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        if (hasLocationPermission) {
+            viewModel.startReplay()
+        }
+    }
 
     // Force dark status bar
     val view = LocalView.current
@@ -329,7 +353,20 @@ fun ReplayHudScreen(
                         if (!uiState.isFinished) {
                             FilledTonalButton(
                                 onClick = {
-                                    if (uiState.isActive) viewModel.stopReplay() else viewModel.startReplay()
+                                    if (uiState.isActive) {
+                                        viewModel.stopReplay()
+                                    } else if (hasLocationPermission) {
+                                        viewModel.startReplay()
+                                    } else {
+                                        val perms = mutableListOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                                        )
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                                        }
+                                        permissionLauncher.launch(perms.toTypedArray())
+                                    }
                                 },
                                 shape = RoundedCornerShape(20.dp),
                             ) {
