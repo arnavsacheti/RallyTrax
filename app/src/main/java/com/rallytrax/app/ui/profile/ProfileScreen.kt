@@ -1,6 +1,8 @@
 package com.rallytrax.app.ui.profile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -45,6 +48,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.rallytrax.app.data.auth.AuthState
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.CalendarHeatmap
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
@@ -214,6 +218,14 @@ fun ProfileScreen(
 
             // Driving Trends Card
             DrivingTrendsCard(profile = profile)
+
+            if (profile.vehicleComparison.size >= 2) {
+                Spacer(modifier = Modifier.height(16.dp))
+                VehicleComparisonCard(
+                    vehicleStats = profile.vehicleComparison,
+                    unitSystem = preferences.unitSystem,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -485,6 +497,72 @@ private fun HeroStatCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun VehicleComparisonCard(
+    vehicleStats: List<VehicleStats>,
+    unitSystem: UnitSystem,
+    modifier: Modifier = Modifier,
+) {
+    val maxDistance = vehicleStats.maxOfOrNull { it.totalDistanceMeters } ?: 1.0
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Vehicle Comparison",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            vehicleStats.forEach { stats ->
+                val fraction = if (maxDistance > 0) {
+                    (stats.totalDistanceMeters / maxDistance).toFloat().coerceIn(0f, 1f)
+                } else 0f
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stats.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${stats.driveCount}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = formatDistance(stats.totalDistanceMeters, unitSystem),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                )
+            }
         }
     }
 }
