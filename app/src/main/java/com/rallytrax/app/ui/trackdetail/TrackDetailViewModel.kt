@@ -15,6 +15,7 @@ import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.data.analytics.CrossSensorAnalytics
 import com.rallytrax.app.data.classification.ValhallaRouteClient
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
@@ -113,6 +114,13 @@ data class TrackDetailUiState(
     val lateralGProfile: List<LateralGPoint> = emptyList(),
     val yawRateProfile: List<YawRatePoint> = emptyList(),
     val rollRateProfile: List<RollRatePoint> = emptyList(),
+    // Driving insights (cross-sensor analytics)
+    val smoothnessScore: Int? = null,
+    val brakingEfficiencyScore: Int? = null,
+    val peakCorneringG: Double? = null,
+    val avgCorneringG: Double? = null,
+    val roadRoughnessIndex: Double? = null,
+    val elevationAdjustedAvgSpeedMps: Double? = null,
 )
 
 enum class MapLayer {
@@ -218,6 +226,39 @@ class TrackDetailViewModel @Inject constructor(
                 )
             }
 
+            // Driving insights: read from track entity, or compute if missing
+            var smoothness = track?.smoothnessScore
+            var brakingEff = track?.brakingEfficiencyScore
+            var peakCornG = track?.peakCorneringG
+            var avgCornG = track?.avgCorneringG
+            var roughness = track?.roadRoughnessIndex
+            var elevAdjSpeed = track?.elevationAdjustedAvgSpeedMps
+
+            val allNull = smoothness == null && brakingEff == null && peakCornG == null
+                && avgCornG == null && roughness == null && elevAdjSpeed == null
+            if (allNull && sensorStats.hasSensorData && track != null) {
+                val insights = withContext(defaultDispatcher) {
+                    CrossSensorAnalytics.analyze(points)
+                }
+                smoothness = insights.smoothnessScore
+                brakingEff = insights.brakingEfficiency?.score
+                peakCornG = insights.corneringG?.peakLateralG
+                avgCornG = insights.corneringG?.avgLateralG
+                roughness = insights.roadRoughnessIndex
+                elevAdjSpeed = insights.elevationAdjustedAvgSpeed
+                withContext(ioDispatcher) {
+                    trackDao.updateInsights(
+                        trackId = trackId,
+                        peakCorneringG = peakCornG,
+                        avgCorneringG = avgCornG,
+                        smoothnessScore = smoothness,
+                        roadRoughnessIndex = roughness,
+                        brakingEfficiencyScore = brakingEff,
+                        elevationAdjustedAvgSpeedMps = elevAdjSpeed,
+                    )
+                }
+            }
+
             _uiState.value = TrackDetailUiState(
                 track = track,
                 trackPoints = points,
@@ -237,6 +278,12 @@ class TrackDetailViewModel @Inject constructor(
                 lateralGProfile = lateralGProfile,
                 yawRateProfile = yawRateProfile,
                 rollRateProfile = rollRateProfile,
+                smoothnessScore = smoothness,
+                brakingEfficiencyScore = brakingEff,
+                peakCorneringG = peakCornG,
+                avgCorneringG = avgCornG,
+                roadRoughnessIndex = roughness,
+                elevationAdjustedAvgSpeedMps = elevAdjSpeed,
             )
         }
     }
