@@ -72,6 +72,11 @@ data class RollRatePoint(
     val rollRateDegPerS: Double,
 )
 
+data class AccelPoint(
+    val distanceFromStart: Double,
+    val accelMps2: Double,
+)
+
 data class CurvatureDistribution(
     val straight: Float = 0f,  // curvature < 0.5 deg/m
     val gentle: Float = 0f,    // 0.5 - 2.0
@@ -144,6 +149,7 @@ data class TrackDetailUiState(
     val elevationAdjustedAvgSpeedMps: Double? = null,
     // Corner analysis
     val cornerAnalysis: List<CornerAnalysis> = emptyList(),
+    val accelProfile: List<AccelPoint> = emptyList(),
 )
 
 enum class MapLayer {
@@ -199,6 +205,7 @@ class TrackDetailViewModel @Inject constructor(
             val lateralGDeferred = async(defaultDispatcher) { buildLateralGProfile(points) }
             val yawRateDeferred = async(defaultDispatcher) { buildYawRateProfile(points) }
             val rollRateDeferred = async(defaultDispatcher) { buildRollRateProfile(points) }
+            val accelDeferred = async(defaultDispatcher) { buildAccelProfile(points) }
 
             // Parallelize independent DB queries on IO dispatcher
             val weatherDeferred = async(ioDispatcher) { weatherDao.getWeatherForTrack(trackId) }
@@ -219,6 +226,7 @@ class TrackDetailViewModel @Inject constructor(
             val lateralGProfile = lateralGDeferred.await()
             val yawRateProfile = yawRateDeferred.await()
             val rollRateProfile = rollRateDeferred.await()
+            val accelProfile = accelDeferred.await()
 
             val tags = track?.tags
                 ?.split(",")
@@ -307,6 +315,7 @@ class TrackDetailViewModel @Inject constructor(
                 roadRoughnessIndex = roughness,
                 elevationAdjustedAvgSpeedMps = elevAdjSpeed,
                 cornerAnalysis = cornerAnalysis,
+                accelProfile = accelProfile,
             )
         }
     }
@@ -626,6 +635,23 @@ class TrackDetailViewModel @Inject constructor(
     private inline fun <T> List<T>.averageOfOrNull(selector: (T) -> Double?): Double? {
         val values = mapNotNull(selector)
         return if (values.isNotEmpty()) values.average() else null
+    }
+
+    private fun buildAccelProfile(points: List<TrackPointEntity>): List<AccelPoint> {
+        val result = mutableListOf<AccelPoint>()
+        var cumulativeDistance = 0.0
+        var prevLat: Double? = null
+        var prevLon: Double? = null
+        for (point in points) {
+            val accel = point.accelMps2 ?: continue
+            if (prevLat != null && prevLon != null) {
+                cumulativeDistance += haversine(prevLat, prevLon, point.lat, point.lon)
+            }
+            prevLat = point.lat
+            prevLon = point.lon
+            result.add(AccelPoint(cumulativeDistance, accel))
+        }
+        return result
     }
 
     fun regeneratePaceNotes() {

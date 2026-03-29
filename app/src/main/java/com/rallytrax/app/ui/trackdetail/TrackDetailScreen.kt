@@ -1093,6 +1093,143 @@ private fun SpeedChart(data: List<SpeedPoint>, unitSystem: UnitSystem, modifier:
     }
 }
 
+// ── Acceleration Profile Card ───────────────────────────────────────────────
+
+@Composable
+private fun AccelerationProfileCard(
+    accelProfile: List<AccelPoint>,
+    paceNotes: List<PaceNoteEntity>,
+    unitSystem: UnitSystem,
+) {
+    val peakAccel = accelProfile.maxOfOrNull { it.accelMps2 }?.coerceAtLeast(0.0) ?: 0.0
+    val peakBraking = accelProfile.minOfOrNull { it.accelMps2 }?.coerceAtMost(0.0)?.let { abs(it) } ?: 0.0
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Acceleration Profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+            AccelChart(
+                data = accelProfile,
+                paceNoteDistances = paceNotes.map { it.distanceFromStart },
+                modifier = Modifier.fillMaxWidth().height(180.dp),
+            )
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(formatDistance(accelProfile.last().distanceFromStart, unitSystem), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                StatItem("Peak Accel", "%.2f m/s\u00B2".format(peakAccel))
+                StatItem("Peak Braking", "%.2f m/s\u00B2".format(peakBraking))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccelChart(
+    data: List<AccelPoint>,
+    paceNoteDistances: List<Double>,
+    modifier: Modifier = Modifier,
+) {
+    val accelColor = LayerAccel
+    val decelColor = LayerDecel
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val noteLineColor = LayerCallout
+    val labelTextSize = with(LocalDensity.current) { 10.dp.toPx() }
+    val leftPadding = with(LocalDensity.current) { 48.dp.toPx() }
+
+    Canvas(modifier = modifier) {
+        if (data.size < 2) return@Canvas
+        val maxDist = data.last().distanceFromStart
+        val maxAbsAccel = data.maxOf { abs(it.accelMps2) }.coerceAtLeast(0.1)
+        val paddingTop = 4f
+        val chartLeft = leftPadding
+        val chartWidth = size.width - chartLeft
+        val h = size.height - paddingTop
+
+        fun xFor(d: Double) = (chartLeft + (d / maxDist) * chartWidth).toFloat()
+        fun yFor(a: Double) = (paddingTop + h / 2f - (a / maxAbsAccel) * (h / 2f)).toFloat()
+
+        // Y-axis labels
+        val paint = android.graphics.Paint().apply {
+            color = labelColor.toArgb()
+            textSize = labelTextSize
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        val labels = listOf(
+            "%.1f".format(maxAbsAccel) to yFor(maxAbsAccel),
+            "0" to yFor(0.0),
+            "-%.1f".format(maxAbsAccel) to yFor(-maxAbsAccel),
+        )
+        drawIntoCanvas { canvas ->
+            for ((text, y) in labels) {
+                canvas.nativeCanvas.drawText(text, chartLeft - 4f, y + labelTextSize / 3f, paint)
+            }
+        }
+
+        // Zero line
+        val zeroY = yFor(0.0)
+        drawLine(
+            color = labelColor.copy(alpha = 0.3f),
+            start = Offset(chartLeft, zeroY),
+            end = Offset(size.width, zeroY),
+            strokeWidth = 1f,
+        )
+
+        // Filled areas and line segments
+        for (i in 0 until data.size - 1) {
+            val x1 = xFor(data[i].distanceFromStart)
+            val x2 = xFor(data[i + 1].distanceFromStart)
+            val y1 = yFor(data[i].accelMps2)
+            val y2 = yFor(data[i + 1].accelMps2)
+            val isAccel = data[i].accelMps2 >= 0
+            val segColor = if (isAccel) accelColor else decelColor
+
+            // Fill to zero line
+            val fillPath = Path().apply {
+                moveTo(x1, zeroY)
+                lineTo(x1, y1)
+                lineTo(x2, y2)
+                lineTo(x2, zeroY)
+                close()
+            }
+            drawPath(fillPath, color = segColor.copy(alpha = 0.2f))
+
+            // Line segment
+            drawLine(
+                color = segColor,
+                start = Offset(x1, y1),
+                end = Offset(x2, y2),
+                strokeWidth = 2f,
+            )
+        }
+
+        // Pace note overlay — vertical dashed lines
+        val dashLength = 6f
+        val gapLength = 4f
+        for (dist in paceNoteDistances) {
+            if (dist < 0 || dist > maxDist) continue
+            val x = xFor(dist)
+            // Draw dashed vertical line
+            var currentY = paddingTop
+            while (currentY < size.height) {
+                val endY = (currentY + dashLength).coerceAtMost(size.height)
+                drawLine(
+                    color = noteLineColor.copy(alpha = 0.4f),
+                    start = Offset(x, currentY),
+                    end = Offset(x, endY),
+                    strokeWidth = 1f,
+                )
+                currentY += dashLength + gapLength
+            }
+        }
+    }
+}
+
 // ── Elevation Profile Card ──────────────────────────────────────────────────
 
 @Composable
@@ -1442,6 +1579,12 @@ private fun ViewTab(
         if (CardType.SPEED_PROFILE in visible && uiState.speedProfile.size >= 2 && track.trackCategory != "route") {
             Spacer(modifier = Modifier.height(16.dp))
             SpeedProfileCard(uiState.speedProfile, unitSystem, track)
+        }
+
+        // Acceleration profile chart (hidden for routes)
+        if (uiState.accelProfile.size >= 2 && track.trackCategory != "route") {
+            Spacer(modifier = Modifier.height(16.dp))
+            AccelerationProfileCard(uiState.accelProfile, uiState.paceNotes, unitSystem)
         }
 
         // Elevation chart with inline hero stats
