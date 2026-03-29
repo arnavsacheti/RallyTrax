@@ -12,10 +12,12 @@ import com.rallytrax.app.data.gpx.GpxExporter
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.dao.WeatherDao
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
+import com.rallytrax.app.data.local.entity.WeatherEntity
 import com.rallytrax.app.data.analytics.CrossSensorAnalytics
 import com.rallytrax.app.data.classification.ValhallaRouteClient
 import com.rallytrax.app.data.preferences.UserPreferencesData
@@ -121,6 +123,8 @@ data class TrackDetailUiState(
     val paceNotesStale: Boolean = false, // true when pace notes lack segment data and need regeneration
     // Highlighted suggested segment (eye toggle — only one at a time)
     val highlightedSuggestionIndex: Int? = null,
+    // Weather context
+    val weatherCondition: WeatherEntity? = null,
     // Sensor data
     val sensorStats: SensorStats = SensorStats(),
     val lateralGProfile: List<LateralGPoint> = emptyList(),
@@ -147,6 +151,7 @@ class TrackDetailViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val weatherDao: WeatherDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     private val segmentRepository: SegmentRepository,
     private val valhallaRouteClient: ValhallaRouteClient,
@@ -190,6 +195,7 @@ class TrackDetailViewModel @Inject constructor(
             val rollRateDeferred = async(defaultDispatcher) { buildRollRateProfile(points) }
 
             // Parallelize independent DB queries on IO dispatcher
+            val weatherDeferred = async(ioDispatcher) { weatherDao.getWeatherForTrack(trackId) }
             val paceNotesDeferred = async(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
             val routeTracksDeferred = async(ioDispatcher) {
                 if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()
@@ -291,6 +297,7 @@ class TrackDetailViewModel @Inject constructor(
                 personalBestMs = personalBest,
                 averageTimeMs = averageTime,
                 segments = segmentUi,
+                weatherCondition = weatherDeferred.await(),
                 sensorStats = sensorStats,
                 lateralGProfile = lateralGProfile,
                 yawRateProfile = yawRateProfile,

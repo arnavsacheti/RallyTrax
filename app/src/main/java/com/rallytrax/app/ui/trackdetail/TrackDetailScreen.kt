@@ -100,6 +100,7 @@ import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.rallytrax.app.data.local.entity.NoteModifier
+import com.rallytrax.app.ui.components.WeatherBadge
 import com.rallytrax.app.ui.recording.SensorStats
 import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
@@ -1408,6 +1409,23 @@ private fun ViewTab(
 
         Spacer(modifier = Modifier.height(12.dp))
         TrackInfoChips(track, vehicleName)
+
+        // Weather context badge
+        val weather = uiState.weatherCondition
+        if (weather != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Column {
+                WeatherBadge(weather = weather.toWeatherCondition())
+                if (weather.hasPerformanceImpact) {
+                    Text(
+                        text = "Weather may have affected performance",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+                    )
+                }
+            }
+        }
 
         // Driving insights (cross-sensor analytics)
         val hasInsights = uiState.smoothnessScore != null || uiState.brakingEfficiencyScore != null
