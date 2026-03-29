@@ -122,6 +122,7 @@ import com.rallytrax.app.ui.theme.LayerElevation
 import com.rallytrax.app.ui.theme.LayerSpeedHigh
 import com.rallytrax.app.ui.theme.LayerSpeedLow
 import com.rallytrax.app.ui.theme.LayerSpeedMid
+import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDateTime
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -1448,6 +1449,15 @@ private fun ViewTab(
             SensorStatsCard(uiState.sensorStats, uiState.lateralGProfile, uiState.yawRateProfile, uiState.rollRateProfile)
         }
 
+        // Corner analysis
+        if (uiState.cornerAnalysis.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            CornerPerformanceCard(
+                corners = uiState.cornerAnalysis,
+                unitSystem = unitSystem,
+            )
+        }
+
         // Pace notes
         if (CardType.PACE_NOTES in visible && uiState.paceNotes.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -1944,6 +1954,183 @@ private fun formatCurvature(trackPoints: List<TrackPointEntity>): String {
     if (withCurvature.isEmpty()) return "N/A"
     val avg = withCurvature.map { abs(it) }.average()
     return "%.1f deg/m".format(avg)
+}
+
+// ── Corner Performance Card ────────────────────────────────────────────
+
+@Composable
+private fun CornerPerformanceCard(
+    corners: List<CornerAnalysis>,
+    unitSystem: UnitSystem,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val displayLimit = 10
+    val showExpandButton = corners.size > displayLimit
+    val displayedCorners = if (expanded) corners else corners.take(displayLimit)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Corner Analysis",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            displayedCorners.forEachIndexed { index, corner ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 6.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                }
+                CornerRow(corner, unitSystem)
+            }
+
+            if (showExpandButton) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (expanded) "Show less"
+                        else "Show all ${corners.size} corners",
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CornerRow(corner: CornerAnalysis, unitSystem: UnitSystem) {
+    val note = corner.note
+    val speedSafe = MaterialTheme.rallyTraxColors.speedSafe
+    val speedDanger = MaterialTheme.rallyTraxColors.speedDanger
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PaceNoteIconRenderer.PaceNoteIcon(
+                noteType = note.noteType,
+                severity = note.severity,
+                modifier = note.modifier,
+                sizeDp = 28.dp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                note.callText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            // Speed flow: entry -> min -> exit
+            if (corner.entrySpeedMps != null || corner.minSpeedMps != null || corner.exitSpeedMps != null) {
+                SpeedFlow(
+                    entryMps = corner.entrySpeedMps,
+                    minMps = corner.minSpeedMps,
+                    exitMps = corner.exitSpeedMps,
+                    unitSystem = unitSystem,
+                    safeColor = speedSafe,
+                    dangerColor = speedDanger,
+                )
+            }
+        }
+
+        // Peak lateral G badge
+        corner.peakLateralG?.let { g ->
+            Row(
+                modifier = Modifier.padding(start = 36.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Card(
+                    shape = RoundedCornerShape(6.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                ) {
+                    Text(
+                        "${"%.2f".format(g)}g",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                }
+            }
+        }
+
+        corner.tip?.let { tip ->
+            Text(
+                tip,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier
+                    .padding(start = 36.dp, top = 4.dp)
+                    .background(
+                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                        RoundedCornerShape(6.dp),
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpeedFlow(
+    entryMps: Double?,
+    minMps: Double?,
+    exitMps: Double?,
+    unitSystem: UnitSystem,
+    safeColor: Color,
+    dangerColor: Color,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        entryMps?.let {
+            Text(
+                formatSpeed(it, unitSystem),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (entryMps != null && minMps != null) {
+            val losing = minMps < entryMps
+            Text(
+                " \u2192 ",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (losing) dangerColor else safeColor,
+            )
+        }
+        minMps?.let {
+            Text(
+                formatSpeed(it, unitSystem),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = dangerColor,
+            )
+        }
+        if (minMps != null && exitMps != null) {
+            val gaining = exitMps > minMps
+            Text(
+                " \u2192 ",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (gaining) safeColor else dangerColor,
+            )
+        }
+        exitMps?.let {
+            val gaining = minMps != null && it > minMps
+            Text(
+                formatSpeed(it, unitSystem),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (gaining) safeColor else dangerColor,
+            )
+        }
+    }
 }
 
 // ── Sensor Stats Card ──────────────────────────────────────────────────
