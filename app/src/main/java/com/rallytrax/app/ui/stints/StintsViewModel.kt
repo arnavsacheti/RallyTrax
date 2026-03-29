@@ -94,6 +94,10 @@ class StintsViewModel @Inject constructor(
             SortOption.DISTANCE_SHORTEST -> filteredByTags.sortedBy { it.distanceMeters }
             SortOption.DURATION_LONGEST -> filteredByTags.sortedByDescending { it.durationMs }
             SortOption.DURATION_SHORTEST -> filteredByTags.sortedBy { it.durationMs }
+            SortOption.ELEVATION_MOST -> filteredByTags.sortedByDescending { it.elevationGainM }
+            SortOption.ELEVATION_LEAST -> filteredByTags.sortedBy { it.elevationGainM }
+            SortOption.DIFFICULTY_HARDEST -> filteredByTags.sortedByDescending { com.rallytrax.app.data.classification.RouteClassifier.difficultyOrdinal(it.difficultyRating) }
+            SortOption.DIFFICULTY_EASIEST -> filteredByTags.sortedBy { com.rallytrax.app.data.classification.RouteClassifier.difficultyOrdinal(it.difficultyRating) }
         }
 
         StintsUiState(
@@ -199,4 +203,5 @@ class StintsViewModel @Inject constructor(
             }
         }
     }
+
 }

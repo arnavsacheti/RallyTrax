@@ -48,6 +48,14 @@ object RouteClassifier {
         DIFFICULTY_EXPERT to 0xFFEA4335.toInt(),    // red
     )
 
+    fun difficultyOrdinal(rating: String?): Int = when (rating) {
+        DIFFICULTY_CASUAL -> 0
+        DIFFICULTY_MODERATE -> 1
+        DIFFICULTY_SPIRITED -> 2
+        DIFFICULTY_EXPERT -> 3
+        else -> -1
+    }
+
     // ── Surface Types ────────────────────────────────────────────────────────
     const val SURFACE_PAVED = "Paved"
     const val SURFACE_GRAVEL = "Gravel"

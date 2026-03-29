@@ -6,7 +6,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +32,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +49,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -68,17 +68,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rallytrax.app.data.local.entity.TrackEntity
-import com.rallytrax.app.data.preferences.UnitSystem
-import com.rallytrax.app.util.formatDate
-import com.rallytrax.app.util.formatDistance
-import com.rallytrax.app.util.formatElapsedTime
-import com.rallytrax.app.util.formatSpeed
-import com.rallytrax.app.util.speedUnit
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -99,6 +91,7 @@ fun LibraryScreen(
 
     var showSortMenu by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
+    var showAdvancedFilters by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -190,10 +183,16 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Tag filter button
-                        if (uiState.availableTags.isNotEmpty()) {
+                        // Filter button with badge
+                        BadgedBox(
+                            badge = {
+                                if (uiState.activeFilterCount > 0) {
+                                    Badge { Text("${uiState.activeFilterCount}") }
+                                }
+                            },
+                        ) {
                             IconButton(onClick = { showTagFilter = !showTagFilter }) {
-                                Icon(Icons.Filled.FilterList, contentDescription = "Filter by tag")
+                                Icon(Icons.Filled.FilterList, contentDescription = "Filter")
                             }
                         }
 
@@ -257,6 +256,43 @@ fun LibraryScreen(
                 ),
             )
 
+            // Active filter indicator
+            if (uiState.activeFilterCount > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "${uiState.activeFilterCount} filter${if (uiState.activeFilterCount > 1) "s" else ""} active",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    TextButton(onClick = { viewModel.clearAllFilters() }) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Clear all")
+                    }
+                }
+            }
+
+            // Filter chip bar
+            LibraryFilterChipBar(
+                uiState = uiState,
+                onToggleDifficulty = { viewModel.toggleDifficultyFilter(it) },
+                onToggleSurface = { viewModel.toggleSurfaceFilter(it) },
+                onToggleRouteType = { viewModel.toggleRouteTypeFilter(it) },
+                onNearMeClick = { /* TODO: location permission + near me filter */ },
+                onMoreFiltersClick = { showAdvancedFilters = true },
+                onClearAllFilters = { viewModel.clearAllFilters() },
+            )
+
             // Tag filter chips
             if (showTagFilter && uiState.availableTags.isNotEmpty()) {
                 FlowRow(
@@ -288,14 +324,14 @@ fun LibraryScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = if (uiState.searchQuery.isNotEmpty()) "No routes found" else "No routes yet",
+                            text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) "No routes found" else "No routes yet",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (uiState.searchQuery.isNotEmpty()) {
-                                "Try a different search"
+                            text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) {
+                                "Try a different search or adjust filters"
                             } else {
                                 "Import a GPX or KML file to add a route"
                             },
@@ -369,17 +405,18 @@ fun LibraryScreen(
                                 enableDismissFromStartToEnd = true,
                                 modifier = Modifier.animateItem(),
                             ) {
-                                TrackListItem(
+                                EnhancedTrackListItem(
                                     track = track,
                                     isSelected = track.id in uiState.selectedTrackIds,
                                     isMultiSelectMode = false,
                                     unitSystem = preferences.unitSystem,
                                     onClick = { onTrackClick(track.id) },
                                     onLongClick = { viewModel.toggleMultiSelect(track.id) },
+                                    attemptCount = uiState.attemptCounts[track.name] ?: 1,
                                 )
                             }
                         } else {
-                            TrackListItem(
+                            EnhancedTrackListItem(
                                 track = track,
                                 isSelected = track.id in uiState.selectedTrackIds,
                                 isMultiSelectMode = true,
@@ -387,6 +424,7 @@ fun LibraryScreen(
                                 onClick = { viewModel.toggleMultiSelect(track.id) },
                                 onLongClick = { viewModel.toggleMultiSelect(track.id) },
                                 modifier = Modifier.animateItem(),
+                                attemptCount = uiState.attemptCounts[track.name] ?: 1,
                             )
                         }
                     }
@@ -394,122 +432,26 @@ fun LibraryScreen(
             }
         }
     }
-}
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun TrackListItem(
-    track: TrackEntity,
-    isSelected: Boolean,
-    isMultiSelectMode: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    unitSystem: UnitSystem = UnitSystem.METRIC,
-) {
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-            ),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
-            // Name and date
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Text(
-                    text = track.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = formatDate(track.recordedAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Stats row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                TrackStatChip(
-                    label = "Distance",
-                    value = formatDistance(track.distanceMeters, unitSystem),
-                )
-                TrackStatChip(
-                    label = "Duration",
-                    value = formatElapsedTime(track.durationMs),
-                )
-                if (track.avgSpeedMps > 0) {
-                    TrackStatChip(
-                        label = "Avg",
-                        value = "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
-                    )
-                }
-            }
-
-            // Tags
-            if (track.tags.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    track.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { tag ->
-                        Text(
-                            text = tag,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .background(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.shapes.small,
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrackStatChip(label: String, value: String) {
-    Column {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    // Advanced filter bottom sheet
+    if (showAdvancedFilters) {
+        LibraryAdvancedFilterSheet(
+            distanceRange = uiState.distanceRange,
+            elevationRange = uiState.elevationRange,
+            durationRange = uiState.durationRange,
+            maxDistance = uiState.maxDistance,
+            maxElevation = uiState.maxElevation,
+            maxDuration = uiState.maxDuration,
+            unitSystem = preferences.unitSystem,
+            onDistanceRangeChange = { viewModel.updateDistanceRange(it) },
+            onElevationRangeChange = { viewModel.updateElevationRange(it) },
+            onDurationRangeChange = { viewModel.updateDurationRange(it) },
+            onDismiss = { showAdvancedFilters = false },
+            onReset = {
+                viewModel.updateDistanceRange(null)
+                viewModel.updateElevationRange(null)
+                viewModel.updateDurationRange(null)
+            },
         )
     }
 }
-
