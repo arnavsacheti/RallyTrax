@@ -29,6 +29,13 @@ data class ProfileState(
     val longestDriveMeters: Double = 0.0,
     val vehicleCount: Int = 0,
     val stintCount: Int = 0,
+    // Driving trends (last 20 stints with insight data)
+    val smoothnessTrend: List<Float> = emptyList(),
+    val brakingTrend: List<Float> = emptyList(),
+    val corneringGTrend: List<Float> = emptyList(),
+    val latestSmoothness: Int? = null,
+    val latestBraking: Int? = null,
+    val latestCorneringG: Double? = null,
     // Yearly stats
     val yearlyDrives: Int = 0,
     val yearlyDistanceMeters: Double = 0.0,
@@ -90,6 +97,17 @@ class ProfileViewModel @Inject constructor(
             Instant.ofEpochMilli(it.recordedAt).atZone(zone).toLocalDate()
         }.mapValues { (_, tracks) -> tracks.sumOf { it.distanceMeters } }
 
+        // Driving trends (most recent 20 stints with insight data, reversed to oldest-first for sparkline)
+        val smoothnessTrend = stints.filter { it.smoothnessScore != null }.take(20)
+            .reversed().mapNotNull { it.smoothnessScore?.toFloat() }
+        val brakingTrend = stints.filter { it.brakingEfficiencyScore != null }.take(20)
+            .reversed().mapNotNull { it.brakingEfficiencyScore?.toFloat() }
+        val corneringGTrend = stints.filter { it.avgCorneringG != null }.take(20)
+            .reversed().mapNotNull { it.avgCorneringG?.toFloat() }
+        val latestSmoothness = stints.firstOrNull { it.smoothnessScore != null }?.smoothnessScore
+        val latestBraking = stints.firstOrNull { it.brakingEfficiencyScore != null }?.brakingEfficiencyScore
+        val latestCorneringG = stints.firstOrNull { it.avgCorneringG != null }?.avgCorneringG
+
         // Yearly stats (stints only)
         val yearStart = LocalDate.of(today.year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
         val yearlyTracks = stints.filter { it.recordedAt >= yearStart }
@@ -104,6 +122,12 @@ class ProfileViewModel @Inject constructor(
             longestDriveMeters = longestDrive,
             vehicleCount = vehicleCount,
             stintCount = stints.size,
+            smoothnessTrend = smoothnessTrend,
+            brakingTrend = brakingTrend,
+            corneringGTrend = corneringGTrend,
+            latestSmoothness = latestSmoothness,
+            latestBraking = latestBraking,
+            latestCorneringG = latestCorneringG,
             yearlyDrives = yearlyTracks.size,
             yearlyDistanceMeters = yearlyTracks.sumOf { it.distanceMeters },
         )
