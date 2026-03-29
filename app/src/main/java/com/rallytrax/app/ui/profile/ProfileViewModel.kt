@@ -18,6 +18,13 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
+data class VehicleStats(
+    val name: String,
+    val driveCount: Int,
+    val totalDistanceMeters: Double,
+    val avgSmoothness: Int?,
+)
+
 data class ProfileState(
     val currentStreak: Int = 0,
     val activeDaysThisMonth: Set<LocalDate> = emptySet(),
@@ -39,6 +46,8 @@ data class ProfileState(
     // Yearly stats
     val yearlyDrives: Int = 0,
     val yearlyDistanceMeters: Double = 0.0,
+    // Vehicle comparison
+    val vehicleComparison: List<VehicleStats> = emptyList(),
 )
 
 @HiltViewModel
@@ -112,6 +121,28 @@ class ProfileViewModel @Inject constructor(
         val yearStart = LocalDate.of(today.year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
         val yearlyTracks = stints.filter { it.recordedAt >= yearStart }
 
+        // Per-vehicle comparison
+        val vehicleMap = allVehicles.associateBy { it.id }
+        val vehicleComparison = stints
+            .groupBy { it.vehicleId }
+            .map { (vehicleId, vehicleStints) ->
+                val name = if (vehicleId != null) {
+                    vehicleMap[vehicleId]?.name ?: "Unknown"
+                } else {
+                    "Unassigned"
+                }
+                val smoothnessScores = vehicleStints.mapNotNull { it.smoothnessScore }
+                VehicleStats(
+                    name = name,
+                    driveCount = vehicleStints.size,
+                    totalDistanceMeters = vehicleStints.sumOf { it.distanceMeters },
+                    avgSmoothness = if (smoothnessScores.isNotEmpty()) {
+                        smoothnessScores.average().toInt()
+                    } else null,
+                )
+            }
+            .sortedByDescending { it.totalDistanceMeters }
+
         ProfileState(
             currentStreak = currentStreak,
             activeDaysThisMonth = activeDaysThisMonth,
@@ -130,6 +161,7 @@ class ProfileViewModel @Inject constructor(
             latestCorneringG = latestCorneringG,
             yearlyDrives = yearlyTracks.size,
             yearlyDistanceMeters = yearlyTracks.sumOf { it.distanceMeters },
+            vehicleComparison = vehicleComparison,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileState())
