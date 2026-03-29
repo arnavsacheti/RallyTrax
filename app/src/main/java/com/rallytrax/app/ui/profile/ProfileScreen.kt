@@ -1,5 +1,6 @@
 package com.rallytrax.app.ui.profile
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,12 +36,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -225,6 +234,12 @@ fun ProfileScreen(
                     vehicleStats = profile.vehicleComparison,
                     unitSystem = preferences.unitSystem,
                 )
+            }
+
+            // Corner Speed Profile radar chart
+            if (profile.driverProfile.size >= 3) {
+                Spacer(modifier = Modifier.height(16.dp))
+                DriverRadarCard(driverProfile = profile.driverProfile)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -562,6 +577,161 @@ private fun VehicleComparisonCard(
                         .clip(RoundedCornerShape(4.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DriverRadarCard(
+    driverProfile: Map<Int, Double>,
+    modifier: Modifier = Modifier,
+) {
+    val sortedEntries = remember(driverProfile) {
+        driverProfile.entries.sortedBy { it.key }
+    }
+    val axisCount = sortedEntries.size
+    val maxSpeed = remember(sortedEntries) {
+        sortedEntries.maxOf { it.value }.coerceAtLeast(1.0)
+    }
+    val strongest = remember(sortedEntries) { sortedEntries.maxByOrNull { it.value } }
+    val weakest = remember(sortedEntries) { sortedEntries.minByOrNull { it.value } }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val fillColor = primaryColor.copy(alpha = 0.3f)
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelTextSizePx = with(LocalDensity.current) { 10.dp.toPx() }
+
+    val labelPaint = remember(labelColor, labelTextSizePx) {
+        android.graphics.Paint().apply {
+            color = labelColor.toArgb()
+            textSize = labelTextSizePx
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Corner Speed Profile",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Your average speed through turns of different radii",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+            ) {
+                val centerX = size.width / 2f
+                val centerY = size.height / 2f
+                val chartRadius = minOf(centerX, centerY) - labelTextSizePx * 2.5f
+
+                val angleStep = (2.0 * Math.PI / axisCount).toFloat()
+                // Start from top (negative Y) per radar chart convention
+                val startAngle = (-Math.PI / 2.0).toFloat()
+
+                for (fraction in listOf(0.25f, 0.5f, 0.75f, 1.0f)) {
+                    drawCircle(
+                        color = gridColor.copy(alpha = 0.2f),
+                        radius = chartRadius * fraction,
+                        center = Offset(centerX, centerY),
+                        style = Stroke(width = 1f),
+                    )
+                }
+
+                for (i in 0 until axisCount) {
+                    val angle = startAngle + i * angleStep
+                    val endX = centerX + chartRadius * kotlin.math.cos(angle)
+                    val endY = centerY + chartRadius * kotlin.math.sin(angle)
+                    drawLine(
+                        color = gridColor.copy(alpha = 0.2f),
+                        start = Offset(centerX, centerY),
+                        end = Offset(endX, endY),
+                        strokeWidth = 1f,
+                    )
+                }
+
+                val path = Path()
+                for (i in sortedEntries.indices) {
+                    val angle = startAngle + i * angleStep
+                    val normalizedSpeed = (sortedEntries[i].value / maxSpeed).toFloat()
+                    val dist = chartRadius * normalizedSpeed
+                    val px = centerX + dist * kotlin.math.cos(angle)
+                    val py = centerY + dist * kotlin.math.sin(angle)
+                    if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                }
+                path.close()
+
+                drawPath(path = path, color = fillColor)
+                drawPath(path = path, color = primaryColor, style = Stroke(width = 2f))
+
+                drawIntoCanvas { canvas ->
+                    for (i in sortedEntries.indices) {
+                        val angle = startAngle + i * angleStep
+                        val labelDist = chartRadius + labelTextSizePx * 1.5f
+                        val lx = centerX + labelDist * kotlin.math.cos(angle)
+                        val ly = centerY + labelDist * kotlin.math.sin(angle) + labelTextSizePx / 3f
+                        canvas.nativeCanvas.drawText(
+                            "${sortedEntries[i].key}m",
+                            lx,
+                            ly,
+                            labelPaint,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                if (strongest != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Strongest",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "${strongest.key}m radius",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                if (weakest != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Weakest",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "${weakest.key}m radius",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
         }
     }

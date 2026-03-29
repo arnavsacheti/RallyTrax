@@ -2,15 +2,18 @@ package com.rallytrax.app.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -48,14 +51,26 @@ data class ProfileState(
     val yearlyDistanceMeters: Double = 0.0,
     // Vehicle comparison
     val vehicleComparison: List<VehicleStats> = emptyList(),
+    val driverProfile: Map<Int, Double> = emptyMap(),
 )
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val vehicleDao: VehicleDao,
+    private val driverProfileDao: DriverProfileDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
+
+    private val _driverProfile = MutableStateFlow<Map<Int, Double>>(emptyMap())
+
+    init {
+        viewModelScope.launch {
+            val entries = driverProfileDao.getAll()
+                .filter { it.sampleCount >= 3 }
+            _driverProfile.value = entries.associate { it.radiusBucketM to it.avgSpeedMps }
+        }
+    }
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
@@ -63,7 +78,8 @@ class ProfileViewModel @Inject constructor(
     val profileState: StateFlow<ProfileState> = combine(
         trackDao.getStints(),
         vehicleDao.getAllVehicles(),
-    ) { stints, allVehicles ->
+        _driverProfile,
+    ) { stints, allVehicles, driverProfile ->
         val zone = ZoneId.systemDefault()
         val today = Instant.now().atZone(zone).toLocalDate()
         val yearMonth = YearMonth.from(today)
@@ -162,6 +178,7 @@ class ProfileViewModel @Inject constructor(
             yearlyDrives = yearlyTracks.size,
             yearlyDistanceMeters = yearlyTracks.sumOf { it.distanceMeters },
             vehicleComparison = vehicleComparison,
+            driverProfile = driverProfile,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileState())
