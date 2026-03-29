@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
+      "Edit",
+      "Write",
       "Bash(./gradlew *)",
+      "Bash(gh *)",
+      "Bash(cp */local.properties *)",
       "Bash(adb *)",
       "Bash($HOME/Library/Android/sdk/platform-tools/adb *)",
       "Bash(~/Library/Android/sdk/platform-tools/adb *)",
@@ -38,6 +42,19 @@
       "Read(/tmp/**)",
       "WebSearch",
       "mcp__Claude_Preview__preview_start"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "main_wt=$(git worktree list --porcelain 2>/dev/null | head -1 | sed 's/worktree //'); if [ -n \"$main_wt\" ] && [ ! -f local.properties ] && [ -f \"$main_wt/local.properties\" ]; then cp \"$main_wt/local.properties\" local.properties; fi; true"
+          }
+        ]
+      }
     ]
   }
 }
