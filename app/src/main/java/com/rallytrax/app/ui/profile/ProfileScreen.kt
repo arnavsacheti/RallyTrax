@@ -48,6 +48,8 @@ import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.CalendarHeatmap
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import com.rallytrax.app.ui.components.Sparkline
+import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -210,6 +212,9 @@ fun ProfileScreen(
                 )
             }
 
+            // Driving Trends Card
+            DrivingTrendsCard(profile = profile)
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // My Garage button
@@ -342,6 +347,105 @@ private fun UserHeader(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DrivingTrendsCard(profile: ProfileState) {
+    val hasTrends = profile.smoothnessTrend.size >= 2 ||
+        profile.brakingTrend.size >= 2 ||
+        profile.corneringGTrend.size >= 2
+
+    if (!hasTrends) return
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    Text(
+        text = "Driving Trends",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (profile.smoothnessTrend.size >= 2) {
+                TrendRow(
+                    label = "Smoothness",
+                    latestValue = profile.latestSmoothness?.toString() ?: "--",
+                    trendData = profile.smoothnessTrend,
+                )
+            }
+            if (profile.brakingTrend.size >= 2) {
+                TrendRow(
+                    label = "Braking",
+                    latestValue = profile.latestBraking?.toString() ?: "--",
+                    trendData = profile.brakingTrend,
+                )
+            }
+            if (profile.corneringGTrend.size >= 2) {
+                TrendRow(
+                    label = "Cornering G",
+                    latestValue = profile.latestCorneringG?.let {
+                        String.format("%.2f", it)
+                    } ?: "--",
+                    trendData = profile.corneringGTrend,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendRow(
+    label: String,
+    latestValue: String,
+    trendData: List<Float>,
+) {
+    val improving = trendData.last() > trendData.first()
+    val declining = trendData.last() < trendData.first()
+    val trendColor = when {
+        improving -> MaterialTheme.rallyTraxColors.speedSafe
+        declining -> MaterialTheme.rallyTraxColors.speedDanger
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val trendArrow = when {
+        improving -> " \u2191"
+        declining -> " \u2193"
+        else -> ""
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "$latestValue$trendArrow",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = trendColor,
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Sparkline(
+            data = trendData,
+            color = trendColor,
+            modifier = Modifier
+                .width(60.dp)
+                .height(24.dp),
+        )
     }
 }
 
