@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.local.GridCellComputer
 import com.rallytrax.app.data.local.dao.PaceNoteDao
@@ -104,6 +105,10 @@ class LibraryViewModel @Inject constructor(
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
+
+    init {
+        backfillUnclassifiedRoutes()
+    }
 
     private val _searchQuery = MutableStateFlow("")
     private val _sortOption = MutableStateFlow(SortOption.DATE_NEWEST)
@@ -466,10 +471,59 @@ class LibraryViewModel @Inject constructor(
                 _snackbarMessage.tryEmit("Imported: ${result.track.name}")
                 // Incremental grid cell update instead of full recompute
                 updateGridCellsForTrack(result.track.id)
+                // Auto-classify the imported route
+                classifyTrack(result.track.id)
             } catch (e: GpxParseException) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")
             } catch (e: Exception) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun classifyTrack(trackId: String) {
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) {
+                    val points = trackPointDao.getPointsForTrackOnce(trackId)
+                    if (points.size < 10) return@withContext
+                    val classification = RouteClassifier.classify(points)
+                    val track = trackDao.getTrackById(trackId) ?: return@withContext
+                    trackDao.updateTrack(
+                        track.copy(
+                            routeType = classification.suggestedRouteType,
+                            difficultyRating = classification.difficultyRating,
+                            curvinessScore = classification.curvinessScore,
+                        ),
+                    )
+                }
+            } catch (_: Exception) {
+                // Non-critical
+            }
+        }
+    }
+
+    private fun backfillUnclassifiedRoutes() {
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) {
+                    val routes = trackDao.getAllTracksOnce()
+                        .filter { it.trackCategory == "route" && it.difficultyRating == null }
+                    for (route in routes) {
+                        val points = trackPointDao.getPointsForTrackOnce(route.id)
+                        if (points.size < 10) continue
+                        val classification = RouteClassifier.classify(points)
+                        trackDao.updateTrack(
+                            route.copy(
+                                routeType = classification.suggestedRouteType,
+                                difficultyRating = classification.difficultyRating,
+                                curvinessScore = classification.curvinessScore,
+                            ),
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                // Non-critical
             }
         }
     }
