@@ -18,8 +18,10 @@ import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.local.entity.WeatherEntity
+import com.rallytrax.app.data.analytics.ConsistencyAnalyzer
 import com.rallytrax.app.data.analytics.CrossSensorAnalytics
 import com.rallytrax.app.data.classification.ValhallaRouteClient
+import com.rallytrax.app.data.local.dao.SegmentDao
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.SegmentRepository
@@ -86,6 +88,9 @@ data class TrackSegmentUi(
     val bestTimeMs: Long?,
     val runCount: Int,
     val isFavorite: Boolean,
+    val recentRunTimesMs: List<Long> = emptyList(),
+    val consistencyScore: Int? = null,
+    val latestDeltaFromBest: Long? = null,
 )
 
 data class CornerAnalysis(
@@ -154,6 +159,7 @@ class TrackDetailViewModel @Inject constructor(
     private val weatherDao: WeatherDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     private val segmentRepository: SegmentRepository,
+    private val segmentDao: SegmentDao,
     private val valhallaRouteClient: ValhallaRouteClient,
     preferencesRepository: UserPreferencesRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -237,16 +243,8 @@ class TrackDetailViewModel @Inject constructor(
 
             val cornerAnalysis = cornerAnalysisDeferred.await()
             val segmentMatches = segmentMatchesDeferred.await()
-            val segmentUi = segmentMatches.map { match ->
-                TrackSegmentUi(
-                    segmentId = match.segment.id,
-                    name = match.segment.name,
-                    distanceMeters = match.segment.distanceMeters,
-                    thisRunDurationMs = match.durationMs,
-                    bestTimeMs = match.stats.bestTimeMs,
-                    runCount = match.stats.runCount,
-                    isFavorite = match.stats.isFavorite,
-                )
+            val segmentUi = withContext(ioDispatcher) {
+                segmentMatches.map { match -> enrichSegmentUi(match) }
             }
 
             // Driving insights: read from track entity, or compute if missing
@@ -379,18 +377,32 @@ class TrackDetailViewModel @Inject constructor(
             withContext(ioDispatcher) { segmentRepository.detectSegmentsForTrack(trackId) }
         } catch (_: Exception) { emptyList() }
 
-        _uiState.value = _uiState.value.copy(
-            segments = matches.map { match ->
-                TrackSegmentUi(
-                    segmentId = match.segment.id,
-                    name = match.segment.name,
-                    distanceMeters = match.segment.distanceMeters,
-                    thisRunDurationMs = match.durationMs,
-                    bestTimeMs = match.stats.bestTimeMs,
-                    runCount = match.stats.runCount,
-                    isFavorite = match.stats.isFavorite,
-                )
-            },
+        val enriched = withContext(ioDispatcher) {
+            matches.map { match -> enrichSegmentUi(match) }
+        }
+        _uiState.value = _uiState.value.copy(segments = enriched)
+    }
+
+    private suspend fun enrichSegmentUi(match: TrackSegmentMatch): TrackSegmentUi {
+        val runs = segmentDao.getRunsForSegmentOnce(match.segment.id)
+        val chronologicalRuns = runs.sortedBy { it.timestamp }
+        val recentRunTimesMs = chronologicalRuns.map { it.durationMs }
+        val consistencyResult = ConsistencyAnalyzer.analyze(chronologicalRuns)
+        val latestDelta = match.stats.bestTimeMs?.let { best ->
+            match.durationMs - best
+        }
+
+        return TrackSegmentUi(
+            segmentId = match.segment.id,
+            name = match.segment.name,
+            distanceMeters = match.segment.distanceMeters,
+            thisRunDurationMs = match.durationMs,
+            bestTimeMs = match.stats.bestTimeMs,
+            runCount = match.stats.runCount,
+            isFavorite = match.stats.isFavorite,
+            recentRunTimesMs = recentRunTimesMs,
+            consistencyScore = consistencyResult?.overallScore,
+            latestDeltaFromBest = latestDelta,
         )
     }
 
