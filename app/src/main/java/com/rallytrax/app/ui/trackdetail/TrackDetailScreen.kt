@@ -107,6 +107,7 @@ import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.pacenotes.SegmentMatcher
 import com.rallytrax.app.recording.LatLng
+import com.rallytrax.app.ui.components.GoalRing
 import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
@@ -917,6 +918,96 @@ private fun StatItem(label: String, value: String) {
     }
 }
 
+// ── Driving Insights Card ───────────────────────────────────────────────────
+
+@Composable
+private fun DrivingInsightsCard(
+    uiState: TrackDetailUiState,
+    unitSystem: UnitSystem,
+    track: com.rallytrax.app.data.local.entity.TrackEntity,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Driving Insights", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // GoalRing row: Smoothness + Braking Efficiency
+            val hasRings = uiState.smoothnessScore != null || uiState.brakingEfficiencyScore != null
+            if (hasRings) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    if (uiState.smoothnessScore != null) {
+                        GoalRing(
+                            progress = uiState.smoothnessScore / 100f,
+                            label = "Smoothness",
+                            progressColor = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (uiState.brakingEfficiencyScore != null) {
+                        GoalRing(
+                            progress = uiState.brakingEfficiencyScore / 100f,
+                            label = "Braking",
+                            progressColor = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Stat items: Cornering G, Roughness, Elevation-Adjusted Speed
+            val hasStats = uiState.peakCorneringG != null || uiState.roadRoughnessIndex != null
+                || uiState.elevationAdjustedAvgSpeedMps != null
+            if (hasStats) {
+                if (hasRings) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    if (uiState.peakCorneringG != null) {
+                        StatItem("Peak Cornering", "%.2f G".format(uiState.peakCorneringG))
+                    }
+                    if (uiState.roadRoughnessIndex != null) {
+                        val roughnessLabel = when {
+                            uiState.roadRoughnessIndex < 1.0 -> "Smooth"
+                            uiState.roadRoughnessIndex <= 2.0 -> "Moderate"
+                            else -> "Rough"
+                        }
+                        StatItem("Road Surface", roughnessLabel)
+                    }
+                }
+            }
+            if (uiState.elevationAdjustedAvgSpeedMps != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val rawAvg = track.avgSpeedMps
+                val adjusted = uiState.elevationAdjustedAvgSpeedMps
+                val delta = adjusted - rawAvg
+                val arrow = if (delta >= 0) "\u2191" else "\u2193"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    StatItem(
+                        "Elev-Adj Speed",
+                        "${formatSpeed(adjusted, unitSystem)} ${speedUnit(unitSystem)}",
+                    )
+                    StatItem(
+                        "vs Raw Avg",
+                        "$arrow ${formatSpeed(abs(delta), unitSystem)} ${speedUnit(unitSystem)}",
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ── Speed Profile Card ──────────────────────────────────────────────────────
 
 @Composable
@@ -1316,6 +1407,15 @@ private fun ViewTab(
 
         Spacer(modifier = Modifier.height(12.dp))
         TrackInfoChips(track, vehicleName)
+
+        // Driving insights (cross-sensor analytics)
+        val hasInsights = uiState.smoothnessScore != null || uiState.brakingEfficiencyScore != null
+            || uiState.peakCorneringG != null || uiState.roadRoughnessIndex != null
+            || uiState.elevationAdjustedAvgSpeedMps != null
+        if (hasInsights) {
+            Spacer(modifier = Modifier.height(16.dp))
+            DrivingInsightsCard(uiState, unitSystem, track)
+        }
 
         // Speed chart with inline hero stats (hidden for routes)
         if (CardType.SPEED_PROFILE in visible && uiState.speedProfile.size >= 2 && track.trackCategory != "route") {
