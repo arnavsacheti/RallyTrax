@@ -12,6 +12,7 @@ import com.rallytrax.app.data.gpx.GpxExporter
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TrackPointEntity
@@ -85,6 +86,17 @@ data class TrackSegmentUi(
     val isFavorite: Boolean,
 )
 
+data class CornerAnalysis(
+    val note: PaceNoteEntity,
+    val entrySpeedMps: Double?,
+    val minSpeedMps: Double?,
+    val exitSpeedMps: Double?,
+    val peakLateralG: Double?,
+    val entryAccelMps2: Double?,   // negative = braking
+    val exitAccelMps2: Double?,    // positive = accelerating
+    val tip: String?,              // actionable improvement suggestion
+)
+
 data class TrackDetailUiState(
     val track: TrackEntity? = null,
     val trackPoints: List<TrackPointEntity> = emptyList(),
@@ -121,6 +133,8 @@ data class TrackDetailUiState(
     val avgCorneringG: Double? = null,
     val roadRoughnessIndex: Double? = null,
     val elevationAdjustedAvgSpeedMps: Double? = null,
+    // Corner analysis
+    val cornerAnalysis: List<CornerAnalysis> = emptyList(),
 )
 
 enum class MapLayer {
@@ -203,6 +217,8 @@ class TrackDetailViewModel @Inject constructor(
             val paceNotes = paceNotesDeferred.await()
             val paceNotesStale = paceNotes.isNotEmpty() && paceNotes.any { it.segmentStartIndex == null }
 
+            val cornerAnalysisDeferred = async(defaultDispatcher) { buildCornerAnalysis(points, paceNotes) }
+
             val routeTracks = routeTracksDeferred.await()
             val completionCount = routeTracks.size
             val personalBest = if (completionCount >= 2) {
@@ -213,6 +229,7 @@ class TrackDetailViewModel @Inject constructor(
                 if (validTimes.isNotEmpty()) validTimes.average().toLong() else null
             } else null
 
+            val cornerAnalysis = cornerAnalysisDeferred.await()
             val segmentMatches = segmentMatchesDeferred.await()
             val segmentUi = segmentMatches.map { match ->
                 TrackSegmentUi(
@@ -284,6 +301,7 @@ class TrackDetailViewModel @Inject constructor(
                 avgCorneringG = avgCornG,
                 roadRoughnessIndex = roughness,
                 elevationAdjustedAvgSpeedMps = elevAdjSpeed,
+                cornerAnalysis = cornerAnalysis,
             )
         }
     }
@@ -513,6 +531,82 @@ class TrackDetailViewModel @Inject constructor(
             result.add(RollRatePoint(cumulativeDistance, abs(roll)))
         }
         return result
+    }
+
+    private fun buildCornerAnalysis(
+        points: List<TrackPointEntity>,
+        paceNotes: List<PaceNoteEntity>,
+    ): List<CornerAnalysis> {
+        if (points.isEmpty() || paceNotes.isEmpty()) return emptyList()
+
+        return paceNotes
+            .filter { it.noteType != NoteType.STRAIGHT && it.segmentStartIndex != null && it.segmentEndIndex != null }
+            .mapNotNull { note ->
+                val start = note.segmentStartIndex!!
+                val end = note.segmentEndIndex!!
+                if (start < 0 || end >= points.size || start >= end) return@mapNotNull null
+                val segment = points.subList(start, end + 1)
+                if (segment.size < 3) return@mapNotNull null
+
+                val first3 = segment.take(3)
+                val last3 = segment.takeLast(3)
+
+                val entrySpeed = first3.averageOfOrNull { it.speed }
+                val exitSpeed = last3.averageOfOrNull { it.speed }
+                val minSpeed = segment.mapNotNull { it.speed }.minOrNull()
+
+                val peakLateralG = segment.mapNotNull { it.lateralAccelMps2 }
+                    .maxOfOrNull { abs(it) }
+                    ?.let { it / 9.81 }
+
+                val entryAccel = first3.averageOfOrNull { it.accelMps2 }
+                val exitAccel = last3.averageOfOrNull { it.accelMps2 }
+
+                val tip = generateCornerTip(entrySpeed, minSpeed, exitSpeed, peakLateralG, entryAccel, exitAccel)
+
+                CornerAnalysis(
+                    note = note,
+                    entrySpeedMps = entrySpeed,
+                    minSpeedMps = minSpeed,
+                    exitSpeedMps = exitSpeed,
+                    peakLateralG = peakLateralG,
+                    entryAccelMps2 = entryAccel,
+                    exitAccelMps2 = exitAccel,
+                    tip = tip,
+                )
+            }
+    }
+
+    private fun generateCornerTip(
+        entrySpeed: Double?,
+        minSpeed: Double?,
+        exitSpeed: Double?,
+        peakLateralG: Double?,
+        entryAccel: Double?,
+        exitAccel: Double?,
+    ): String? {
+        if (entryAccel != null && entryAccel < -3.0) {
+            return "Heavy braking on entry \u2014 try earlier, lighter braking"
+        }
+        if (entryAccel != null && entryAccel < -1.5 && exitAccel != null && exitAccel > 1.0) {
+            return "Good trail braking technique"
+        }
+        if (minSpeed != null && entrySpeed != null && entrySpeed > 0 && minSpeed < entrySpeed * 0.3) {
+            return "Large speed loss \u2014 carry more speed through"
+        }
+        if (exitAccel != null && exitAccel < 0.5 && exitSpeed != null && entrySpeed != null && entrySpeed > 0 && exitSpeed < entrySpeed * 0.8) {
+            return "Slow exit \u2014 get on throttle earlier"
+        }
+        if (peakLateralG != null && peakLateralG > 0.5) {
+            return "High cornering forces \u2014 smooth inputs recommended"
+        }
+        return null
+    }
+
+    /** Average of non-null values extracted by [selector], or null if none. */
+    private inline fun <T> List<T>.averageOfOrNull(selector: (T) -> Double?): Double? {
+        val values = mapNotNull(selector)
+        return if (values.isNotEmpty()) values.average() else null
     }
 
     fun regeneratePaceNotes() {
