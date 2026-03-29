@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -45,10 +46,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.rallytrax.app.data.auth.AuthState
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.MonthCalendar
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
+import com.rallytrax.app.util.formatSpeed
+import com.rallytrax.app.util.speedUnit
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -207,6 +213,15 @@ fun ProfileScreen(
                     icon = Icons.Filled.Straighten,
                     value = formatDistance(profile.yearlyDistanceMeters, preferences.unitSystem),
                     label = "Distance",
+                )
+            }
+
+            // Weather Impact Card
+            if (profile.weatherBuckets.size >= 2) {
+                Spacer(modifier = Modifier.height(16.dp))
+                WeatherImpactCard(
+                    buckets = profile.weatherBuckets,
+                    unitSystem = preferences.unitSystem,
                 )
             }
 
@@ -381,6 +396,144 @@ private fun HeroStatCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+private val BASELINE_CONDITION_GROUPS = setOf("Clear", "Clouds")
+private val IMPACT_CONDITION_GROUPS = setOf("Rain", "Drizzle", "Thunderstorm", "Snow")
+
+@Composable
+private fun WeatherImpactCard(
+    buckets: List<WeatherBucket>,
+    unitSystem: UnitSystem,
+    modifier: Modifier = Modifier,
+) {
+    val clearBucket = buckets.find { it.label in BASELINE_CONDITION_GROUPS }
+    val impactBuckets = buckets.filter { it.label in IMPACT_CONDITION_GROUPS }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Weather Impact",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            buckets.forEach { bucket ->
+                WeatherBucketRow(bucket = bucket, unitSystem = unitSystem)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (clearBucket != null && impactBuckets.isNotEmpty()) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+
+                impactBuckets.forEach { impactBucket ->
+                    if (clearBucket.avgSpeedMps > 0) {
+                        ComparisonRow(
+                            label = "${impactBucket.label} vs ${clearBucket.label}:",
+                            diffPercent = percentChange(impactBucket.avgSpeedMps, clearBucket.avgSpeedMps),
+                            positiveLabel = "faster",
+                            negativeLabel = "slower",
+                        )
+                    }
+
+                    val clearSmooth = clearBucket.avgSmoothness
+                    val impactSmooth = impactBucket.avgSmoothness
+                    if (clearSmooth != null && impactSmooth != null && clearSmooth > 0) {
+                        ComparisonRow(
+                            label = "${impactBucket.label} smoothness:",
+                            diffPercent = percentChange(impactSmooth, clearSmooth),
+                            positiveLabel = "smoother",
+                            negativeLabel = "rougher",
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+        }
+    }
+}
+
+private fun percentChange(value: Double, baseline: Double): Double =
+    ((value - baseline) / baseline) * 100
+
+@Composable
+private fun ComparisonRow(
+    label: String,
+    diffPercent: Double,
+    positiveLabel: String,
+    negativeLabel: String,
+) {
+    val text = if (diffPercent < 0) {
+        String.format(Locale.US, "%.0f%% %s", -diffPercent, negativeLabel)
+    } else {
+        String.format(Locale.US, "+%.0f%% %s", diffPercent, positiveLabel)
+    }
+    val color = if (diffPercent < 0) {
+        MaterialTheme.rallyTraxColors.speedDanger
+    } else {
+        MaterialTheme.rallyTraxColors.speedSafe
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+        )
+    }
+}
+
+@Composable
+private fun WeatherBucketRow(
+    bucket: WeatherBucket,
+    unitSystem: UnitSystem,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = bucket.label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = "${bucket.driveCount} drive${if (bucket.driveCount != 1) "s" else ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "${formatSpeed(bucket.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (bucket.avgSmoothness != null) {
+                Text(
+                    text = String.format(Locale.US, "%.0f smoothness", bucket.avgSmoothness),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
