@@ -46,7 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.ui.auth.GoogleSignInCard
-import com.rallytrax.app.ui.components.MonthCalendar
+import com.rallytrax.app.ui.components.CalendarHeatmap
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.util.formatDistance
 
@@ -104,11 +104,11 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Month Calendar
+            // Year-in-Review Calendar Heatmap
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    MonthCalendar(
-                        activeDays = profile.activeDaysThisMonth,
+                    CalendarHeatmap(
+                        dailyDistances = profile.dailyDistances,
                         currentStreak = profile.currentStreak,
                     )
                 }

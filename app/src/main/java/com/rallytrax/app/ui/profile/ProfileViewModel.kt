@@ -21,6 +21,7 @@ import javax.inject.Inject
 data class ProfileState(
     val currentStreak: Int = 0,
     val activeDaysThisMonth: Set<LocalDate> = emptySet(),
+    val dailyDistances: Map<LocalDate, Double> = emptyMap(),
     // Lifetime stats
     val totalDrives: Int = 0,
     val totalDistanceMeters: Double = 0.0,
@@ -84,6 +85,11 @@ class ProfileViewModel @Inject constructor(
         val longestDrive = stints.maxOfOrNull { it.distanceMeters } ?: 0.0
         val vehicleCount = allVehicles.count { !it.isArchived }
 
+        // Daily distances for heatmap
+        val dailyDistances = stints.groupBy {
+            Instant.ofEpochMilli(it.recordedAt).atZone(zone).toLocalDate()
+        }.mapValues { (_, tracks) -> tracks.sumOf { it.distanceMeters } }
+
         // Yearly stats (stints only)
         val yearStart = LocalDate.of(today.year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
         val yearlyTracks = stints.filter { it.recordedAt >= yearStart }
@@ -91,6 +97,7 @@ class ProfileViewModel @Inject constructor(
         ProfileState(
             currentStreak = currentStreak,
             activeDaysThisMonth = activeDaysThisMonth,
+            dailyDistances = dailyDistances,
             totalDrives = totalDrives,
             totalDistanceMeters = totalDistance,
             avgDriveLengthMeters = avgDriveLength,
