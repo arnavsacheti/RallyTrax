@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +53,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -97,6 +99,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val feedState by viewModel.feedState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+    val duplicateState by viewModel.duplicateImportState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var hasLocationPermission by remember {
@@ -306,6 +309,48 @@ fun HomeScreen(
 
     if (showFillUpSheet) {
         FillUpSheet(onDismiss = { showFillUpSheet = false })
+    }
+
+    // Duplicate import detection dialog
+    duplicateState?.let { state ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDuplicateDialog() },
+            title = { Text("Route Already Exists") },
+            text = {
+                Column {
+                    Text(
+                        text = "\"${state.pendingImport.track.name}\" appears to match an existing route.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Existing: ${formatDistance(state.existingTrack.distanceMeters, preferences.unitSystem)}, ${formatElapsedTime(state.existingTrack.durationMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "New: ${formatDistance(state.pendingImport.track.distanceMeters, preferences.unitSystem)}, ${formatElapsedTime(state.pendingImport.track.durationMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmReplaceExisting() }) {
+                    Text("Replace Existing")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { viewModel.dismissDuplicateDialog() }) {
+                        Text("Cancel")
+                    }
+                    TextButton(onClick = { viewModel.confirmImportAsNew() }) {
+                        Text("Import Anyway")
+                    }
+                }
+            },
+        )
     }
 }
 

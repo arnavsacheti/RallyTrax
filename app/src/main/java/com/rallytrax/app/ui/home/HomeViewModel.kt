@@ -4,10 +4,12 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.gpx.GpxImportResult
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.di.IoDispatcher
@@ -18,10 +20,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoField
@@ -31,6 +35,11 @@ data class WeeklySummary(
     val totalDistanceMeters: Double = 0.0,
     val driveCount: Int = 0,
     val totalDurationMs: Long = 0L,
+)
+
+data class DuplicateImportState(
+    val pendingImport: GpxImportResult,
+    val existingTrack: TrackEntity,
 )
 
 data class HomeFeedState(
@@ -60,6 +69,9 @@ class HomeViewModel @Inject constructor(
     val snackbarMessage = _snackbarMessage.asSharedFlow()
 
     private val _showActiveVehicleOnly = MutableStateFlow(false)
+
+    private val _duplicateImportState = MutableStateFlow<DuplicateImportState?>(null)
+    val duplicateImportState: StateFlow<DuplicateImportState?> = _duplicateImportState.asStateFlow()
 
     val feedState: StateFlow<HomeFeedState> = combine(
         trackDao.getStints(),
@@ -114,8 +126,7 @@ class HomeViewModel @Inject constructor(
         _showActiveVehicleOnly.value = !_showActiveVehicleOnly.value
     }
 
-    fun importGpx(context: Context, uri: Uri): String? {
-        var importedTrackId: String? = null
+    fun importGpx(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
                 val result = withContext(ioDispatcher) {
@@ -123,23 +134,81 @@ class HomeViewModel @Inject constructor(
                         ?: throw GpxParseException("Could not open file")
                     inputStream.use { com.rallytrax.app.data.gpx.TrackImporter.import(it) }
                 }
-                withContext(ioDispatcher) {
-                    trackDao.insertTrack(result.track.copy(trackCategory = "route"))
-                    result.points.chunked(1000).forEach { chunk ->
-                        trackPointDao.insertPoints(chunk)
-                    }
-                    if (result.paceNotes.isNotEmpty()) {
-                        paceNoteDao.insertNotes(result.paceNotes)
-                    }
+
+                // Detect duplicates before inserting
+                val duplicate = withContext(ioDispatcher) { findDuplicate(result) }
+                if (duplicate != null) {
+                    _duplicateImportState.value = DuplicateImportState(result, duplicate)
+                } else {
+                    insertImport(result)
+                    _snackbarMessage.tryEmit("Imported: ${result.track.name}")
                 }
-                importedTrackId = result.track.id
-                _snackbarMessage.tryEmit("Imported: ${result.track.name}")
             } catch (e: GpxParseException) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")
             } catch (e: Exception) {
                 _snackbarMessage.tryEmit("Import failed: ${e.message}")
             }
         }
-        return importedTrackId
+    }
+
+    fun confirmImportAsNew() {
+        val state = _duplicateImportState.value ?: return
+        _duplicateImportState.value = null
+        viewModelScope.launch {
+            insertImport(state.pendingImport)
+            _snackbarMessage.tryEmit("Imported: ${state.pendingImport.track.name}")
+        }
+    }
+
+    fun confirmReplaceExisting() {
+        val state = _duplicateImportState.value ?: return
+        _duplicateImportState.value = null
+        viewModelScope.launch {
+            withContext(ioDispatcher) {
+                trackDao.deleteTrack(state.existingTrack.id)
+            }
+            insertImport(state.pendingImport)
+            _snackbarMessage.tryEmit("Replaced: ${state.pendingImport.track.name}")
+        }
+    }
+
+    fun dismissDuplicateDialog() {
+        _duplicateImportState.value = null
+    }
+
+    private suspend fun findDuplicate(result: GpxImportResult): TrackEntity? {
+        val track = result.track
+        // First check by name match
+        val byName = trackDao.getTracksForRoute(track.name)
+            .filter { it.trackCategory == "route" }
+        if (byName.isNotEmpty()) return byName.first()
+
+        // Then check by bounding box overlap + distance similarity
+        if (track.boundingBoxNorthLat == 0.0 && track.boundingBoxSouthLat == 0.0) return null
+        val overlapping = trackDao.getTracksOverlappingBounds(
+            excludeTrackId = "",
+            northLat = track.boundingBoxNorthLat,
+            southLat = track.boundingBoxSouthLat,
+            eastLon = track.boundingBoxEastLon,
+            westLon = track.boundingBoxWestLon,
+        ).filter { it.trackCategory == "route" }
+
+        return overlapping.firstOrNull { existing ->
+            val distanceDiff = abs(existing.distanceMeters - track.distanceMeters)
+            val tolerance = track.distanceMeters * 0.1 // 10% tolerance
+            distanceDiff <= tolerance
+        }
+    }
+
+    private suspend fun insertImport(result: GpxImportResult) {
+        withContext(ioDispatcher) {
+            trackDao.insertTrack(result.track.copy(trackCategory = "route"))
+            result.points.chunked(1000).forEach { chunk ->
+                trackPointDao.insertPoints(chunk)
+            }
+            if (result.paceNotes.isNotEmpty()) {
+                paceNoteDao.insertNotes(result.paceNotes)
+            }
+        }
     }
 }
