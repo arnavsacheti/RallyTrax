@@ -22,6 +22,7 @@ import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.sync.SyncManager
+import com.rallytrax.app.data.sync.SyncStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -66,6 +67,8 @@ class SettingsViewModel @Inject constructor(
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
 
+    val syncStatus: StateFlow<SyncStatus> = syncManager.syncStatus
+
     private val isSignedIn: Boolean
         get() = authRepository.authState.value is AuthState.SignedIn
 
@@ -79,6 +82,10 @@ class SettingsViewModel @Inject constructor(
         if (isSignedIn) {
             syncManager.scheduleDebouncedSync()
         }
+    }
+
+    fun syncNow() {
+        syncManager.scheduleImmediateSync()
     }
 
     fun setThemeMode(mode: ThemeMode) {

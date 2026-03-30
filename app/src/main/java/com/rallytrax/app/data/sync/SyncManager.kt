@@ -176,6 +176,15 @@ class SyncManager @Inject constructor(
         Log.d(TAG, "GPX backup scheduled (Wi-Fi + charging)")
     }
 
+    /**
+     * Immediately enqueue a one-time sync (no debounce delay).
+     */
+    fun scheduleImmediateSync() {
+        debounceJob?.cancel()
+        _syncStatus.value = _syncStatus.value.copy(pendingChanges = true)
+        enqueueOneTimeSync()
+    }
+
     private fun enqueueOneTimeSync() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
