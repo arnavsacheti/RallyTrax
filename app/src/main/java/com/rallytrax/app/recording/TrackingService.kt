@@ -131,6 +131,9 @@ class TrackingService : LifecycleService() {
         private val _savedTrackId = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val savedTrackId = _savedTrackId.asSharedFlow()
 
+        private val _sensorHudData = MutableStateFlow(SensorHudData.EMPTY)
+        val sensorHudData = _sensorHudData.asStateFlow()
+
         private val _gasStationDetected = MutableSharedFlow<GasStationPrompt>(extraBufferCapacity = 1)
         val gasStationDetected = _gasStationDetected.asSharedFlow()
     }
@@ -374,6 +377,7 @@ class TrackingService : LifecycleService() {
             _savedTrackId.tryEmit(savedId)
             _recordingStatus.value = RecordingStatus.IDLE
             _recordingData.value = RecordingData.EMPTY
+            _sensorHudData.value = SensorHudData.EMPTY
 
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -628,6 +632,19 @@ class TrackingService : LifecycleService() {
                     currentLatLng = predictedLatLng,
                     currentSpeed = predicted.speedMps,
                 )
+                // Emit live sensor readings for HUD overlay
+                // SensorCollector maps: values[1] -> lateralAccel (y-axis),
+                // values[2] -> verticalAccel (z-axis). For the HUD:
+                // - lateral G = y-axis (side-to-side cornering force)
+                // - longitudinal G = z-axis (accel/brake in device frame)
+                // - vertical G = residual z-axis component (road roughness)
+                sensorCollector?.snapshot()?.let { snap ->
+                    _sensorHudData.value = SensorHudData(
+                        lateralAccelMps2 = snap.lateralAccelMps2,
+                        longitudinalAccelMps2 = snap.verticalAccelMps2,
+                        verticalAccelMps2 = snap.verticalAccelMps2,
+                    )
+                }
             }
         }
     }

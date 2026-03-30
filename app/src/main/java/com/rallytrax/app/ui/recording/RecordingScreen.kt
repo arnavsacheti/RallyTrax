@@ -74,6 +74,8 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.GpsNotFixed
 import androidx.compose.material.icons.filled.GpsOff
+import androidx.compose.material.icons.filled.Speed
+import com.rallytrax.app.recording.SensorHudData
 
 @Composable
 fun RecordingScreen(
@@ -112,6 +114,9 @@ fun RecordingScreen(
     BackHandler(enabled = status == RecordingStatus.RECORDING || status == RecordingStatus.PAUSED) {
         showStopDialog = true
     }
+
+    val sensorData by viewModel.sensorHudData.collectAsStateWithLifecycle()
+    var showSensorHud by remember { mutableStateOf(false) }
 
     val isRecording = status == RecordingStatus.RECORDING
     val isPaused = status == RecordingStatus.PAUSED
@@ -215,6 +220,26 @@ fun RecordingScreen(
 
             // GPS quality indicator
             GpsQualityBadge(accuracy = data.gpsAccuracy)
+        }
+
+        // Sensor HUD overlay
+        if (isRecording && showSensorHud) {
+            SensorHudOverlay(
+                sensorData = sensorData,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 100.dp, end = 12.dp),
+            )
+        }
+
+        // Sensor HUD toggle
+        if (isRecording) {
+            androidx.compose.material3.IconButton(
+                onClick = { showSensorHud = !showSensorHud },
+                modifier = Modifier.align(Alignment.TopStart).padding(top = 100.dp, start = 12.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp)),
+            ) {
+                Icon(Icons.Filled.Speed, if (showSensorHud) "Hide sensors" else "Show sensors",
+                    tint = if (showSensorHud) Color(0xFF1A73E8) else Color.White.copy(alpha = 0.7f))
+            }
         }
 
         // GPS lock loading indicator
@@ -430,5 +455,32 @@ private fun GpsQualityBadge(accuracy: Float?) {
             style = MaterialTheme.typography.labelSmall,
             color = Color.White,
         )
+    }
+}
+
+@Composable
+private fun SensorHudOverlay(sensorData: SensorHudData, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(12.dp)).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val latG = sensorData.lateralG
+        SensorRow("Lat G", latG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "—",
+            when { latG == null -> Color.Gray; latG < 0.3 -> Color(0xFF34A853); latG < 0.5 -> Color(0xFFFBBC04); else -> Color(0xFFEA4335) })
+        val longG = sensorData.longitudinalG
+        SensorRow(if (longG != null && longG < -0.05) "Brake" else "Accel",
+            longG?.let { String.format(java.util.Locale.US, "%.2f", kotlin.math.abs(it)) } ?: "—",
+            when { longG == null -> Color.Gray; longG > 0.05 -> Color(0xFF34A853); longG < -0.05 -> Color(0xFFEA4335); else -> Color.White.copy(alpha = 0.5f) })
+        val vertG = sensorData.verticalG
+        SensorRow("Vrt G", vertG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "—", Color.White.copy(alpha = 0.7f))
+    }
+}
+
+@Composable
+private fun SensorRow(label: String, value: String, color: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(6.dp).background(color, CircleShape))
+        Text(value, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.width(40.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
     }
 }

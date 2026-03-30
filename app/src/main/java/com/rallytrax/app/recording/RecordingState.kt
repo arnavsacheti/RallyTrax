@@ -13,6 +13,29 @@ enum class RecordingStatus {
     STOPPED,
 }
 
+/**
+ * Live sensor readings for the HUD overlay during recording.
+ * Values are in m/s^2 for acceleration and converted to G-forces in the UI.
+ */
+data class SensorHudData(
+    val lateralAccelMps2: Double? = null,
+    val longitudinalAccelMps2: Double? = null,
+    val verticalAccelMps2: Double? = null,
+) {
+    companion object {
+        val EMPTY = SensorHudData()
+        /** Standard gravity in m/s^2 */
+        const val GRAVITY = 9.80665
+    }
+
+    /** Lateral acceleration in G-forces (absolute value) */
+    val lateralG: Double? get() = lateralAccelMps2?.let { kotlin.math.abs(it) / GRAVITY }
+    /** Longitudinal acceleration in G-forces (positive = accel, negative = brake) */
+    val longitudinalG: Double? get() = longitudinalAccelMps2?.let { it / GRAVITY }
+    /** Vertical acceleration in G-forces (absolute value) */
+    val verticalG: Double? get() = verticalAccelMps2?.let { kotlin.math.abs(it) / GRAVITY }
+}
+
 data class RecordingData(
     val pathSegments: List<List<LatLng>> = emptyList(),
     val currentSpeed: Double = 0.0,
