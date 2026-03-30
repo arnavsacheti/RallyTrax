@@ -13,9 +13,12 @@ import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccoun
 import com.rallytrax.app.data.gpx.GpxExporter
 import com.google.api.services.drive.DriveScopes
 import com.rallytrax.app.data.gpx.TrackImporter
+import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.ByteArrayOutputStream
@@ -24,6 +27,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +47,9 @@ class SyncManager @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val vehicleDao: VehicleDao,
+    private val maintenanceDao: MaintenanceDao,
+    private val fuelLogDao: FuelLogDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var debounceJob: Job? = null
@@ -101,6 +109,9 @@ class SyncManager @Inject constructor(
                 driveHelper.uploadManifest(manifest)
             }
             // else: hashes match, nothing to do
+
+            // 3b. Backup garage data (vehicles, maintenance, fuel logs)
+            manifest = backupGarageData(driveHelper, manifest)
 
             // 4. Update sync time
             val now = System.currentTimeMillis()
@@ -165,6 +176,43 @@ class SyncManager @Inject constructor(
         val updatedManifest = manifest.copy(gpxFileIds = updatedGpxFileIds)
         driveHelper.uploadManifest(updatedManifest)
         Log.d(TAG, "GPX backup complete: ${updatedGpxFileIds.size} tracks in manifest")
+    }
+
+    /**
+     * Back up all garage data (vehicles, maintenance schedules/records, fuel logs) to Drive.
+     * Loads all entities in parallel, serializes to JSON, computes MD5 to skip unchanged data.
+     * Returns the updated manifest (or the original if nothing changed).
+     */
+    private suspend fun backupGarageData(
+        driveHelper: DriveServiceHelper,
+        manifest: SyncManifest,
+    ): SyncManifest {
+        val garageData = coroutineScope {
+            val vehiclesDeferred = async { vehicleDao.getAllVehiclesOnce() }
+            val schedulesDeferred = async { maintenanceDao.getAllSchedulesOnce() }
+            val recordsDeferred = async { maintenanceDao.getAllRecordsOnce() }
+            val fuelLogsDeferred = async { fuelLogDao.getAllLogsOnce() }
+
+            SyncableGarage(
+                vehicles = vehiclesDeferred.await().map { it.toSyncable() },
+                maintenanceSchedules = schedulesDeferred.await().map { it.toSyncable() },
+                maintenanceRecords = recordsDeferred.await().map { it.toSyncable() },
+                fuelLogs = fuelLogsDeferred.await().map { it.toSyncable() },
+            )
+        }
+
+        val garageJson = garageData.toJson()
+        val garageMd5 = DriveServiceHelper.md5Hash(garageJson)
+
+        if (garageMd5 == manifest.garageMd5) {
+            Log.d(TAG, "Garage data unchanged — skipping upload")
+            return manifest
+        }
+
+        val updatedManifest = driveHelper.uploadGarageData(garageJson, manifest)
+        driveHelper.uploadManifest(updatedManifest)
+        Log.d(TAG, "Garage data backed up successfully")
+        return updatedManifest
     }
 
     /**

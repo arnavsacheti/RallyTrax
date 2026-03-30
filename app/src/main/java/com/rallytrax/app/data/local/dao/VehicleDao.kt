@@ -41,6 +41,9 @@ interface VehicleDao {
     @Query("UPDATE vehicles SET isArchived = 0, updatedAt = :now WHERE id = :vehicleId")
     suspend fun unarchiveVehicle(vehicleId: String, now: Long = System.currentTimeMillis())
 
+    @Query("SELECT * FROM vehicles ORDER BY updatedAt DESC")
+    suspend fun getAllVehiclesOnce(): List<VehicleEntity>
+
     @Query("SELECT COUNT(*) FROM vehicles WHERE isArchived = 0")
     suspend fun getVehicleCount(): Int
 

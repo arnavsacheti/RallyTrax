@@ -104,6 +104,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val feedState by viewModel.feedState.collectAsStateWithLifecycle()
+    val friendActivities by viewModel.friendActivities.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val duplicateState by viewModel.duplicateImportState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -298,6 +299,28 @@ fun HomeScreen(
                         onClick = { onTrackClick(feedItem.track.id) },
                         modifier = Modifier.animateItem(),
                     )
+                }
+
+                // Friends activity feed
+                if (friendActivities.isNotEmpty()) {
+                    item(key = "friends_header") {
+                        Text(
+                            text = "Friends",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                    items(
+                        items = friendActivities,
+                        key = { "friend_${it.trackId}" },
+                    ) { sharedTrack ->
+                        FriendActivityCard(
+                            sharedTrack = sharedTrack,
+                            unitSystem = preferences.unitSystem,
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
                 }
 
                 // Bottom spacer for FAB
