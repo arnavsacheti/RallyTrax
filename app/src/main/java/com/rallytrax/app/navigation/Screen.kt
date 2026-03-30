@@ -41,6 +41,7 @@ data class TopLevelRoute(
 @Serializable data class EditVehicleRoute(val vehicleId: String)
 @Serializable data object StintsRoute
 @Serializable data object AchievementsRoute
+@Serializable data object FriendsRoute
 @Serializable data object SegmentsListRoute
 @Serializable data class SegmentDetailRoute(val segmentId: String)
 
