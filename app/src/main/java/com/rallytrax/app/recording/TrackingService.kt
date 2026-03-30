@@ -85,6 +85,9 @@ class TrackingService : LifecycleService() {
     // Phone sensor collector for Jemba-style inertial data
     private var sensorCollector: SensorCollector? = null
 
+    // Voice note recorder
+    private var voiceNoteRecorder: VoiceNoteRecorder? = null
+
     // Gas station pause detection
     private var pauseStartTime: Long? = null
     private var pauseLocation: Location? = null
@@ -126,6 +129,7 @@ class TrackingService : LifecycleService() {
         const val ACTION_RESUME = "ACTION_RESUME"
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_MARK_SEGMENT = "ACTION_MARK_SEGMENT"
+        const val ACTION_VOICE_NOTE = "ACTION_VOICE_NOTE"
         const val EXTRA_SEGMENT_TYPE = "EXTRA_SEGMENT_TYPE"
 
         private val _recordingStatus = MutableStateFlow(RecordingStatus.IDLE)
@@ -142,7 +146,18 @@ class TrackingService : LifecycleService() {
 
         private val _gasStationDetected = MutableSharedFlow<GasStationPrompt>(extraBufferCapacity = 1)
         val gasStationDetected = _gasStationDetected.asSharedFlow()
+
+        private val _voiceNoteEvents = MutableSharedFlow<VoiceNoteEvent>(extraBufferCapacity = 5)
+        val voiceNoteEvents = _voiceNoteEvents.asSharedFlow()
+
+        private val _isRecordingVoiceNote = MutableStateFlow(false)
+        val isRecordingVoiceNote = _isRecordingVoiceNote.asStateFlow()
     }
+
+    data class VoiceNoteEvent(
+        val filePath: String,
+        val pointIndex: Int,
+    )
 
     data class GasStationPrompt(
         val stationName: String,
@@ -165,6 +180,7 @@ class TrackingService : LifecycleService() {
             ACTION_RESUME -> resumeRecording()
             ACTION_STOP -> stopRecording()
             ACTION_MARK_SEGMENT -> markSegment(intent?.getStringExtra(EXTRA_SEGMENT_TYPE) ?: "break")
+            ACTION_VOICE_NOTE -> toggleVoiceNote()
         }
         return START_STICKY
     }
@@ -301,6 +317,8 @@ class TrackingService : LifecycleService() {
         flushJob?.cancel()
         sensorCollector?.stop()
         sensorCollector = null
+        voiceNoteRecorder?.stopRecording()
+        _isRecordingVoiceNote.value = false
 
         _recordingStatus.value = RecordingStatus.STOPPED
 
@@ -530,6 +548,21 @@ class TrackingService : LifecycleService() {
         pointBuffer.add(point)
     }
 
+    private fun toggleVoiceNote() {
+        val recorder = voiceNoteRecorder ?: VoiceNoteRecorder(this).also { voiceNoteRecorder = it }
+        if (recorder.isRecording()) {
+            val idx = pointIndex
+            val filePath = recorder.stopRecording()
+            _isRecordingVoiceNote.value = false
+            if (filePath != null) {
+                _voiceNoteEvents.tryEmit(VoiceNoteEvent(filePath = filePath, pointIndex = idx))
+            }
+        } else {
+            recorder.startRecording(trackId, pointIndex)
+            _isRecordingVoiceNote.value = recorder.isRecording()
+        }
+    }
+
     private fun checkAutoPause(speed: Double, now: Long) {
         // Read auto-pause preference (cached at start, check periodically)
         val prefs = kotlinx.coroutines.runBlocking {
@@ -721,6 +754,8 @@ class TrackingService : LifecycleService() {
         predictionJob?.cancel()
         sensorCollector?.stop()
         sensorCollector = null
+        voiceNoteRecorder?.stopRecording()
+        voiceNoteRecorder = null
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 }
