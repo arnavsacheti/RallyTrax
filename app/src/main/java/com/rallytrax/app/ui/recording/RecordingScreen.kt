@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -71,6 +73,7 @@ import com.rallytrax.app.ui.map.OsmPolylineData
 import org.osmdroid.util.GeoPoint
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
+import com.rallytrax.app.util.formatElevation
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
 import androidx.compose.material.icons.filled.Flag
@@ -271,8 +274,7 @@ fun RecordingScreen(
                 .padding(top = 16.dp, bottom = 32.dp, start = 16.dp, end = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // === PRIMARY METRICS (always visible, largest) ===
-            // Speed (Display Large)
+            // === SPEED (always visible, above pager) ===
             Text(
                 text = formatSpeed(data.currentSpeed, preferences.unitSystem),
                 style = MaterialTheme.typography.displayLarge,
@@ -285,28 +287,56 @@ fun RecordingScreen(
                 color = Color.White.copy(alpha = 0.6f),
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Time and distance (primary row)
+            // Page indicator dots
+            val pagerState = rememberPagerState(pageCount = { 3 })
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.Center,
             ) {
-                RecStatItem("Time", formatElapsedTime(data.elapsedTimeMs))
-                RecStatItem("Distance", formatDistance(data.distanceMeters, preferences.unitSystem))
+                repeat(3) { page ->
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                if (page == pagerState.currentPage) Color.White else Color.White.copy(alpha = 0.3f),
+                                CircleShape,
+                            ),
+                    )
+                    if (page < 2) Spacer(modifier = Modifier.width(6.dp))
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // === SECONDARY METRICS (medium, glanceable) ===
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                RecStatItem("Avg Speed", "${formatSpeed(data.avgSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}")
-                RecStatItem("Max Speed", "${formatSpeed(data.maxSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}")
-                if (data.currentElevation != null) {
-                    RecStatItem("Elevation", "${data.currentElevation!!.toInt()} m")
+            // Swipeable metric pages
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+            ) { page ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    when (page) {
+                        0 -> {
+                            MetricColumn(formatElapsedTime(data.elapsedTimeMs), "Time")
+                            MetricColumn(formatDistance(data.distanceMeters, preferences.unitSystem), "Distance")
+                        }
+                        1 -> {
+                            MetricColumn("${formatSpeed(data.avgSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}", "Avg Speed")
+                            MetricColumn("${formatSpeed(data.maxSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}", "Max Speed")
+                            MetricColumn(formatElevation(data.elevationGainM, preferences.unitSystem), "Elev Gain")
+                            MetricColumn(data.currentElevation?.let { formatElevation(it, preferences.unitSystem) } ?: "—", "Elevation")
+                        }
+                        2 -> {
+                            MetricColumn(data.gpsAccuracy?.let { "${it.toInt()}m" } ?: "—", "GPS Acc")
+                            MetricColumn("${data.pointCount}", "Points")
+                            MetricColumn(sensorData.lateralG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "—", "Lat G")
+                            MetricColumn(sensorData.longitudinalG?.let { String.format(java.util.Locale.US, "%.2f", kotlin.math.abs(it)) } ?: "—", "Brk G")
+                        }
+                    }
                 }
             }
 
@@ -410,10 +440,10 @@ fun RecordingScreen(
 }
 
 @Composable
-private fun RecStatItem(label: String, value: String) {
+private fun MetricColumn(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
     }
 }
 
