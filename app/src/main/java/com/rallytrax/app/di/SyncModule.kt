@@ -1,6 +1,9 @@
 package com.rallytrax.app.di
 
 import android.content.Context
+import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.dao.MaintenanceDao
+import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.sync.SyncManager
 import dagger.Module
@@ -19,5 +22,8 @@ object SyncModule {
     fun provideSyncManager(
         @ApplicationContext context: Context,
         preferencesRepository: UserPreferencesRepository,
-    ): SyncManager = SyncManager(context, preferencesRepository)
+        vehicleDao: VehicleDao,
+        maintenanceDao: MaintenanceDao,
+        fuelLogDao: FuelLogDao,
+    ): SyncManager = SyncManager(context, preferencesRepository, vehicleDao, maintenanceDao, fuelLogDao)
 }

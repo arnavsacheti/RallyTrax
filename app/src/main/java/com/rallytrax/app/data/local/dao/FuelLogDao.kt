@@ -23,6 +23,9 @@ interface FuelLogDao {
     @Query("SELECT * FROM fuel_logs WHERE trackId = :trackId")
     suspend fun getLogsByTrackId(trackId: String): List<FuelLogEntity>
 
+    @Query("SELECT * FROM fuel_logs ORDER BY date DESC")
+    suspend fun getAllLogsOnce(): List<FuelLogEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: FuelLogEntity)
 

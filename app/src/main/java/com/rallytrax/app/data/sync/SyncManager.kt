@@ -11,6 +11,9 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.services.drive.DriveScopes
+import com.rallytrax.app.data.local.dao.FuelLogDao
+import com.rallytrax.app.data.local.dao.MaintenanceDao
+import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +23,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -31,6 +36,9 @@ import javax.inject.Singleton
 class SyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferencesRepository: UserPreferencesRepository,
+    private val vehicleDao: VehicleDao,
+    private val maintenanceDao: MaintenanceDao,
+    private val fuelLogDao: FuelLogDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var debounceJob: Job? = null
@@ -55,14 +63,14 @@ class SyncManager @Inject constructor(
             val driveHelper = DriveServiceHelper(credential)
 
             // 1. Get or create manifest
-            val manifest = driveHelper.getOrCreateManifest()
+            var manifest = driveHelper.getOrCreateManifest()
 
             // 2. Get local settings
             val localSettings = preferencesRepository.toSyncableSettings()
             val localJson = localSettings.toJson()
             val localMd5 = DriveServiceHelper.md5Hash(localJson)
 
-            // 3. Compare and sync
+            // 3. Compare and sync settings
             if (manifest.settingsFileId != null && manifest.settingsMd5 != localMd5) {
                 // Remote exists and differs from local — download and merge
                 val remoteJson = driveHelper.downloadSettings(manifest)
@@ -73,15 +81,18 @@ class SyncManager @Inject constructor(
 
                     // Upload merged result
                     val mergedJson = merged.toJson()
-                    val updatedManifest = driveHelper.uploadSettings(mergedJson, manifest)
-                    driveHelper.uploadManifest(updatedManifest)
+                    manifest = driveHelper.uploadSettings(mergedJson, manifest)
+                    driveHelper.uploadManifest(manifest)
                 }
             } else if (manifest.settingsFileId == null || manifest.settingsMd5 != localMd5) {
                 // No remote or local has changed — upload local
-                val updatedManifest = driveHelper.uploadSettings(localJson, manifest)
-                driveHelper.uploadManifest(updatedManifest)
+                manifest = driveHelper.uploadSettings(localJson, manifest)
+                driveHelper.uploadManifest(manifest)
             }
             // else: hashes match, nothing to do
+
+            // 3b. Backup garage data (vehicles, maintenance, fuel logs)
+            manifest = backupGarageData(driveHelper, manifest)
 
             // 4. Update sync time
             val now = System.currentTimeMillis()
@@ -108,6 +119,43 @@ class SyncManager @Inject constructor(
                 error = e.message ?: "Sync failed",
             )
         }
+    }
+
+    /**
+     * Back up all garage data (vehicles, maintenance schedules/records, fuel logs) to Drive.
+     * Loads all entities in parallel, serializes to JSON, computes MD5 to skip unchanged data.
+     * Returns the updated manifest (or the original if nothing changed).
+     */
+    private suspend fun backupGarageData(
+        driveHelper: DriveServiceHelper,
+        manifest: SyncManifest,
+    ): SyncManifest {
+        val garageData = coroutineScope {
+            val vehiclesDeferred = async { vehicleDao.getAllVehiclesOnce() }
+            val schedulesDeferred = async { maintenanceDao.getAllSchedulesOnce() }
+            val recordsDeferred = async { maintenanceDao.getAllRecordsOnce() }
+            val fuelLogsDeferred = async { fuelLogDao.getAllLogsOnce() }
+
+            SyncableGarage(
+                vehicles = vehiclesDeferred.await().map { it.toSyncable() },
+                maintenanceSchedules = schedulesDeferred.await().map { it.toSyncable() },
+                maintenanceRecords = recordsDeferred.await().map { it.toSyncable() },
+                fuelLogs = fuelLogsDeferred.await().map { it.toSyncable() },
+            )
+        }
+
+        val garageJson = garageData.toJson()
+        val garageMd5 = DriveServiceHelper.md5Hash(garageJson)
+
+        if (garageMd5 == manifest.garageMd5) {
+            Log.d(TAG, "Garage data unchanged — skipping upload")
+            return manifest
+        }
+
+        val updatedManifest = driveHelper.uploadGarageData(garageJson, manifest)
+        driveHelper.uploadManifest(updatedManifest)
+        Log.d(TAG, "Garage data backed up successfully")
+        return updatedManifest
     }
 
     /**
