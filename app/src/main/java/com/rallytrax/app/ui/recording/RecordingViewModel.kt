@@ -8,6 +8,7 @@ import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.recording.RecordingData
 import com.rallytrax.app.recording.RecordingStatus
+import com.rallytrax.app.recording.SensorHudData
 import com.rallytrax.app.recording.TrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,6 +32,9 @@ class RecordingViewModel @Inject constructor(
 
     val recordingData: StateFlow<RecordingData> = TrackingService.recordingData
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RecordingData.EMPTY)
+
+    val sensorHudData: StateFlow<SensorHudData> = TrackingService.sensorHudData
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SensorHudData.EMPTY)
 
     private val _navigateToTrackDetail = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val navigateToTrackDetail = _navigateToTrackDetail.asSharedFlow()
