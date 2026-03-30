@@ -1,11 +1,13 @@
 package com.rallytrax.app.ui.recording
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
+import com.rallytrax.app.data.ThumbnailGenerator
 import com.rallytrax.app.data.achievements.AchievementTracker
 import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.data.classification.SurfaceFusion
@@ -21,7 +23,9 @@ import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.ui.components.generateShareBitmap
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
+import com.rallytrax.app.di.DefaultDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +34,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class SensorStats(
@@ -60,12 +65,14 @@ data class ActivitySummaryState(
 @HiltViewModel
 class ActivitySummaryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val application: Application,
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val vehicleDao: VehicleDao,
     private val achievementTracker: AchievementTracker,
     private val valhallaSurfaceClient: ValhallaSurfaceClient,
     preferencesRepository: UserPreferencesRepository,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val trackId: String = savedStateHandle["trackId"] ?: ""
@@ -212,6 +219,15 @@ class ActivitySummaryViewModel @Inject constructor(
                 vehicleId = current.selectedVehicleId,
             )
             trackDao.updateTrack(updated)
+
+            // Generate thumbnail
+            val points = trackPointDao.getPointsForTrackOnce(trackId)
+            val thumbnailPath = withContext(defaultDispatcher) {
+                ThumbnailGenerator.generate(points, context = application)
+            }
+            if (thumbnailPath != null) {
+                trackDao.updateTrack(updated.copy(thumbnailPath = thumbnailPath))
+            }
 
             // Check achievements
             achievementTracker.seedAchievements()
