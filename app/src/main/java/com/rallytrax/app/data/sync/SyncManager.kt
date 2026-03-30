@@ -10,9 +10,13 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
-import com.google.api.services.drive.DriveScopes
+import com.rallytrax.app.data.gpx.GpxExporter
+import com.rallytrax.app.data.local.dao.PaceNoteDao
+import com.rallytrax.app.data.local.dao.TrackDao
+import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +35,9 @@ import javax.inject.Singleton
 class SyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferencesRepository: UserPreferencesRepository,
+    private val trackDao: TrackDao,
+    private val trackPointDao: TrackPointDao,
+    private val paceNoteDao: PaceNoteDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var debounceJob: Job? = null
@@ -63,7 +70,7 @@ class SyncManager @Inject constructor(
             val driveHelper = DriveServiceHelper(credential)
 
             // 1. Get or create manifest
-            val manifest = driveHelper.getOrCreateManifest()
+            var manifest = driveHelper.getOrCreateManifest()
 
             // 2. Get local settings
             val localSettings = preferencesRepository.toSyncableSettings()
@@ -81,13 +88,13 @@ class SyncManager @Inject constructor(
 
                     // Upload merged result
                     val mergedJson = merged.toJson()
-                    val updatedManifest = driveHelper.uploadSettings(mergedJson, manifest)
-                    driveHelper.uploadManifest(updatedManifest)
+                    manifest = driveHelper.uploadSettings(mergedJson, manifest)
+                    driveHelper.uploadManifest(manifest)
                 }
             } else if (manifest.settingsFileId == null || manifest.settingsMd5 != localMd5) {
                 // No remote or local has changed — upload local
-                val updatedManifest = driveHelper.uploadSettings(localJson, manifest)
-                driveHelper.uploadManifest(updatedManifest)
+                manifest = driveHelper.uploadSettings(localJson, manifest)
+                driveHelper.uploadManifest(manifest)
             }
             // else: hashes match, nothing to do
 
@@ -101,11 +108,10 @@ class SyncManager @Inject constructor(
                 error = null,
             )
 
-            // 5. GPX backup (Tier 2) — if enabled, schedule via WorkManager
+            // 5. GPX track backup — upload tracks not yet in manifest
             val prefs = preferencesRepository.preferences.first()
             if (prefs.backupTracksEnabled) {
-                Log.d(TAG, "GPX backup is enabled — will sync on Wi-Fi + charging")
-                scheduleGpxBackup()
+                backupTracks(driveHelper, manifest)
             }
 
             Log.d(TAG, "Sync completed successfully")
@@ -116,6 +122,45 @@ class SyncManager @Inject constructor(
                 error = e.message ?: "Sync failed",
             )
         }
+    }
+
+    /**
+     * Back up all local GPX tracks to Google Drive that are not yet in the manifest.
+     * Each track is exported to GPX format and uploaded to the appDataFolder.
+     */
+    private suspend fun backupTracks(driveHelper: DriveServiceHelper, manifest: SyncManifest) {
+        val allTracks = trackDao.getAllTracksOnce()
+        val existingIds = manifest.gpxFileIds
+        val tracksToBackup = allTracks.filter { it.id !in existingIds }
+
+        if (tracksToBackup.isEmpty()) {
+            Log.d(TAG, "All tracks already backed up (${allTracks.size} total)")
+            return
+        }
+
+        Log.d(TAG, "Backing up ${tracksToBackup.size} tracks to Google Drive")
+        val updatedGpxFileIds = existingIds.toMutableMap()
+
+        for (track in tracksToBackup) {
+            try {
+                val points = trackPointDao.getPointsForTrackOnce(track.id)
+                val paceNotes = paceNoteDao.getNotesForTrackOnce(track.id)
+                val gpxBytes = ByteArrayOutputStream().also { stream ->
+                    GpxExporter.export(track, points, stream, paceNotes)
+                }.toByteArray()
+
+                val driveFileId = driveHelper.uploadGpxFile(track.id, gpxBytes)
+                updatedGpxFileIds[track.id] = driveFileId
+                Log.d(TAG, "Backed up track ${track.id} (${gpxBytes.size} bytes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to back up track ${track.id}", e)
+            }
+        }
+
+        // Persist updated manifest with new gpxFileIds
+        val updatedManifest = manifest.copy(gpxFileIds = updatedGpxFileIds)
+        driveHelper.uploadManifest(updatedManifest)
+        Log.d(TAG, "GPX backup complete: ${updatedGpxFileIds.size} tracks in manifest")
     }
 
     /**

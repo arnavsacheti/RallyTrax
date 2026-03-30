@@ -68,6 +68,27 @@ class DriveServiceHelper(credential: GoogleAccountCredential) {
             }
         }
 
+    /**
+     * Upload a GPX track file to Drive appDataFolder.
+     * Updates the existing file if one with the same name already exists.
+     *
+     * @return the Drive file ID for the uploaded file
+     */
+    suspend fun uploadGpxFile(trackId: String, gpxContent: ByteArray): String =
+        withContext(Dispatchers.IO) {
+            retryWithBackoff {
+                val fileName = "track_${trackId}.gpx"
+                val existingFile = findFile(fileName)
+                if (existingFile != null) {
+                    updateFileContent(existingFile.id, gpxContent, MIME_GPX)
+                    existingFile.id
+                } else {
+                    val file = uploadNewFile(fileName, gpxContent, MIME_GPX)
+                    file.id
+                }
+            }
+        }
+
     suspend fun downloadSettings(manifest: SyncManifest): String? =
         withContext(Dispatchers.IO) {
             val fileId = manifest.settingsFileId ?: return@withContext null
@@ -92,19 +113,25 @@ class DriveServiceHelper(credential: GoogleAccountCredential) {
         return outputStream.toString(Charsets.UTF_8.name())
     }
 
-    private fun uploadNewFile(name: String, content: String, mimeType: String): File {
+    private fun uploadNewFile(name: String, content: String, mimeType: String): File =
+        uploadNewFile(name, content.toByteArray(Charsets.UTF_8), mimeType)
+
+    private fun updateFileContent(fileId: String, content: String, mimeType: String) =
+        updateFileContent(fileId, content.toByteArray(Charsets.UTF_8), mimeType)
+
+    private fun uploadNewFile(name: String, content: ByteArray, mimeType: String): File {
         val metadata = File().apply {
             this.name = name
             this.parents = listOf("appDataFolder")
         }
-        val mediaContent = ByteArrayContent(mimeType, content.toByteArray(Charsets.UTF_8))
+        val mediaContent = ByteArrayContent(mimeType, content)
         return driveService.files().create(metadata, mediaContent)
             .setFields("id")
             .execute()
     }
 
-    private fun updateFileContent(fileId: String, content: String, mimeType: String) {
-        val mediaContent = ByteArrayContent(mimeType, content.toByteArray(Charsets.UTF_8))
+    private fun updateFileContent(fileId: String, content: ByteArray, mimeType: String) {
+        val mediaContent = ByteArrayContent(mimeType, content)
         driveService.files().update(fileId, null, mediaContent).execute()
     }
 
@@ -113,6 +140,7 @@ class DriveServiceHelper(credential: GoogleAccountCredential) {
         private const val MANIFEST_FILENAME = "manifest.json"
         private const val SETTINGS_FILENAME = "settings.json"
         private const val MIME_JSON = "application/json"
+        private const val MIME_GPX = "application/gpx+xml"
 
         fun md5Hash(input: String): String {
             val digest = MessageDigest.getInstance("MD5")
