@@ -1,5 +1,7 @@
 package com.rallytrax.app.ui.recording
 
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +18,9 @@ import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.ui.components.generateShareBitmap
+import com.rallytrax.app.util.formatDistance
+import com.rallytrax.app.util.formatElapsedTime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -213,6 +218,25 @@ class ActivitySummaryViewModel @Inject constructor(
 
     fun dismissAchievements() {
         _navigateToDetail.tryEmit(trackId)
+    }
+
+    fun shareActivity(context: Context) {
+        val track = _state.value.track ?: return
+        val unitSystem = preferences.value.unitSystem
+        viewModelScope.launch {
+            val uri = generateShareBitmap(context, track, unitSystem) ?: return@launch
+            val shareText =
+                "${track.name} — ${formatDistance(track.distanceMeters, unitSystem)} in ${formatElapsedTime(track.durationMs)}"
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, shareText)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(shareIntent, "Share Activity")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        }
     }
 
     fun discardTrack() {
