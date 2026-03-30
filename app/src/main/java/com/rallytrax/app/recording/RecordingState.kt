@@ -21,11 +21,18 @@ data class SensorHudData(
     val lateralAccelMps2: Double? = null,
     val longitudinalAccelMps2: Double? = null,
     val verticalAccelMps2: Double? = null,
+    val peakLateralG: Double = 0.0,
+    val peakBrakingG: Double = 0.0,
+    val alertCount: Int = 0,
 ) {
     companion object {
         val EMPTY = SensorHudData()
         /** Standard gravity in m/s^2 */
         const val GRAVITY = 9.80665
+        /** Lateral G threshold for triggering an alert */
+        const val LATERAL_G_ALERT_THRESHOLD = 0.5
+        /** Braking G threshold for triggering an alert */
+        const val BRAKING_G_ALERT_THRESHOLD = 0.4
     }
 
     /** Lateral acceleration in G-forces (absolute value) */

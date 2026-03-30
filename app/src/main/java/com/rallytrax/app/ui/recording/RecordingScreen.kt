@@ -48,8 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -460,19 +463,73 @@ private fun GpsQualityBadge(accuracy: Float?) {
 
 @Composable
 private fun SensorHudOverlay(sensorData: SensorHudData, modifier: Modifier = Modifier) {
+    val hapticFeedback = LocalHapticFeedback.current
+    val latG = sensorData.lateralG
+    val longG = sensorData.longitudinalG
+
+    LaunchedEffect(latG) {
+        if (latG != null && latG > 0.7) {
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+    LaunchedEffect(longG) {
+        if (longG != null && longG < -0.6) {
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+
+    val latGAlertActive = latG != null && latG > SensorHudData.LATERAL_G_ALERT_THRESHOLD
+    val latGRowBg by animateColorAsState(
+        targetValue = if (latGAlertActive) Color(0xFFEA4335).copy(alpha = 0.35f) else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "lat_g_alert_bg",
+    )
+
     Column(
         modifier = modifier.background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(12.dp)).padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val latG = sensorData.lateralG
-        SensorRow("Lat G", latG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "—",
-            when { latG == null -> Color.Gray; latG < 0.3 -> Color(0xFF34A853); latG < 0.5 -> Color(0xFFFBBC04); else -> Color(0xFFEA4335) })
-        val longG = sensorData.longitudinalG
+        if (sensorData.alertCount > 0) {
+            Text(
+                text = "\u26A0 ${sensorData.alertCount} alerts",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFBBC04),
+                modifier = Modifier.align(Alignment.End),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(latGRowBg, RoundedCornerShape(4.dp)),
+        ) {
+            SensorRow("Lat G", latG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "\u2014",
+                when { latG == null -> Color.Gray; latG < 0.3 -> Color(0xFF34A853); latG < 0.5 -> Color(0xFFFBBC04); else -> Color(0xFFEA4335) })
+        }
+
         SensorRow(if (longG != null && longG < -0.05) "Brake" else "Accel",
-            longG?.let { String.format(java.util.Locale.US, "%.2f", kotlin.math.abs(it)) } ?: "—",
+            longG?.let { String.format(java.util.Locale.US, "%.2f", kotlin.math.abs(it)) } ?: "\u2014",
             when { longG == null -> Color.Gray; longG > 0.05 -> Color(0xFF34A853); longG < -0.05 -> Color(0xFFEA4335); else -> Color.White.copy(alpha = 0.5f) })
+
+        val brakingFraction = kotlin.math.abs(longG ?: 0.0).toFloat().coerceIn(0f, 1f)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.DarkGray),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(brakingFraction)
+                    .height(4.dp)
+                    .background(if (brakingFraction > 0.4f) Color.Red else Color(0xFFFBBC04)),
+            )
+        }
+
         val vertG = sensorData.verticalG
-        SensorRow("Vrt G", vertG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "—", Color.White.copy(alpha = 0.7f))
+        SensorRow("Vrt G", vertG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "\u2014", Color.White.copy(alpha = 0.7f))
     }
 }
 
