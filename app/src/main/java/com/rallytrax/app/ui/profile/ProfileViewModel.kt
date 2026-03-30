@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.VehicleDao
+import com.rallytrax.app.data.local.dao.WeatherDao
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +21,13 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
+
+data class WeatherBucket(
+    val label: String,
+    val driveCount: Int,
+    val avgSpeedMps: Double,
+    val avgSmoothness: Double?,
+)
 
 data class VehicleStats(
     val name: String,
@@ -52,6 +60,8 @@ data class ProfileState(
     // Vehicle comparison
     val vehicleComparison: List<VehicleStats> = emptyList(),
     val driverProfile: Map<Int, Double> = emptyMap(),
+    // Weather impact
+    val weatherBuckets: List<WeatherBucket> = emptyList(),
 )
 
 @HiltViewModel
@@ -59,6 +69,7 @@ class ProfileViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val vehicleDao: VehicleDao,
     private val driverProfileDao: DriverProfileDao,
+    private val weatherDao: WeatherDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -79,7 +90,8 @@ class ProfileViewModel @Inject constructor(
         trackDao.getStints(),
         vehicleDao.getAllVehicles(),
         _driverProfile,
-    ) { stints, allVehicles, driverProfile ->
+        weatherDao.getAllWeather(),
+    ) { stints, allVehicles, driverProfile, allWeather ->
         val zone = ZoneId.systemDefault()
         val today = Instant.now().atZone(zone).toLocalDate()
         val yearMonth = YearMonth.from(today)
@@ -159,6 +171,29 @@ class ProfileViewModel @Inject constructor(
             }
             .sortedByDescending { it.totalDistanceMeters }
 
+        // Weather impact analysis
+        val stintById = stints.associateBy { it.id }
+        val weatherByTrack = allWeather.groupBy { it.trackId }
+        val weatherBuckets = weatherByTrack
+            .mapNotNull { (trackId, weatherRecords) ->
+                val stint = stintById[trackId] ?: return@mapNotNull null
+                val weather = weatherRecords.first()
+                Triple(weather.conditionGroup, stint.avgSpeedMps, stint.smoothnessScore)
+            }
+            .groupBy { it.first }
+            .map { (group, entries) ->
+                val smoothnessValues = entries.mapNotNull { it.third }
+                WeatherBucket(
+                    label = group,
+                    driveCount = entries.size,
+                    avgSpeedMps = entries.sumOf { it.second } / entries.size,
+                    avgSmoothness = if (smoothnessValues.isNotEmpty()) {
+                        smoothnessValues.sumOf { it.toDouble() } / smoothnessValues.size
+                    } else null,
+                )
+            }
+            .sortedByDescending { it.driveCount }
+
         ProfileState(
             currentStreak = currentStreak,
             activeDaysThisMonth = activeDaysThisMonth,
@@ -179,6 +214,7 @@ class ProfileViewModel @Inject constructor(
             yearlyDistanceMeters = yearlyTracks.sumOf { it.distanceMeters },
             vehicleComparison = vehicleComparison,
             driverProfile = driverProfile,
+            weatherBuckets = weatherBuckets,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileState())
