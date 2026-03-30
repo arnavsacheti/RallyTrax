@@ -69,8 +69,14 @@
 # UpdateChecker JSON parsing
 -keep class com.rallytrax.app.update.** { *; }
 
-# Firebase Auth
+# Firebase Auth & Firestore
 -keep class com.google.firebase.auth.** { *; }
+-keep class com.google.firebase.firestore.** { *; }
+
+# gRPC (required by Firestore)
+-keep class io.grpc.** { *; }
+-dontwarn io.grpc.**
+-dontwarn com.google.firebase.firestore.**
 
 # Credential Manager
 -keep class androidx.credentials.** { *; }

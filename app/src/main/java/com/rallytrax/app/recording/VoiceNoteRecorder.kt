@@ -20,7 +20,8 @@ class VoiceNoteRecorder(private val context: Context) {
         dir.mkdirs()
         val file = File(dir, "note_${pointIndex}_${System.currentTimeMillis()}.3gp")
         return try {
-            recorder = MediaRecorder(context).apply {
+            @Suppress("DEPRECATION")
+            recorder = (if (android.os.Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()).apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
