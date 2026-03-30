@@ -2,8 +2,12 @@ package com.rallytrax.app.ui.home
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.rallytrax.app.data.gpx.GpxImportResult
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.local.dao.AchievementDao
@@ -14,9 +18,12 @@ import com.rallytrax.app.data.local.entity.AchievementEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.data.social.SharedTrack
 import com.rallytrax.app.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import java.time.Instant
@@ -72,12 +80,67 @@ class HomeViewModel @Inject constructor(
     private val maintenanceDao: com.rallytrax.app.data.local.dao.MaintenanceDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     private val achievementDao: AchievementDao,
+    private val firestore: FirebaseFirestore,
+    private val firebaseAuth: FirebaseAuth,
     preferencesRepository: UserPreferencesRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
+
+    private val _friendActivities = MutableStateFlow<List<SharedTrack>>(emptyList())
+    val friendActivities: StateFlow<List<SharedTrack>> = _friendActivities.asStateFlow()
+
+    init {
+        loadFriendActivities()
+    }
+
+    private fun loadFriendActivities() {
+        val uid = firebaseAuth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val followingSnapshot = withContext(ioDispatcher) {
+                    firestore.collection("following")
+                        .document(uid)
+                        .collection("list")
+                        .get()
+                        .await()
+                }
+
+                val friendUids = followingSnapshot.documents.mapNotNull { it.id.takeIf { id -> id.isNotBlank() } }
+                if (friendUids.isEmpty()) return@launch
+
+                val allTracks = withContext(ioDispatcher) {
+                    friendUids.map { friendUid ->
+                        async {
+                            try {
+                                firestore.collection("users")
+                                    .document(friendUid)
+                                    .collection("sharedTracks")
+                                    .orderBy("recordedAt", Query.Direction.DESCENDING)
+                                    .limit(5)
+                                    .get()
+                                    .await()
+                                    .documents.mapNotNull { doc ->
+                                        doc.toObject(SharedTrack::class.java)
+                                    }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to load tracks for $friendUid", e)
+                                emptyList()
+                            }
+                        }
+                    }.awaitAll().flatten()
+                }
+
+                _friendActivities.value = allTracks
+                    .sortedByDescending { it.recordedAt }
+                    .take(20)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load friend activities", e)
+            }
+        }
+    }
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()
@@ -254,5 +317,9 @@ class HomeViewModel @Inject constructor(
                 paceNoteDao.insertNotes(result.paceNotes)
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "HomeViewModel"
     }
 }
