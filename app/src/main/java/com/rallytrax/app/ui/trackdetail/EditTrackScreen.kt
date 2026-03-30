@@ -75,11 +75,14 @@ fun EditTrackScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showAddTagDialog by remember { mutableStateOf(false) }
     var editedName by remember(uiState.track?.name) { mutableStateOf(uiState.track?.name ?: "") }
+    var editedDescription by remember(uiState.track?.description) { mutableStateOf(uiState.track?.description ?: "") }
     val currentEditedName by rememberUpdatedState(editedName)
+    val currentEditedDescription by rememberUpdatedState(editedDescription)
 
     DisposableEffect(Unit) {
         onDispose {
             viewModel.updateTrackName(currentEditedName)
+            viewModel.updateTrackDescription(currentEditedDescription)
         }
     }
 
@@ -132,6 +135,25 @@ fun EditTrackScreen(
                         keyboardActions = KeyboardActions(onDone = {
                             viewModel.updateTrackName(editedName)
                         }),
+                    )
+                }
+            }
+
+            // ── Description ─────────────────────────────────────────
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Notes", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editedDescription,
+                        onValueChange = { editedDescription = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Add notes about your drive...") },
+                        minLines = 2,
+                        maxLines = 4,
                     )
                 }
             }
