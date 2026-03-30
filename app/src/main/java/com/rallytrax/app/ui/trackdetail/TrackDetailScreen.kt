@@ -194,6 +194,14 @@ fun TrackDetailScreen(
                                 leadingIcon = { Icon(Icons.Filled.Edit, null) },
                             )
                             androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Share Activity") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.shareActivity(context)
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Share, null) },
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
                                 text = { Text("Export GPX") },
                                 onClick = {
                                     showOverflowMenu = false
