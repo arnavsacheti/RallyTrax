@@ -84,6 +84,8 @@ import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
+import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
+import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatElapsedTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -255,9 +257,12 @@ fun HomeScreen(
                 }
 
                 // Maintenance warning
-                if (feedState.maintenanceDueCount > 0) {
+                if (feedState.maintenanceDueItems.isNotEmpty()) {
                     item(key = "maintenance") {
-                        MaintenanceWarningCard(dueCount = feedState.maintenanceDueCount)
+                        MaintenanceWarningCard(
+                            items = feedState.maintenanceDueItems,
+                            onItemClick = { /* TODO: navigate to vehicle detail */ },
+                        )
                     }
                 }
 
@@ -454,50 +459,130 @@ private fun SummaryMetric(
 // ── Maintenance Warning Card ──────────────────────────────────────────────────
 
 @Composable
-private fun MaintenanceWarningCard(dueCount: Int) {
+private fun MaintenanceWarningCard(
+    items: List<MaintenanceDueItem>,
+    onItemClick: (String) -> Unit = {},
+) {
+    val maintenanceColor = MaterialTheme.rallyTraxColors.maintenanceDue
+    val displayItems = items.take(3)
+    val remainingCount = items.size - displayItems.size
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val maintenanceColor = MaterialTheme.rallyTraxColors.maintenanceDue
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(
-                        maintenanceColor.copy(alpha = 0.15f),
-                        androidx.compose.foundation.shape.CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Build,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = maintenanceColor,
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            maintenanceColor.copy(alpha = 0.15f),
+                            androidx.compose.foundation.shape.CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Build,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = maintenanceColor,
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Maintenance Due",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Service items
+            displayItems.forEachIndexed { index, item ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+                }
+                MaintenanceServiceRow(
+                    item = item,
+                    onClick = { onItemClick(item.vehicleId) },
+                )
+            }
+
+            // "+X more" indicator
+            if (remainingCount > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "$dueCount service${if (dueCount != 1) "s" else ""} due or overdue",
+                    text = "+ $remainingCount more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaintenanceServiceRow(
+    item: MaintenanceDueItem,
+    onClick: () -> Unit,
+) {
+    val isOverdue = item.status == MaintenanceScheduleEntity.STATUS_OVERDUE
+    val statusColor = if (isOverdue) {
+        MaterialTheme.rallyTraxColors.maintenanceDue
+    } else {
+        MaterialTheme.rallyTraxColors.maintenanceWarning
+    }
+    val statusText = if (isOverdue) "Overdue" else "Due Soon"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.serviceType,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = item.vehicleName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (item.nextDueDate != null) {
+                Text(
+                    text = formatDate(item.nextDueDate),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = statusColor,
+            modifier = Modifier
+                .background(
+                    statusColor.copy(alpha = 0.12f),
+                    MaterialTheme.shapes.small,
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 
