@@ -1649,6 +1649,12 @@ private fun ViewTab(
             unitSystem = unitSystem,
         )
 
+        // Split Time Comparison
+        if (uiState.segments.size >= 2 && uiState.segments.any { it.bestTimeMs != null }) {
+            Spacer(modifier = Modifier.height(16.dp))
+            SplitComparisonCard(segments = uiState.segments)
+        }
+
         // Route History / Previous Attempts
         if (uiState.routeCompletionCount >= 2) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -1926,6 +1932,142 @@ private fun SegmentsCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SplitComparisonCard(
+    segments: List<TrackSegmentUi>,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Split Times",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Segment",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "Time",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(64.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+                Text(
+                    text = "Best",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(64.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+                Text(
+                    text = "Delta",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(56.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+
+            // Segment rows
+            for (segment in segments) {
+                SplitComparisonRow(segment = segment)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplitComparisonRow(segment: TrackSegmentUi) {
+    val bestTime = segment.bestTimeMs
+    val deltaMs = segment.latestDeltaFromBest
+    val ratio = if (bestTime != null && bestTime > 0 && deltaMs != null) {
+        (segment.thisRunDurationMs.toFloat() / bestTime.toFloat()).coerceIn(0f, 2f)
+    } else {
+        null
+    }
+    val deltaColor = if (deltaMs != null && deltaMs <= 0) {
+        MaterialTheme.rallyTraxColors.speedSafe
+    } else {
+        MaterialTheme.rallyTraxColors.speedDanger
+    }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = segment.name,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Text(
+                text = formatElapsedTime(segment.thisRunDurationMs),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.width(64.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            )
+            Text(
+                text = if (bestTime != null) formatElapsedTime(bestTime) else "--",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(64.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            )
+            if (deltaMs != null) {
+                Text(
+                    text = String.format(java.util.Locale.US, "%+.1fs", deltaMs / 1000.0),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = deltaColor,
+                    modifier = Modifier.width(56.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            } else {
+                Spacer(modifier = Modifier.width(56.dp))
+            }
+        }
+
+        // Visual bar showing performance relative to PB
+        if (ratio != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction = (ratio / 2f).coerceIn(0.05f, 1f))
+                    .height(4.dp)
+                    .background(deltaColor, RoundedCornerShape(2.dp)),
+            )
         }
     }
 }
