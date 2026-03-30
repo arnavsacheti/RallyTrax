@@ -1,8 +1,11 @@
 package com.rallytrax.app.ui.library
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -92,6 +95,22 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
     var showAdvancedFilters by remember { mutableStateOf(false) }
+
+    // Location permission for Near Me filter
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasLocationPermission = granted
+        if (granted) viewModel.enableNearMeFilter(context)
+    }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -288,7 +307,15 @@ fun LibraryScreen(
                 onToggleDifficulty = { viewModel.toggleDifficultyFilter(it) },
                 onToggleSurface = { viewModel.toggleSurfaceFilter(it) },
                 onToggleRouteType = { viewModel.toggleRouteTypeFilter(it) },
-                onNearMeClick = { /* TODO: location permission + near me filter */ },
+                onNearMeClick = {
+                    if (uiState.nearMeFilter != null) {
+                        viewModel.clearNearMeFilter()
+                    } else if (hasLocationPermission) {
+                        viewModel.enableNearMeFilter(context)
+                    } else {
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    }
+                },
                 onMoreFiltersClick = { showAdvancedFilters = true },
                 onClearAllFilters = { viewModel.clearAllFilters() },
             )

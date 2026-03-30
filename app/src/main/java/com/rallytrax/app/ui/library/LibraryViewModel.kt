@@ -1,9 +1,11 @@
 package com.rallytrax.app.ui.library
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.LocationServices
 import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.local.GridCellComputer
@@ -27,8 +29,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 enum class SortOption(val label: String) {
     DATE_NEWEST("Newest first"),
@@ -344,6 +351,42 @@ class LibraryViewModel @Inject constructor(
         _nearMeFilter.value = filter
     }
 
+    @SuppressLint("MissingPermission")
+    fun enableNearMeFilter(context: Context) {
+        viewModelScope.launch {
+            try {
+                val client = LocationServices.getFusedLocationProviderClient(context)
+                val location = suspendCancellableCoroutine { cont ->
+                    client.lastLocation
+                        .addOnSuccessListener { loc -> cont.resumeWith(Result.success(loc)) }
+                        .addOnFailureListener { cont.resumeWith(Result.success(null)) }
+                }
+                if (location != null) {
+                    _nearMeFilter.value = NearMeFilter(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        radiusKm = 25.0,
+                    )
+                } else {
+                    _snackbarMessage.tryEmit("Could not determine location — try again")
+                }
+            } catch (_: Exception) {
+                _snackbarMessage.tryEmit("Failed to get location")
+            }
+        }
+    }
+
+    fun clearNearMeFilter() {
+        _nearMeFilter.value = null
+    }
+
+    /** Haversine distance in meters from a user location to the center of a track's bounding box. */
+    fun distanceToUser(track: TrackEntity, userLat: Double, userLon: Double): Double {
+        val centerLat = (track.boundingBoxNorthLat + track.boundingBoxSouthLat) / 2.0
+        val centerLon = (track.boundingBoxEastLon + track.boundingBoxWestLon) / 2.0
+        return haversine(userLat, userLon, centerLat, centerLon)
+    }
+
     fun clearAllFilters() {
         _selectedTags.value = emptySet()
         _selectedRouteTypes.value = emptySet()
@@ -538,6 +581,21 @@ class LibraryViewModel @Inject constructor(
             } catch (_: Exception) {
                 // Non-critical
             }
+        }
+    }
+
+    companion object {
+        private const val EARTH_RADIUS_METERS = 6_371_000.0
+
+        /** Haversine distance in meters between two lat/lon points. */
+        fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = sin(dLat / 2) * sin(dLat / 2) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(dLon / 2) * sin(dLon / 2)
+            val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+            return EARTH_RADIUS_METERS * c
         }
     }
 
