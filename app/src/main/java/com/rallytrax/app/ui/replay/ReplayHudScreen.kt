@@ -93,6 +93,7 @@ import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import java.util.Locale
 
 private const val DARK_MAP_STYLE = """[
   {"elementType":"geometry","stylers":[{"color":"#212121"}]},
@@ -218,6 +219,29 @@ fun ReplayHudScreen(
                     // Mute indicator in top bar
                     if (uiState.isMuted) {
                         Icon(Icons.AutoMirrored.Filled.VolumeOff, "Muted", tint = Color.Red, modifier = Modifier.padding(end = 8.dp))
+                    }
+                }
+
+                // ── Ghost delta timer ──
+                if (uiState.hasGhost && uiState.isActive && !uiState.isFinished) {
+                    val deltaText = formatDelta(uiState.ghostDeltaMs)
+                    val deltaColor = if (uiState.ghostDeltaMs <= 0) Color(0xFF34A853) else Color(0xFFEA4335)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 84.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.6f),
+                                RoundedCornerShape(12.dp),
+                            )
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                    ) {
+                        Text(
+                            deltaText,
+                            color = deltaColor,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
 
@@ -455,6 +479,19 @@ private fun GoogleReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
             driverMarkerState.position = com.google.android.gms.maps.model.LatLng(driverPos.latitude, driverPos.longitude)
             Marker(state = driverMarkerState, title = "You", icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_CYAN))
         }
+        // Ghost marker (personal best position)
+        val ghostPos = uiState.ghostPosition
+        if (ghostPos != null && uiState.hasGhost) {
+            val ghostMarkerState = rememberMarkerState(key = "ghost",
+                position = com.google.android.gms.maps.model.LatLng(ghostPos.latitude, ghostPos.longitude))
+            ghostMarkerState.position = com.google.android.gms.maps.model.LatLng(ghostPos.latitude, ghostPos.longitude)
+            Marker(
+                state = ghostMarkerState,
+                title = "Ghost (PB)",
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                alpha = 0.5f,
+            )
+        }
         // Rally-style icons for pace notes (skip straights)
         val density = (LocalDensity.current.density * 160f).toInt()
         uiState.paceNotes.forEach { note ->
@@ -505,6 +542,10 @@ private fun OsmReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
 
     val osmMarkers = buildList {
         if (driverPos != null) add(OsmMarkerData(GeoPoint(driverPos.latitude, driverPos.longitude), "You", hue = 180f))
+        val ghostPos = uiState.ghostPosition
+        if (ghostPos != null && uiState.hasGhost) {
+            add(OsmMarkerData(GeoPoint(ghostPos.latitude, ghostPos.longitude), "Ghost (PB)", hue = 210f))
+        }
         uiState.paceNotes.forEach { note ->
             if (note.noteType == NoteType.STRAIGHT) return@forEach
             val midIdx = if (note.segmentStartIndex != null && note.segmentEndIndex != null) {
@@ -601,6 +642,8 @@ private fun noteTypeColor(type: NoteType): Color = when (type) {
     NoteType.DIP, NoteType.SMALL_DIP, NoteType.BIG_DIP -> Color(0xFFFF6D00)
     NoteType.STRAIGHT -> Color(0xFF9C27B0)
 }
+
+private fun formatDelta(ms: Long): String = String.format(Locale.US, "%+.1fs", ms / 1000.0)
 
 private fun noteTypeAbbrev(type: NoteType): String = when (type) {
     NoteType.LEFT -> "L"; NoteType.RIGHT -> "R"

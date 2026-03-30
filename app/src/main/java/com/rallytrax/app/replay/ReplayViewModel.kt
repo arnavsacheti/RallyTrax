@@ -22,6 +22,7 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.PaceNoteEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import com.rallytrax.app.data.preferences.UserPreferencesData
@@ -67,6 +68,11 @@ data class ReplayUiState(
     val isMuted: Boolean = false,
     val volume: Float = 0.8f,
 
+    // Ghost replay (personal best comparison)
+    val ghostPosition: LatLng? = null,
+    val ghostDeltaMs: Long = 0L,
+    val hasGhost: Boolean = false,
+
     // Error
     val error: String? = null,
 )
@@ -98,6 +104,8 @@ class ReplayViewModel @Inject constructor(
     private var locationCallback: LocationCallback? = null
     private val replayKalmanFilter = GpsKalmanFilter()
     private var replayPredictionJob: Job? = null
+    private var ghostPoints: List<TrackPointEntity> = emptyList()
+    private var replayStartTimeMs: Long = 0L
 
     init {
         loadTrackData()
@@ -145,11 +153,31 @@ class ReplayViewModel @Inject constructor(
                     driverProfile = driverProfile,
                 )
 
+                // Load ghost track (personal best for the same route)
+                val hasGhostTrack = withContext(ioDispatcher) {
+                    val routeTracks = trackDao.getTracksForRoute(track.name)
+                    val pb = routeTracks
+                        .filter { it.id != trackId && it.durationMs > 0L }
+                        .minByOrNull { it.durationMs }
+                    if (pb != null) {
+                        ghostPoints = trackPointDao.getPointsForTrackOnce(pb.id)
+                        ghostPoints.size >= 2
+                    } else {
+                        false
+                    }
+                }
+                if (hasGhostTrack) {
+                    withContext(defaultDispatcher) {
+                        replayEngine?.setGhostTrack(ghostPoints)
+                    }
+                }
+
                 _uiState.value = _uiState.value.copy(
                     track = track,
                     polylinePoints = polyline,
                     paceNotes = notes,
                     isLoading = false,
+                    hasGhost = hasGhostTrack,
                     nextNote = notes.sortedBy { it.distanceFromStart }.firstOrNull(),
                 )
             } catch (e: Exception) {
@@ -219,6 +247,8 @@ class ReplayViewModel @Inject constructor(
             }
             application.startForegroundService(startIntent)
 
+            replayStartTimeMs = System.currentTimeMillis()
+
             _uiState.value = _uiState.value.copy(
                 isActive = true,
                 isFinished = false,
@@ -264,6 +294,12 @@ class ReplayViewModel @Inject constructor(
             stopTrackingService()
         }
 
+        // Compute ghost position if a personal best track is loaded
+        val ghostState = if (ghostPoints.size >= 2) {
+            val elapsedMs = System.currentTimeMillis() - replayStartTimeMs
+            engine.getGhostPosition(engine.currentProgress, elapsedMs)
+        } else null
+
         _uiState.value = _uiState.value.copy(
             driverPosition = driverPos,
             currentSpeedMps = speedMps,
@@ -272,6 +308,8 @@ class ReplayViewModel @Inject constructor(
             isFinished = result.isFinished,
             nextNote = result.nextNote,
             distanceToNextNote = result.distanceToNextNote,
+            ghostPosition = ghostState?.position,
+            ghostDeltaMs = ghostState?.deltaMs ?: 0L,
         )
     }
 
