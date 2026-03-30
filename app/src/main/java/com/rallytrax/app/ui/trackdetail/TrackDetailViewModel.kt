@@ -3,8 +3,14 @@ package com.rallytrax.app.ui.trackdetail
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -44,6 +50,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.rallytrax.app.util.formatDate
+import com.rallytrax.app.util.formatDistance
+import com.rallytrax.app.util.formatElapsedTime
+import com.rallytrax.app.util.formatSpeed
+import java.io.File
 import javax.inject.Inject
 import kotlin.math.abs
 
@@ -920,5 +931,194 @@ class TrackDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(track = updated)
             _snackbarMessage.tryEmit("Vehicle removed")
         }
+    }
+
+    // ── Share Activity ─────────────────────────────────────────────────────
+
+    fun shareActivity(context: Context) {
+        val track = _uiState.value.track ?: return
+        viewModelScope.launch {
+            try {
+                val unitSystem = preferences.value.unitSystem
+                val bitmap = withContext(defaultDispatcher) {
+                    generateShareBitmap(track, unitSystem)
+                }
+                val file = File(context.cacheDir, "share_activity.png")
+                withContext(ioDispatcher) {
+                    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                }
+                bitmap.recycle()
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "${track.name} — ${formatDistance(track.distanceMeters, unitSystem)} in ${formatElapsedTime(track.durationMs)}",
+                    )
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(shareIntent, "Share Activity")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Share failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun generateShareBitmap(
+        track: TrackEntity,
+        unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
+    ): Bitmap {
+        val width = 1080
+        val height = 1350
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // Colors
+        val bgColor = 0xFFF8F9FA.toInt()
+        val cardColor = 0xFFFFFFFF.toInt()
+        val primaryColor = 0xFF1A73E8.toInt()
+        val textPrimary = 0xFF1F1F1F.toInt()
+        val textSecondary = 0xFF5F6368.toInt()
+        val dividerColor = 0xFFE0E0E0.toInt()
+
+        // Background
+        val bgPaint = Paint().apply { color = bgColor; style = Paint.Style.FILL }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+        // Card background with rounded corners
+        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = cardColor
+            style = Paint.Style.FILL
+            setShadowLayer(8f, 0f, 4f, 0x33000000)
+        }
+        val cardRect = RectF(48f, 48f, (width - 48).toFloat(), (height - 48).toFloat())
+        canvas.drawRoundRect(cardRect, 32f, 32f, cardPaint)
+
+        // Branding
+        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = primaryColor
+            textSize = 36f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("RallyTrax", width / 2f, 130f, brandPaint)
+
+        // Divider under branding
+        val dividerPaint = Paint().apply { color = dividerColor; strokeWidth = 2f }
+        canvas.drawLine(96f, 160f, (width - 96).toFloat(), 160f, dividerPaint)
+
+        // Track name
+        val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textPrimary
+            textSize = 56f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(track.name, width / 2f, 240f, namePaint)
+
+        // Date
+        val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textSecondary
+            textSize = 32f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(formatDate(track.recordedAt), width / 2f, 290f, datePaint)
+
+        // Difficulty badge
+        var statsTop = 360f
+        val difficulty = track.difficultyRating
+        if (!difficulty.isNullOrBlank()) {
+            val badgeColor = when (difficulty.lowercase()) {
+                "easy" -> 0xFF34A853.toInt()
+                "moderate" -> 0xFFFBBC04.toInt()
+                "hard" -> 0xFFE8710A.toInt()
+                "expert" -> 0xFFEA4335.toInt()
+                else -> primaryColor
+            }
+            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = badgeColor
+                style = Paint.Style.FILL
+            }
+            val badgeText = difficulty.replaceFirstChar { it.uppercase() }
+            val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFFFFF.toInt()
+                textSize = 28f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            val badgeWidth = badgeTextPaint.measureText(badgeText) + 48f
+            val badgeRect = RectF(
+                (width - badgeWidth) / 2f, 320f,
+                (width + badgeWidth) / 2f, 358f,
+            )
+            canvas.drawRoundRect(badgeRect, 19f, 19f, badgePaint)
+            canvas.drawText(badgeText, width / 2f, 348f, badgeTextPaint)
+            statsTop = 400f
+        }
+
+        // Stats grid (2 columns, 3 rows)
+        data class Stat(val label: String, val value: String)
+
+        val stats = mutableListOf(
+            Stat("Distance", formatDistance(track.distanceMeters, unitSystem)),
+            Stat("Duration", formatElapsedTime(track.durationMs)),
+            Stat("Avg Speed", formatSpeed(track.avgSpeedMps, unitSystem)),
+            Stat("Max Speed", formatSpeed(track.maxSpeedMps, unitSystem)),
+        )
+        if (track.elevationGainM > 0) {
+            stats.add(Stat("Elevation Gain", "${track.elevationGainM.toInt()}m"))
+        }
+
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textSecondary
+            textSize = 28f
+            textAlign = Paint.Align.CENTER
+        }
+        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textPrimary
+            textSize = 48f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+
+        val colWidth = (width - 96) / 2f
+        val rowHeight = 160f
+        val statCardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFF1F3F4.toInt()
+            style = Paint.Style.FILL
+        }
+
+        stats.forEachIndexed { index, stat ->
+            val col = index % 2
+            val row = index / 2
+            val cx = 96f + colWidth * col + colWidth / 2f
+            val cy = statsTop + rowHeight * row
+
+            val statRect = RectF(
+                cx - colWidth / 2f + 16f, cy,
+                cx + colWidth / 2f - 16f, cy + rowHeight - 20f,
+            )
+            canvas.drawRoundRect(statRect, 16f, 16f, statCardPaint)
+
+            canvas.drawText(stat.value, cx, cy + 70f, valuePaint)
+            canvas.drawText(stat.label, cx, cy + 110f, labelPaint)
+        }
+
+        // Footer branding
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textSecondary
+            textSize = 24f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("Recorded with RallyTrax", width / 2f, (height - 80).toFloat(), footerPaint)
+
+        return bitmap
     }
 }
