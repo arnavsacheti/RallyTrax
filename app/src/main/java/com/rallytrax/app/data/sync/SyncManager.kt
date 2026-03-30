@@ -11,6 +11,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.rallytrax.app.data.gpx.GpxExporter
+import com.google.api.services.drive.DriveScopes
+import com.rallytrax.app.data.gpx.TrackImporter
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -27,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -237,6 +241,52 @@ class SyncManager @Inject constructor(
         _syncStatus.value = _syncStatus.value.copy(pendingChanges = true)
         enqueueOneTimeSync()
     }
+
+    /**
+     * Restore tracks from Google Drive that don't already exist locally.
+     * Returns the number of tracks restored.
+     */
+    suspend fun restoreTracks(driveHelper: DriveServiceHelper): Int =
+        withContext(Dispatchers.IO) {
+            val gpxFiles = driveHelper.listGpxFiles()
+            var restoredCount = 0
+
+            for (file in gpxFiles) {
+                try {
+                    // Extract trackId from filename pattern: track_<id>.gpx
+                    val trackId = file.fileName
+                        .removePrefix("track_")
+                        .removeSuffix(".gpx")
+
+                    // Skip if track already exists locally
+                    if (trackDao.getTrackById(trackId) != null) {
+                        Log.d(TAG, "Track $trackId already exists locally, skipping")
+                        continue
+                    }
+
+                    // Download and parse
+                    val bytes = driveHelper.downloadFile(file.fileId)
+                    val result = TrackImporter.import(ByteArrayInputStream(bytes))
+
+                    // Insert track, points, and pace notes
+                    trackDao.insertTrack(result.track)
+                    result.points.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
+                    if (result.paceNotes.isNotEmpty()) {
+                        paceNoteDao.insertNotes(result.paceNotes)
+                    }
+
+                    restoredCount++
+                    Log.d(TAG, "Restored track: ${file.fileName}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to restore ${file.fileName}", e)
+                }
+            }
+
+            Log.d(TAG, "Restore complete: $restoredCount tracks restored from ${gpxFiles.size} files")
+            restoredCount
+        }
 
     private fun enqueueOneTimeSync() {
         val constraints = Constraints.Builder()

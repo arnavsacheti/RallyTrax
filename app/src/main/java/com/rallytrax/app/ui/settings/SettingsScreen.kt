@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Map
@@ -92,6 +93,7 @@ fun SettingsScreen(
     val preferences by settingsViewModel.preferences.collectAsStateWithLifecycle()
     val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val syncStatus by settingsViewModel.syncStatus.collectAsStateWithLifecycle()
+    val isRestoring by settingsViewModel.isRestoring.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     Scaffold(
@@ -259,6 +261,24 @@ fun SettingsScreen(
                             Icon(Icons.Filled.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Sync Now")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { settingsViewModel.restoreFromCloud(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isRestoring,
+                    ) {
+                        if (isRestoring) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Restoring...")
+                        } else {
+                            Icon(Icons.Filled.CloudDownload, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Restore from Cloud")
                         }
                     }
 
