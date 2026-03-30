@@ -61,13 +61,13 @@ class SettingsViewModel @Inject constructor(
     val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
+    val syncStatus: StateFlow<SyncStatus> = syncManager.syncStatus
+
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
-
-    val syncStatus: StateFlow<SyncStatus> = syncManager.syncStatus
 
     private val isSignedIn: Boolean
         get() = authRepository.authState.value is AuthState.SignedIn
@@ -159,6 +159,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesRepository.setBackupTracksEnabled(enabled)
         }
+    }
+
+    fun clearSyncError() {
+        syncManager.clearError()
     }
 
     fun setKeepScreenOn(enabled: Boolean) {
