@@ -52,6 +52,8 @@ data class HomeFeedState(
     val showActiveVehicleOnly: Boolean = false,
     val activeVehicleName: String? = null,
     val recentAchievements: List<AchievementEntity> = emptyList(),
+    val weeklyGoalKm: Double? = null,
+    val weeklyGoalProgress: Float? = null,
 )
 
 @HiltViewModel
@@ -82,7 +84,15 @@ class HomeViewModel @Inject constructor(
         vehicleDao.getAllVehicles(),
         _showActiveVehicleOnly,
         vehicleDao.observeActiveVehicle(),
-    ) { allStints, allVehicles, filterByActive, activeVehicle ->
+        preferences,
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val allStints = values[0] as List<com.rallytrax.app.data.local.entity.TrackEntity>
+        @Suppress("UNCHECKED_CAST")
+        val allVehicles = values[1] as List<com.rallytrax.app.data.local.entity.VehicleEntity>
+        val filterByActive = values[2] as Boolean
+        val activeVehicle = values[3] as com.rallytrax.app.data.local.entity.VehicleEntity?
+        val prefs = values[4] as UserPreferencesData
         val stints = if (filterByActive && activeVehicle != null) {
             allStints.filter { it.vehicleId == activeVehicle.id }
         } else {
@@ -118,6 +128,13 @@ class HomeViewModel @Inject constructor(
             )
         }
 
+        val goalKm = prefs.weeklyDistanceGoalKm
+        val goalProgress = if (goalKm != null && goalKm > 0) {
+            (weeklySummary.totalDistanceMeters / (goalKm * 1000)).toFloat().coerceAtMost(1.5f)
+        } else {
+            null
+        }
+
         HomeFeedState(
             weeklySummary = weeklySummary,
             feedItems = feedItems,
@@ -126,6 +143,8 @@ class HomeViewModel @Inject constructor(
             showActiveVehicleOnly = filterByActive,
             activeVehicleName = activeVehicle?.name,
             recentAchievements = recentAchievements,
+            weeklyGoalKm = goalKm,
+            weeklyGoalProgress = goalProgress,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeFeedState())
