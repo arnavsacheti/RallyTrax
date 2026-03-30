@@ -78,6 +78,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.AchievementEntity
 import com.rallytrax.app.ui.auth.GoogleSignInCard
+import com.rallytrax.app.ui.components.GoalRing
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.theme.RallyTraxMotion
@@ -238,6 +239,7 @@ fun HomeScreen(
                     WeeklySummaryStrip(
                         summary = feedState.weeklySummary,
                         unitSystem = preferences.unitSystem,
+                        weeklyGoalProgress = feedState.weeklyGoalProgress,
                     )
                 }
 
@@ -374,6 +376,7 @@ fun HomeScreen(
 private fun WeeklySummaryStrip(
     summary: WeeklySummary,
     unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
+    weeklyGoalProgress: Float? = null,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -388,11 +391,20 @@ private fun WeeklySummaryStrip(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SummaryMetric(
-                label = "This Week",
-                value = formatDistance(summary.totalDistanceMeters, unitSystem),
-                modifier = Modifier.weight(1f),
-            )
+            if (weeklyGoalProgress != null) {
+                GoalRing(
+                    progress = weeklyGoalProgress,
+                    label = "Goal",
+                    size = 56.dp,
+                    strokeWidth = 6.dp,
+                )
+            } else {
+                SummaryMetric(
+                    label = "This Week",
+                    value = formatDistance(summary.totalDistanceMeters, unitSystem),
+                    modifier = Modifier.weight(1f),
+                )
+            }
             VerticalDivider(
                 modifier = Modifier.height(32.dp),
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
