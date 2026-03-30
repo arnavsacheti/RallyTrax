@@ -96,6 +96,12 @@ class TrackingService : LifecycleService() {
     private var lastGpsAccuracy: Float? = null
     private var lastElevation: Double? = null
 
+    // Sensor alert tracking
+    private var peakLateralG: Double = 0.0
+    private var peakBrakingG: Double = 0.0
+    private var alertCount: Int = 0
+    private var wasInAlert: Boolean = false
+
     private var pendingFlushJob: Job? = null
     private val pointBuffer = mutableListOf<TrackPointEntity>()
     private val pathSegments = mutableListOf<MutableList<LatLng>>()
@@ -179,6 +185,10 @@ class TrackingService : LifecycleService() {
         cachedUnitSystem = kotlinx.coroutines.runBlocking {
             preferencesRepository.preferences.first()
         }.unitSystem
+        peakLateralG = 0.0
+        peakBrakingG = 0.0
+        alertCount = 0
+        wasInAlert = false
         kalmanFilter.reset()
         minLat = Double.MAX_VALUE
         maxLat = -Double.MAX_VALUE
@@ -639,10 +649,24 @@ class TrackingService : LifecycleService() {
                 // - longitudinal G = z-axis (accel/brake in device frame)
                 // - vertical G = residual z-axis component (road roughness)
                 sensorCollector?.snapshot()?.let { snap ->
-                    _sensorHudData.value = SensorHudData(
+                    val hudData = SensorHudData(
                         lateralAccelMps2 = snap.lateralAccelMps2,
                         longitudinalAccelMps2 = snap.verticalAccelMps2,
                         verticalAccelMps2 = snap.verticalAccelMps2,
+                    )
+                    val currentLatG = hudData.lateralG ?: 0.0
+                    val currentBrakingG = hudData.longitudinalG?.let { if (it < 0) kotlin.math.abs(it) else 0.0 } ?: 0.0
+                    if (currentLatG > peakLateralG) peakLateralG = currentLatG
+                    if (currentBrakingG > peakBrakingG) peakBrakingG = currentBrakingG
+                    // Edge-triggered: only count when transitioning into alert state
+                    val isInAlert = currentLatG > SensorHudData.LATERAL_G_ALERT_THRESHOLD ||
+                        currentBrakingG > SensorHudData.BRAKING_G_ALERT_THRESHOLD
+                    if (isInAlert && !wasInAlert) alertCount++
+                    wasInAlert = isInAlert
+                    _sensorHudData.value = hudData.copy(
+                        peakLateralG = peakLateralG,
+                        peakBrakingG = peakBrakingG,
+                        alertCount = alertCount,
                     )
                 }
             }
