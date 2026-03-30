@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -21,8 +22,8 @@ class SocialRepository @Inject constructor(
 ) {
     private val usersCollection get() = firestore.collection("users")
 
-    private val currentUid: String
-        get() = auth.currentUser?.uid ?: throw IllegalStateException("User not authenticated")
+    private val currentUid: String?
+        get() = auth.currentUser?.uid
 
     // ---- User Profile ----
 
@@ -54,7 +55,7 @@ class SocialRepository @Inject constructor(
     // ---- Follow / Unfollow ----
 
     suspend fun follow(targetUid: String) {
-        val myUid = currentUid
+        val myUid = currentUid ?: return
         val timestamp = mapOf("followedAt" to System.currentTimeMillis())
         firestore.runBatch { batch ->
             batch.set(
@@ -71,7 +72,7 @@ class SocialRepository @Inject constructor(
     }
 
     suspend fun unfollow(targetUid: String) {
-        val myUid = currentUid
+        val myUid = currentUid ?: return
         firestore.runBatch { batch ->
             batch.delete(
                 usersCollection.document(myUid)
@@ -88,9 +89,11 @@ class SocialRepository @Inject constructor(
 
     fun getFollowers(): Flow<List<UserProfile>> = observeRelationship("followers")
 
-    private fun observeRelationship(subcollection: String): Flow<List<UserProfile>> = callbackFlow {
-        val registration = usersCollection.document(currentUid)
-            .collection(subcollection)
+    private fun observeRelationship(subcollection: String): Flow<List<UserProfile>> {
+        val uid = currentUid ?: return flowOf(emptyList())
+        return callbackFlow {
+            val registration = usersCollection.document(uid)
+                .collection(subcollection)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
@@ -102,7 +105,8 @@ class SocialRepository @Inject constructor(
                     trySend(profiles)
                 }
             }
-        awaitClose { registration.remove() }
+            awaitClose { registration.remove() }
+        }
     }
 
     // ---- Shared Tracks ----

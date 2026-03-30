@@ -106,6 +106,7 @@ class HomeViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load friend activities", e)
+                _friendActivities.value = emptyList()
             }
         }
     }
