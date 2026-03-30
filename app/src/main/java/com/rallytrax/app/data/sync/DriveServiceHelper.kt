@@ -13,6 +13,8 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
+data class DriveFileInfo(val fileId: String, val fileName: String)
+
 class DriveServiceHelper(credential: GoogleAccountCredential) {
 
     private val driveService: Drive = Drive.Builder(
@@ -96,6 +98,43 @@ class DriveServiceHelper(credential: GoogleAccountCredential) {
                 downloadFileContent(fileId)
             }
         }
+
+    /**
+     * Lists all GPX track files stored in the app's Drive appDataFolder.
+     */
+    suspend fun listGpxFiles(): List<DriveFileInfo> = withContext(Dispatchers.IO) {
+        retryWithBackoff {
+            val files = mutableListOf<DriveFileInfo>()
+            var pageToken: String? = null
+            do {
+                val result = driveService.files().list()
+                    .setSpaces("appDataFolder")
+                    .setQ("name contains 'track_' and trashed = false")
+                    .setFields("nextPageToken, files(id, name)")
+                    .setPageSize(100)
+                    .apply { if (pageToken != null) setPageToken(pageToken) }
+                    .execute()
+                result.files?.forEach { file ->
+                    if (file.name.endsWith(".gpx")) {
+                        files.add(DriveFileInfo(fileId = file.id, fileName = file.name))
+                    }
+                }
+                pageToken = result.nextPageToken
+            } while (pageToken != null)
+            files
+        }
+    }
+
+    /**
+     * Downloads the raw bytes of a file from Drive.
+     */
+    suspend fun downloadFile(fileId: String): ByteArray = withContext(Dispatchers.IO) {
+        retryWithBackoff {
+            val outputStream = ByteArrayOutputStream()
+            driveService.files().get(fileId).executeMediaAndDownloadTo(outputStream)
+            outputStream.toByteArray()
+        }
+    }
 
     private fun findFile(name: String): File? {
         val result = driveService.files().list()

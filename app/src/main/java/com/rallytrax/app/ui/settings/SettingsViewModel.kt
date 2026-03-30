@@ -7,9 +7,12 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.services.drive.DriveScopes
 import com.rallytrax.app.data.auth.AuthRepository
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.data.export.CsvExporter
+import com.rallytrax.app.data.sync.DriveServiceHelper
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -68,6 +71,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
+
+    private val _isRestoring = MutableStateFlow(false)
+    val isRestoring: StateFlow<Boolean> = _isRestoring.asStateFlow()
 
     private val isSignedIn: Boolean
         get() = authRepository.authState.value is AuthState.SignedIn
@@ -250,6 +256,44 @@ class SettingsViewModel @Inject constructor(
                 _snackbarMessage.tryEmit("Export failed: ${e.message}")
             } finally {
                 _uiState.value = _uiState.value.copy(isExporting = false)
+            }
+        }
+    }
+
+    // ── Cloud Restore ────────────────────────────────────────────────────────
+
+    fun restoreFromCloud(context: Context) {
+        if (_isRestoring.value) return
+        viewModelScope.launch {
+            _isRestoring.value = true
+            try {
+                val email = authRepository.getCurrentUser()?.email
+                if (email == null) {
+                    _snackbarMessage.tryEmit("Sign in required to restore from cloud")
+                    return@launch
+                }
+
+                val credential = GoogleAccountCredential.usingOAuth2(
+                    context,
+                    listOf(DriveScopes.DRIVE_APPDATA),
+                )
+                credential.selectedAccountName = email
+
+                val driveHelper = DriveServiceHelper(credential)
+                val restoredCount = syncManager.restoreTracks(driveHelper)
+
+                if (restoredCount > 0) {
+                    _uiState.value = _uiState.value.copy(
+                        trackCount = trackDao.getTrackCount(),
+                    )
+                    _snackbarMessage.tryEmit("Restored $restoredCount track${if (restoredCount != 1) "s" else ""} from cloud")
+                } else {
+                    _snackbarMessage.tryEmit("No new tracks to restore")
+                }
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Restore failed: ${e.message}")
+            } finally {
+                _isRestoring.value = false
             }
         }
     }
