@@ -766,6 +766,22 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
+                    onClick = { settingsViewModel.exportCsv(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = uiState.trackCount > 0 && !uiState.isExporting,
+                ) {
+                    if (uiState.isExporting) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Exporting...")
+                    } else {
+                        Icon(Icons.Filled.Download, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Export All Drives (CSV)")
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
                     onClick = { settingsViewModel.showDeleteConfirmation() },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = uiState.trackCount > 0 && !uiState.isDeleting,

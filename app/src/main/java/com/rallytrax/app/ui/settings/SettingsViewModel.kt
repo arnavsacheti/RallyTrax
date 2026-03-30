@@ -1,9 +1,15 @@
 package com.rallytrax.app.ui.settings
 
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.auth.AuthRepository
 import com.rallytrax.app.data.auth.AuthState
+import com.rallytrax.app.data.export.CsvExporter
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -17,12 +23,19 @@ import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -30,6 +43,7 @@ data class SettingsUiState(
     val showClearCacheConfirmation: Boolean = false,
     val trackCount: Int = 0,
     val isDeleting: Boolean = false,
+    val isExporting: Boolean = false,
 )
 
 @HiltViewModel
@@ -48,6 +62,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
 
     private val isSignedIn: Boolean
         get() = authRepository.authState.value is AuthState.SignedIn
@@ -167,6 +184,61 @@ class SettingsViewModel @Inject constructor(
                 }
             } catch (_: Exception) {
                 _uiState.value = _uiState.value.copy(isDeleting = false)
+            }
+        }
+    }
+
+    // ── CSV Export ──────────────────────────────────────────────────────────
+
+    fun exportCsv(context: Context) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isExporting = true)
+            try {
+                val tracksDeferred = async(Dispatchers.IO) { trackDao.getStintsOnce() }
+                val vehiclesDeferred = async(Dispatchers.IO) { vehicleDao.getAllVehicles().first() }
+                val tracks = tracksDeferred.await()
+                val vehicles = vehiclesDeferred.await()
+
+                if (tracks.isEmpty()) {
+                    _snackbarMessage.tryEmit("No drives to export")
+                    return@launch
+                }
+
+                val fileName = "rallytrax_export_${System.currentTimeMillis()}.csv"
+
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, "text/csv")
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri == null) {
+                    _snackbarMessage.tryEmit("Failed to create file")
+                    return@launch
+                }
+
+                withContext(Dispatchers.IO) {
+                    resolver.openOutputStream(uri)?.use { outputStream ->
+                        CsvExporter.export(tracks, vehicles, outputStream)
+                    }
+                }
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(shareIntent, "Share CSV export")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+
+                _snackbarMessage.tryEmit("Exported ${tracks.size} drives to Downloads: $fileName")
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Export failed: ${e.message}")
+            } finally {
+                _uiState.value = _uiState.value.copy(isExporting = false)
             }
         }
     }
