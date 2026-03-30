@@ -61,7 +61,6 @@ import coil.compose.AsyncImage
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.auth.GoogleSignInCard
-import com.rallytrax.app.ui.components.CalendarHeatmap
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.components.Sparkline
 import com.rallytrax.app.ui.theme.rallyTraxColors
@@ -125,18 +124,6 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Year-in-Review Calendar Heatmap
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    CalendarHeatmap(
-                        dailyDistances = profile.dailyDistances,
-                        currentStreak = profile.currentStreak,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Hero Stats — Lifetime
             Text(
                 text = "Lifetime Stats",
@@ -158,8 +145,8 @@ fun ProfileScreen(
                 HeroStatCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Filled.LocalFireDepartment,
-                    value = "${profile.currentStreak}",
-                    label = "Day Streak",
+                    value = "${profile.stintCount}",
+                    label = "Stints",
                 )
             }
 
@@ -201,6 +188,45 @@ fun ProfileScreen(
                     value = formatDistance(profile.longestDriveMeters, preferences.unitSystem),
                     label = "Longest Drive",
                 )
+            }
+
+            // Streak card (Strava-style)
+            if (profile.currentStreak > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocalFireDepartment,
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "${profile.currentStreak} day streak!",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                            Text(
+                                text = "Keep it going — drive again today",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
