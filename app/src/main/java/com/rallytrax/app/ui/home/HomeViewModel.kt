@@ -44,11 +44,19 @@ data class DuplicateImportState(
     val existingTrack: TrackEntity,
 )
 
+data class MaintenanceDueItem(
+    val serviceType: String,
+    val vehicleName: String,
+    val status: String, // "DUE_SOON", "OVERDUE"
+    val nextDueDate: Long?,
+    val vehicleId: String,
+)
+
 data class HomeFeedState(
     val weeklySummary: WeeklySummary = WeeklySummary(),
     val feedItems: List<ActivityFeedItem> = emptyList(),
     val totalStintCount: Int = 0,
-    val maintenanceDueCount: Int = 0,
+    val maintenanceDueItems: List<MaintenanceDueItem> = emptyList(),
     val showActiveVehicleOnly: Boolean = false,
     val activeVehicleName: String? = null,
     val recentAchievements: List<AchievementEntity> = emptyList(),
@@ -116,7 +124,16 @@ class HomeViewModel @Inject constructor(
             totalDurationMs = weeklyStints.sumOf { it.durationMs },
         )
 
-        val dueCount = try { maintenanceDao.getDueSchedules().size } catch (_: Exception) { 0 }
+        val dueSchedules = try { maintenanceDao.getDueSchedules() } catch (_: Exception) { emptyList() }
+        val dueItems = dueSchedules.map { schedule ->
+            MaintenanceDueItem(
+                serviceType = schedule.serviceType,
+                vehicleName = vehicleNameMap[schedule.vehicleId] ?: "Unknown Vehicle",
+                status = schedule.status,
+                nextDueDate = schedule.nextDueDate,
+                vehicleId = schedule.vehicleId,
+            )
+        }
 
         val since24h = System.currentTimeMillis() - 24 * 60 * 60 * 1000
         val recentAchievements = try { achievementDao.getRecentlyUnlocked(since24h) } catch (_: Exception) { emptyList() }
@@ -139,7 +156,7 @@ class HomeViewModel @Inject constructor(
             weeklySummary = weeklySummary,
             feedItems = feedItems,
             totalStintCount = stints.size,
-            maintenanceDueCount = dueCount,
+            maintenanceDueItems = dueItems,
             showActiveVehicleOnly = filterByActive,
             activeVehicleName = activeVehicle?.name,
             recentAchievements = recentAchievements,
