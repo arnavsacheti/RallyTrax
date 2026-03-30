@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
@@ -49,9 +50,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.ui.components.AchievementPopup
+import com.rallytrax.app.ui.components.ConfettiOverlay
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatSpeed
+import kotlin.math.abs
 import com.rallytrax.app.util.speedUnit
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -204,6 +207,43 @@ fun ActivitySummaryScreen(
                                         modifier = Modifier.weight(1f),
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    // Personal Record celebration
+                    val prDelta = state.prDeltaMs
+                    if (state.isPersonalRecord && prDelta != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFFFF8E1),
+                            ),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.EmojiEvents,
+                                    contentDescription = "Trophy",
+                                    modifier = Modifier.size(48.dp),
+                                    tint = Color(0xFFFFD700),
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "New Personal Record!",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${formatElapsedTime(abs(prDelta))} faster!",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
                             }
                         }
                     }
@@ -362,6 +402,11 @@ fun ActivitySummaryScreen(
                     Spacer(modifier = Modifier.height(32.dp))
                 }
             }
+        }
+
+        // Personal record confetti overlay
+        if (state.isPersonalRecord) {
+            ConfettiOverlay(modifier = Modifier.fillMaxSize())
         }
 
         // Achievement celebration overlay

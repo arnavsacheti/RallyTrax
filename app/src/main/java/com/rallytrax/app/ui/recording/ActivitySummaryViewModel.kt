@@ -53,6 +53,8 @@ data class ActivitySummaryState(
     val isSaving: Boolean = false,
     val newlyUnlockedAchievements: List<AchievementEntity> = emptyList(),
     val sensorStats: SensorStats = SensorStats(),
+    val isPersonalRecord: Boolean = false,
+    val prDeltaMs: Long? = null, // negative = improvement (faster)
 )
 
 @HiltViewModel
@@ -145,6 +147,13 @@ class ActivitySummaryViewModel @Inject constructor(
             hasSensorData = hasSensorData,
         )
 
+        // Check for personal record
+        val otherTracks = trackDao.getTracksForRoute(track.name).filter { it.id != track.id }
+        val previousBestMs = otherTracks
+            .filter { it.durationMs > 0 }
+            .minOfOrNull { it.durationMs }
+        val isNewPR = previousBestMs != null && track.durationMs > 0 && track.durationMs < previousBestMs
+
         _state.value = ActivitySummaryState(
             track = track,
             classification = classification,
@@ -155,6 +164,8 @@ class ActivitySummaryViewModel @Inject constructor(
             selectedDifficulty = classification?.difficultyRating ?: "",
             selectedVehicleId = track.vehicleId ?: activeVehicle?.id,
             sensorStats = sensorStats,
+            isPersonalRecord = isNewPR,
+            prDeltaMs = if (isNewPR) track.durationMs - previousBestMs!! else null,
         )
     }
 
