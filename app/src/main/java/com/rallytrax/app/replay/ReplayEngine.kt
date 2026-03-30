@@ -236,6 +236,77 @@ class ReplayEngine(
         return Pair(bestIdx, bestDist)
     }
 
+    // ── Ghost replay support ───────────────────────────────────────────────
+
+    data class GhostState(
+        val position: LatLng?,
+        val deltaMs: Long,
+        val ghostProgress: Float,
+    )
+
+    private var cachedGhostPoints: List<TrackPointEntity> = emptyList()
+    private var ghostCumulativeDistances: DoubleArray = DoubleArray(0)
+    private var ghostTotalDistance: Double = 0.0
+
+    /**
+     * Pre-compute cumulative distances for a ghost track so that
+     * [getGhostPosition] avoids redundant haversine work on every GPS update.
+     */
+    fun setGhostTrack(ghostPoints: List<TrackPointEntity>) {
+        cachedGhostPoints = ghostPoints
+        ghostCumulativeDistances = DoubleArray(ghostPoints.size)
+        for (i in 1 until ghostPoints.size) {
+            ghostCumulativeDistances[i] = ghostCumulativeDistances[i - 1] + haversine(
+                ghostPoints[i - 1].lat, ghostPoints[i - 1].lon,
+                ghostPoints[i].lat, ghostPoints[i].lon,
+            )
+        }
+        ghostTotalDistance = if (ghostPoints.isNotEmpty()) ghostCumulativeDistances.last() else 0.0
+    }
+
+    /**
+     * Compute the ghost's position on a personal-best track at the same distance
+     * as the driver's current progress on the main track.
+     *
+     * @param currentDistanceM distance the driver has covered on the main track
+     * @param elapsedMs        wall-clock time since the driver started the replay
+     * @return [GhostState] with interpolated position and time delta
+     */
+    fun getGhostPosition(
+        currentDistanceM: Double,
+        elapsedMs: Long,
+    ): GhostState {
+        val points = cachedGhostPoints
+        if (points.size < 2 || ghostTotalDistance <= 0.0) return GhostState(null, 0L, 0f)
+
+        val clampedDist = currentDistanceM.coerceIn(0.0, ghostTotalDistance)
+
+        // Binary search for the segment containing clampedDist
+        var lo = 0
+        var hi = points.size - 1
+        while (lo < hi - 1) {
+            val mid = (lo + hi) / 2
+            if (ghostCumulativeDistances[mid] <= clampedDist) lo = mid else hi = mid
+        }
+
+        // Interpolate position between points[lo] and points[hi]
+        val segLen = ghostCumulativeDistances[hi] - ghostCumulativeDistances[lo]
+        val frac = if (segLen > 0) ((clampedDist - ghostCumulativeDistances[lo]) / segLen).coerceIn(0.0, 1.0) else 0.0
+        val lat = points[lo].lat + frac * (points[hi].lat - points[lo].lat)
+        val lon = points[lo].lon + frac * (points[hi].lon - points[lo].lon)
+
+        // Interpolate ghost timestamp at this distance
+        val ghostTimeAtDist = points[lo].timestamp + (frac * (points[hi].timestamp - points[lo].timestamp)).toLong()
+        val ghostElapsedAtDist = ghostTimeAtDist - points.first().timestamp
+
+        // Positive delta means the driver is slower than the ghost (behind PB)
+        val deltaMs = elapsedMs - ghostElapsedAtDist
+
+        val ghostProgress = (clampedDist / ghostTotalDistance).toFloat().coerceIn(0f, 1f)
+
+        return GhostState(LatLng(lat, lon), deltaMs, ghostProgress)
+    }
+
     fun reset() {
         nextNoteIndex = 0
         spokenNoteIds.clear()
