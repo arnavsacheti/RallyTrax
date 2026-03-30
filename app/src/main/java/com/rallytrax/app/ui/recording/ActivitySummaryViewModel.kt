@@ -7,6 +7,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.rallytrax.app.data.ThumbnailGenerator
 import com.rallytrax.app.data.achievements.AchievementTracker
 import com.rallytrax.app.data.classification.RouteClassifier
@@ -20,6 +22,7 @@ import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.data.social.SharedTrack
 import com.rallytrax.app.ui.components.generateShareBitmap
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -34,6 +37,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -71,6 +75,8 @@ class ActivitySummaryViewModel @Inject constructor(
     private val vehicleDao: VehicleDao,
     private val achievementTracker: AchievementTracker,
     private val valhallaSurfaceClient: ValhallaSurfaceClient,
+    private val firestore: FirebaseFirestore,
+    private val auth: FirebaseAuth,
     preferencesRepository: UserPreferencesRepository,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -229,6 +235,9 @@ class ActivitySummaryViewModel @Inject constructor(
                 trackDao.updateTrack(updated.copy(thumbnailPath = thumbnailPath))
             }
 
+            // Fire-and-forget publish to Firestore
+            publishTrackToFirestore(updated)
+
             // Check achievements
             achievementTracker.seedAchievements()
             val newAchievements = achievementTracker.checkAndUpdate(updated)
@@ -263,6 +272,37 @@ class ActivitySummaryViewModel @Inject constructor(
             val chooser = Intent.createChooser(shareIntent, "Share Activity")
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
+        }
+    }
+
+    private fun publishTrackToFirestore(track: TrackEntity) {
+        val user = auth.currentUser ?: return
+        viewModelScope.launch {
+            try {
+                val sharedTrack = SharedTrack(
+                    trackId = track.id,
+                    name = track.name,
+                    recordedAt = track.recordedAt,
+                    distanceMeters = track.distanceMeters,
+                    durationMs = track.durationMs,
+                    avgSpeedMps = track.avgSpeedMps,
+                    maxSpeedMps = track.maxSpeedMps,
+                    elevationGainM = track.elevationGainM,
+                    difficultyRating = track.difficultyRating,
+                    boundingBoxNorthLat = track.boundingBoxNorthLat,
+                    boundingBoxSouthLat = track.boundingBoxSouthLat,
+                    boundingBoxEastLon = track.boundingBoxEastLon,
+                    boundingBoxWestLon = track.boundingBoxWestLon,
+                    ownerUid = user.uid,
+                    ownerDisplayName = user.displayName,
+                    ownerPhotoUrl = user.photoUrl?.toString(),
+                )
+                firestore.collection("users").document(user.uid)
+                    .collection("sharedTracks").document(track.id)
+                    .set(sharedTrack).await()
+            } catch (_: Exception) {
+                // Non-critical: Firestore publish failure should not affect the save flow
+            }
         }
     }
 
