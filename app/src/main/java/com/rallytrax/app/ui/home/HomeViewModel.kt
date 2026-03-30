@@ -106,6 +106,11 @@ class HomeViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load friend activities", e)
+                _friendActivities.value = emptyList()
+            } catch (e: Error) {
+                // Catch initialization errors (e.g. gRPC/Firestore NoClassDefFoundError)
+                Log.e(TAG, "Fatal error loading friend activities", e)
+                _friendActivities.value = emptyList()
             }
         }
     }
@@ -125,75 +130,80 @@ class HomeViewModel @Inject constructor(
         vehicleDao.observeActiveVehicle(),
         preferences,
     ) { values ->
-        @Suppress("UNCHECKED_CAST")
-        val allStints = values[0] as List<com.rallytrax.app.data.local.entity.TrackEntity>
-        @Suppress("UNCHECKED_CAST")
-        val allVehicles = values[1] as List<com.rallytrax.app.data.local.entity.VehicleEntity>
-        val filterByActive = values[2] as Boolean
-        val activeVehicle = values[3] as com.rallytrax.app.data.local.entity.VehicleEntity?
-        val prefs = values[4] as UserPreferencesData
-        val stints = if (filterByActive && activeVehicle != null) {
-            allStints.filter { it.vehicleId == activeVehicle.id }
-        } else {
-            allStints
-        }
+        try {
+            @Suppress("UNCHECKED_CAST")
+            val allStints = values[0] as List<com.rallytrax.app.data.local.entity.TrackEntity>
+            @Suppress("UNCHECKED_CAST")
+            val allVehicles = values[1] as List<com.rallytrax.app.data.local.entity.VehicleEntity>
+            val filterByActive = values[2] as Boolean
+            val activeVehicle = values[3] as com.rallytrax.app.data.local.entity.VehicleEntity?
+            val prefs = values[4] as UserPreferencesData
+            val stints = if (filterByActive && activeVehicle != null) {
+                allStints.filter { it.vehicleId == activeVehicle.id }
+            } else {
+                allStints
+            }
 
-        // Vehicle name lookup
-        val vehicleNameMap = allVehicles.associate { it.id to it.name }
+            // Vehicle name lookup
+            val vehicleNameMap = allVehicles.associate { it.id to it.name }
 
-        // Weekly summary
-        val now = Instant.now()
-        val zone = ZoneId.systemDefault()
-        val today = now.atZone(zone).toLocalDate()
-        val startOfWeek = today.with(ChronoField.DAY_OF_WEEK, 1)
-        val weekStartMs = startOfWeek.atStartOfDay(zone).toInstant().toEpochMilli()
+            // Weekly summary
+            val now = Instant.now()
+            val zone = ZoneId.systemDefault()
+            val today = now.atZone(zone).toLocalDate()
+            val startOfWeek = today.with(ChronoField.DAY_OF_WEEK, 1)
+            val weekStartMs = startOfWeek.atStartOfDay(zone).toInstant().toEpochMilli()
 
-        val weeklyStints = stints.filter { it.recordedAt >= weekStartMs }
-        val weeklySummary = WeeklySummary(
-            totalDistanceMeters = weeklyStints.sumOf { it.distanceMeters },
-            driveCount = weeklyStints.size,
-            totalDurationMs = weeklyStints.sumOf { it.durationMs },
-        )
-
-        val dueSchedules = try { maintenanceDao.getDueSchedules() } catch (_: Exception) { emptyList() }
-        val dueItems = dueSchedules.map { schedule ->
-            MaintenanceDueItem(
-                serviceType = schedule.serviceType,
-                vehicleName = vehicleNameMap[schedule.vehicleId] ?: "Unknown Vehicle",
-                status = schedule.status,
-                nextDueDate = schedule.nextDueDate,
-                vehicleId = schedule.vehicleId,
+            val weeklyStints = stints.filter { it.recordedAt >= weekStartMs }
+            val weeklySummary = WeeklySummary(
+                totalDistanceMeters = weeklyStints.sumOf { it.distanceMeters },
+                driveCount = weeklyStints.size,
+                totalDurationMs = weeklyStints.sumOf { it.durationMs },
             )
-        }
 
-        val since24h = System.currentTimeMillis() - 24 * 60 * 60 * 1000
-        val recentAchievements = try { achievementDao.getRecentlyUnlocked(since24h) } catch (_: Exception) { emptyList() }
+            val dueSchedules = try { maintenanceDao.getDueSchedules() } catch (_: Exception) { emptyList() }
+            val dueItems = dueSchedules.map { schedule ->
+                MaintenanceDueItem(
+                    serviceType = schedule.serviceType,
+                    vehicleName = vehicleNameMap[schedule.vehicleId] ?: "Unknown Vehicle",
+                    status = schedule.status,
+                    nextDueDate = schedule.nextDueDate,
+                    vehicleId = schedule.vehicleId,
+                )
+            }
 
-        val feedItems = stints.map { track ->
-            ActivityFeedItem(
-                track = track,
-                vehicleName = track.vehicleId?.let { vehicleNameMap[it] },
+            val since24h = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+            val recentAchievements = try { achievementDao.getRecentlyUnlocked(since24h) } catch (_: Exception) { emptyList() }
+
+            val feedItems = stints.map { track ->
+                ActivityFeedItem(
+                    track = track,
+                    vehicleName = track.vehicleId?.let { vehicleNameMap[it] },
+                )
+            }
+
+            val goalKm = prefs.weeklyDistanceGoalKm
+            val goalProgress = if (goalKm != null && goalKm > 0) {
+                (weeklySummary.totalDistanceMeters / (goalKm * 1000)).toFloat().coerceAtMost(1.5f)
+            } else {
+                null
+            }
+
+            HomeFeedState(
+                weeklySummary = weeklySummary,
+                feedItems = feedItems,
+                totalStintCount = stints.size,
+                maintenanceDueItems = dueItems,
+                showActiveVehicleOnly = filterByActive,
+                activeVehicleName = activeVehicle?.name,
+                recentAchievements = recentAchievements,
+                weeklyGoalKm = goalKm,
+                weeklyGoalProgress = goalProgress,
             )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error computing feed state", e)
+            HomeFeedState()
         }
-
-        val goalKm = prefs.weeklyDistanceGoalKm
-        val goalProgress = if (goalKm != null && goalKm > 0) {
-            (weeklySummary.totalDistanceMeters / (goalKm * 1000)).toFloat().coerceAtMost(1.5f)
-        } else {
-            null
-        }
-
-        HomeFeedState(
-            weeklySummary = weeklySummary,
-            feedItems = feedItems,
-            totalStintCount = stints.size,
-            maintenanceDueItems = dueItems,
-            showActiveVehicleOnly = filterByActive,
-            activeVehicleName = activeVehicle?.name,
-            recentAchievements = recentAchievements,
-            weeklyGoalKm = goalKm,
-            weeklyGoalProgress = goalProgress,
-        )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeFeedState())
 

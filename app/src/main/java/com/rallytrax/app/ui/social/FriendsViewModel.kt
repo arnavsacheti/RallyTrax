@@ -32,14 +32,23 @@ class FriendsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            socialRepository.getFollowing().collect { list ->
-                _uiState.update { it.copy(following = list, isLoading = false) }
+            try {
+                socialRepository.getFollowing().collect { list ->
+                    _uiState.update { it.copy(following = list, isLoading = false) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false) }
+            } catch (_: Error) {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
         viewModelScope.launch {
-            socialRepository.getFollowers().collect { list ->
-                _uiState.update { it.copy(followers = list) }
-            }
+            try {
+                socialRepository.getFollowers().collect { list ->
+                    _uiState.update { it.copy(followers = list) }
+                }
+            } catch (_: Exception) { /* unauthenticated or network error */ }
+            catch (_: Error) { /* Firestore init error */ }
         }
     }
 

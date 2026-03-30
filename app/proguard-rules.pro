@@ -73,10 +73,19 @@
 -keep class com.google.firebase.auth.** { *; }
 -keep class com.google.firebase.firestore.** { *; }
 
+# Firestore data classes (reflection-based deserialization)
+-keep class com.rallytrax.app.data.social.UserProfile { *; }
+-keep class com.rallytrax.app.data.social.SharedTrack { *; }
+
 # gRPC (required by Firestore)
 -keep class io.grpc.** { *; }
+-keepclassmembers class io.grpc.** { *; }
 -dontwarn io.grpc.**
 -dontwarn com.google.firebase.firestore.**
+
+# Protobuf (required by Firestore gRPC transport)
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
 
 # Credential Manager
 -keep class androidx.credentials.** { *; }
