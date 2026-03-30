@@ -6,9 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.gpx.GpxImportResult
 import com.rallytrax.app.data.gpx.GpxParseException
+import com.rallytrax.app.data.local.dao.AchievementDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.entity.AchievementEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
@@ -49,6 +51,7 @@ data class HomeFeedState(
     val maintenanceDueCount: Int = 0,
     val showActiveVehicleOnly: Boolean = false,
     val activeVehicleName: String? = null,
+    val recentAchievements: List<AchievementEntity> = emptyList(),
 )
 
 @HiltViewModel
@@ -58,6 +61,7 @@ class HomeViewModel @Inject constructor(
     private val paceNoteDao: PaceNoteDao,
     private val maintenanceDao: com.rallytrax.app.data.local.dao.MaintenanceDao,
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
+    private val achievementDao: AchievementDao,
     preferencesRepository: UserPreferencesRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -104,6 +108,9 @@ class HomeViewModel @Inject constructor(
 
         val dueCount = try { maintenanceDao.getDueSchedules().size } catch (_: Exception) { 0 }
 
+        val since24h = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+        val recentAchievements = try { achievementDao.getRecentlyUnlocked(since24h) } catch (_: Exception) { emptyList() }
+
         val feedItems = stints.map { track ->
             ActivityFeedItem(
                 track = track,
@@ -118,6 +125,7 @@ class HomeViewModel @Inject constructor(
             maintenanceDueCount = dueCount,
             showActiveVehicleOnly = filterByActive,
             activeVehicleName = activeVehicle?.name,
+            recentAchievements = recentAchievements,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeFeedState())
