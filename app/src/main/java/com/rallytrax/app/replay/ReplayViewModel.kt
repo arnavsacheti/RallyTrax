@@ -14,7 +14,9 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
+import com.rallytrax.app.pacenotes.DriverProfileUpdater
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -76,6 +78,7 @@ class ReplayViewModel @Inject constructor(
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
+    private val driverProfileDao: DriverProfileDao,
     private val preferencesRepository: UserPreferencesRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
@@ -129,10 +132,17 @@ class ReplayViewModel @Inject constructor(
                 }
 
                 val prefs = withContext(ioDispatcher) { preferencesRepository.preferences.first() }
+
+                // Load driver profile for adaptive pace note call timing
+                val driverProfile = withContext(ioDispatcher) {
+                    DriverProfileUpdater.loadProfile(driverProfileDao)
+                }.ifEmpty { null }
+
                 replayEngine = ReplayEngine(
                     trackPoints = points,
                     paceNotes = notes,
                     lookaheadSeconds = prefs.callTimingSeconds.toDouble(),
+                    driverProfile = driverProfile,
                 )
 
                 _uiState.value = _uiState.value.copy(

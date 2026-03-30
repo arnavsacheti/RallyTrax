@@ -18,6 +18,12 @@ class ReplayEngine(
     private val paceNotes: List<PaceNoteEntity>,
     /** Configurable lookahead time in seconds (default 6s, range 3-12). */
     var lookaheadSeconds: Double = 6.0,
+    /**
+     * Driver speed profile: maps radius bucket (in metres, rounded to nearest 10)
+     * to the driver's average speed (m/s) through corners of that radius.
+     * Used for adaptive pace note call timing.
+     */
+    private val driverProfile: Map<Int, Double>? = null,
 ) {
     /** Cumulative distance at each track point index */
     private val cumulativeDistances: DoubleArray
@@ -126,8 +132,8 @@ class ReplayEngine(
             nextNote = candidate
             distToNextNote = candidate.distanceFromStart - currentProgress
 
-            // Pre-call distance: trigger based on speed (higher speed = earlier call)
-            val preCallDistance = computePreCallDistance(speedMps)
+            // Pre-call distance: trigger based on speed and driver profile
+            val preCallDistance = computePreCallDistance(speedMps, candidate)
 
             if (distToNextNote <= preCallDistance && candidate.id !in spokenNoteIds) {
                 // Speed-based priority filtering: drop straights when approaching fast
@@ -163,16 +169,37 @@ class ReplayEngine(
     }
 
     /**
-     * Pre-call distance: time-based lookahead.
-     * distance = speed * lookaheadSeconds, clamped to [40m, 400m].
+     * Adaptive pre-call distance based on current speed, lookahead time, and driver profile.
      *
-     * Default 6s lookahead gives:
-     * - At 20 km/h (~5.5 m/s): ~33m ahead (clamped to 40m)
-     * - At 100 km/h (~27.8 m/s): ~167m ahead
-     * - At 160 km/h (~44.4 m/s): ~267m ahead
+     * When a driver profile is available and the upcoming note has a turn radius, the
+     * engine looks up the driver's typical speed through that radius bucket. If the
+     * driver will need to slow down significantly, the call is issued earlier to give
+     * more reaction time. Without a profile, falls back to the base calculation.
+     *
+     * Base formula: distance = speed * lookaheadSeconds, clamped to [40m, 400m].
+     * Adaptive formula extends the upper clamp to 500m when extra braking time is needed.
      */
-    private fun computePreCallDistance(speedMps: Double): Double {
-        return (speedMps * lookaheadSeconds).coerceIn(40.0, 400.0)
+    private fun computePreCallDistance(speedMps: Double, nextNote: PaceNoteEntity?): Double {
+        val baseDistance = speedMps * lookaheadSeconds
+
+        if (driverProfile == null || nextNote == null) {
+            return baseDistance.coerceIn(40.0, 400.0)
+        }
+
+        val turnRadius = nextNote.turnRadiusM
+            ?: return baseDistance.coerceIn(40.0, 400.0)
+
+        val radiusBucket = (turnRadius / 10.0).toInt() * 10 // Round to nearest 10m
+        val expectedSpeed = driverProfile[radiusBucket]
+
+        if (expectedSpeed != null && expectedSpeed < speedMps) {
+            // Driver needs to slow down — call earlier to give more reaction time
+            val speedDelta = speedMps - expectedSpeed
+            val extraTime = (speedDelta / speedMps) * lookaheadSeconds * 0.5
+            return ((lookaheadSeconds + extraTime) * speedMps).coerceIn(40.0, 500.0)
+        }
+
+        return baseDistance.coerceIn(40.0, 400.0)
     }
 
     /**
