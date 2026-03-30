@@ -3,4 +3,7 @@
     <external-cache-path
         name="apk_updates"
         path="updates/" />
+    <cache-path
+        name="share_images"
+        path="share/" />
 </paths>
