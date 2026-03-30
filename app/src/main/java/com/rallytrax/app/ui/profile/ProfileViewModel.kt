@@ -2,10 +2,12 @@ package com.rallytrax.app.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.local.dao.AchievementDao
 import com.rallytrax.app.data.local.dao.DriverProfileDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.dao.WeatherDao
+import com.rallytrax.app.data.local.entity.AchievementEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +38,12 @@ data class VehicleStats(
     val avgSmoothness: Int?,
 )
 
+data class AchievementSummary(
+    val unlockedCount: Int = 0,
+    val totalCount: Int = 0,
+    val nextAchievement: AchievementEntity? = null,
+)
+
 data class ProfileState(
     val currentStreak: Int = 0,
     val activeDaysThisMonth: Set<LocalDate> = emptySet(),
@@ -62,6 +70,8 @@ data class ProfileState(
     val driverProfile: Map<Int, Double> = emptyMap(),
     // Weather impact
     val weatherBuckets: List<WeatherBucket> = emptyList(),
+    // Achievement summary
+    val achievementSummary: AchievementSummary = AchievementSummary(),
 )
 
 @HiltViewModel
@@ -70,16 +80,30 @@ class ProfileViewModel @Inject constructor(
     private val vehicleDao: VehicleDao,
     private val driverProfileDao: DriverProfileDao,
     private val weatherDao: WeatherDao,
+    private val achievementDao: AchievementDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _driverProfile = MutableStateFlow<Map<Int, Double>>(emptyMap())
+    private val _achievementSummary = MutableStateFlow(AchievementSummary())
 
     init {
         viewModelScope.launch {
             val entries = driverProfileDao.getAll()
                 .filter { it.sampleCount >= 3 }
             _driverProfile.value = entries.associate { it.radiusBucketM to it.avgSpeedMps }
+        }
+        viewModelScope.launch {
+            achievementDao.getAllAchievements().collect { achievements ->
+                val nextAchievement = achievements
+                    .filter { it.unlockedAt == null }
+                    .maxByOrNull { it.progress }
+                _achievementSummary.value = AchievementSummary(
+                    unlockedCount = achievements.count { it.unlockedAt != null },
+                    totalCount = achievements.size,
+                    nextAchievement = nextAchievement,
+                )
+            }
         }
     }
 
@@ -91,7 +115,8 @@ class ProfileViewModel @Inject constructor(
         vehicleDao.getAllVehicles(),
         _driverProfile,
         weatherDao.getAllWeather(),
-    ) { stints, allVehicles, driverProfile, allWeather ->
+        _achievementSummary,
+    ) { stints, allVehicles, driverProfile, allWeather, achievementSummary ->
         val zone = ZoneId.systemDefault()
         val today = Instant.now().atZone(zone).toLocalDate()
         val yearMonth = YearMonth.from(today)
@@ -215,6 +240,7 @@ class ProfileViewModel @Inject constructor(
             vehicleComparison = vehicleComparison,
             driverProfile = driverProfile,
             weatherBuckets = weatherBuckets,
+            achievementSummary = achievementSummary,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileState())
