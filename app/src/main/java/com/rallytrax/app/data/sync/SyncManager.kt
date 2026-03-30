@@ -46,6 +46,14 @@ class SyncManager @Inject constructor(
         }
     }
 
+    fun setError(message: String) {
+        _syncStatus.value = _syncStatus.value.copy(error = message, isSyncing = false)
+    }
+
+    fun clearError() {
+        _syncStatus.value = _syncStatus.value.copy(error = null)
+    }
+
     /**
      * Perform a full sync cycle using the provided Drive credential.
      */
