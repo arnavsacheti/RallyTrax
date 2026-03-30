@@ -40,6 +40,7 @@ data class ActivitySummaryState(
     val classification: RouteClassifier.ClassificationResult? = null,
     val activeVehicle: VehicleEntity? = null,
     val editedName: String = "",
+    val editedDescription: String = "",
     val selectedRouteType: String = "",
     val selectedDifficulty: String = "",
     val selectedActivityTags: Set<String> = emptySet(),
@@ -144,6 +145,7 @@ class ActivitySummaryViewModel @Inject constructor(
             classification = classification,
             activeVehicle = activeVehicle,
             editedName = track.name,
+            editedDescription = track.description ?: "",
             selectedRouteType = classification?.suggestedRouteType ?: "",
             selectedDifficulty = classification?.difficultyRating ?: "",
             selectedVehicleId = track.vehicleId ?: activeVehicle?.id,
@@ -153,6 +155,10 @@ class ActivitySummaryViewModel @Inject constructor(
 
     fun updateName(name: String) {
         _state.value = _state.value.copy(editedName = name)
+    }
+
+    fun updateDescription(desc: String) {
+        _state.value = _state.value.copy(editedDescription = desc)
     }
 
     fun updateRouteType(routeType: String) {
@@ -182,6 +188,7 @@ class ActivitySummaryViewModel @Inject constructor(
         viewModelScope.launch {
             val updated = track.copy(
                 name = current.editedName.ifBlank { track.name },
+                description = current.editedDescription.ifBlank { null },
                 routeType = current.selectedRouteType.ifBlank { null },
                 difficultyRating = current.selectedDifficulty.ifBlank { null },
                 activityTags = current.selectedActivityTags.joinToString(","),

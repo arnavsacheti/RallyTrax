@@ -224,6 +224,18 @@ fun ActivitySummaryScreen(
                         placeholder = { Text("Name your drive") },
                     )
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = state.editedDescription,
+                        onValueChange = { viewModel.updateDescription(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("How was the drive?") },
+                        placeholder = { Text("Add notes about your drive...") },
+                        minLines = 2,
+                        maxLines = 4,
+                    )
+
                     // Classification section
                     if (state.classification != null) {
                         Spacer(modifier = Modifier.height(20.dp))

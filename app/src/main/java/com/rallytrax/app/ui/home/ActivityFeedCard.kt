@@ -115,6 +115,20 @@ fun ActivityFeedCard(
                 }
             }
 
+            // Description
+            track.description?.let { desc ->
+                if (desc.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
             // Surface breakdown
             track.surfaceBreakdown?.let { breakdown ->
                 if (breakdown.isNotBlank()) {
