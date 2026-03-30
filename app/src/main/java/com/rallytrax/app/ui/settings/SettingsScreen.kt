@@ -72,6 +72,7 @@ import com.rallytrax.app.data.preferences.ThemeMode
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.update.DownloadStatus
 import com.rallytrax.app.update.UpdateViewModel
+import com.rallytrax.app.util.formatRelativeTime
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +91,7 @@ fun SettingsScreen(
     val downloadState by updateViewModel.downloadState.collectAsStateWithLifecycle()
     val preferences by settingsViewModel.preferences.collectAsStateWithLifecycle()
     val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+    val syncStatus by settingsViewModel.syncStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     Scaffold(
@@ -181,6 +183,59 @@ fun SettingsScreen(
                                 contentDescription = "Toggle track backup"
                             },
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Sync status row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = if (syncStatus.lastSyncTime > 0L) {
+                                "Last synced: ${formatRelativeTime(syncStatus.lastSyncTime)}"
+                            } else {
+                                "Never synced"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (syncStatus.isSyncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    // Error message
+                    if (syncStatus.error != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = syncStatus.error!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Sync Now button
+                    OutlinedButton(
+                        onClick = { settingsViewModel.syncNow() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !syncStatus.isSyncing,
+                    ) {
+                        if (syncStatus.isSyncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Syncing...")
+                        } else {
+                            Icon(Icons.Filled.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Sync Now")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
