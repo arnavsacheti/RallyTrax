@@ -13,8 +13,11 @@ data class SyncManifest(
     val settingsFileId: String? = null,
     val settingsMd5: String? = null,
     val settingsModifiedAt: Long = 0L,
-    // Stubs for future stages
+    // Garage data (vehicles, maintenance, fuel logs)
     val garageFileId: String? = null,
+    val garageMd5: String? = null,
+    val garageModifiedAt: Long? = null,
+    // Stubs for future stages
     val maintenanceFileId: String? = null,
     val fuelLogFileId: String? = null,
     val statsFileId: String? = null,

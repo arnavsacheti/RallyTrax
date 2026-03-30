@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Speed
@@ -76,6 +77,7 @@ fun ProfileScreen(
     onNavigateToGarage: () -> Unit = {},
     onNavigateToStints: () -> Unit = {},
     onNavigateToAchievements: () -> Unit = {},
+    onNavigateToFriends: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     authState: AuthState = AuthState.SignedOut,
     isSignedIn: Boolean = false,
@@ -417,6 +419,49 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Outlined.ChevronRight,
                         contentDescription = "Go to Achievements",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(
+                onClick = onNavigateToFriends,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.People,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Friends",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "Follow and connect with friends",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Outlined.ChevronRight,
+                        contentDescription = "Go to Friends",
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }

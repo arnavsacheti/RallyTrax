@@ -91,6 +91,33 @@ class DriveServiceHelper(credential: GoogleAccountCredential) {
             }
         }
 
+    suspend fun uploadGarageData(json: String, manifest: SyncManifest): SyncManifest =
+        withContext(Dispatchers.IO) {
+            retryWithBackoff {
+                val md5 = md5Hash(json)
+                val fileId = if (manifest.garageFileId != null) {
+                    updateFileContent(manifest.garageFileId, json, MIME_JSON)
+                    manifest.garageFileId
+                } else {
+                    val file = uploadNewFile(GARAGE_FILENAME, json, MIME_JSON)
+                    file.id
+                }
+                manifest.copy(
+                    garageFileId = fileId,
+                    garageMd5 = md5,
+                    garageModifiedAt = System.currentTimeMillis(),
+                )
+            }
+        }
+
+    suspend fun downloadGarageData(manifest: SyncManifest): String? =
+        withContext(Dispatchers.IO) {
+            val fileId = manifest.garageFileId ?: return@withContext null
+            retryWithBackoff {
+                downloadFileContent(fileId)
+            }
+        }
+
     suspend fun downloadSettings(manifest: SyncManifest): String? =
         withContext(Dispatchers.IO) {
             val fileId = manifest.settingsFileId ?: return@withContext null
@@ -178,6 +205,7 @@ class DriveServiceHelper(credential: GoogleAccountCredential) {
         private const val TAG = "DriveServiceHelper"
         private const val MANIFEST_FILENAME = "manifest.json"
         private const val SETTINGS_FILENAME = "settings.json"
+        private const val GARAGE_FILENAME = "garage.json"
         private const val MIME_JSON = "application/json"
         private const val MIME_GPX = "application/gpx+xml"
 

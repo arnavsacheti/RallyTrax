@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.ui.achievements.AchievementsScreen
+import com.rallytrax.app.ui.social.FriendsScreen
 import com.rallytrax.app.ui.explore.ExploreScreen
 import com.rallytrax.app.ui.garage.EditVehicleScreen
 import com.rallytrax.app.ui.garage.GarageScreen
@@ -118,6 +119,9 @@ fun RallyTraxNavHost(
                 onNavigateToAchievements = {
                     navController.navigate(AchievementsRoute)
                 },
+                onNavigateToFriends = {
+                    navController.navigate(FriendsRoute)
+                },
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
@@ -130,6 +134,11 @@ fun RallyTraxNavHost(
         }
         composable<AchievementsRoute> {
             AchievementsScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<FriendsRoute> {
+            FriendsScreen(
                 onBack = { navController.popBackStack() },
             )
         }

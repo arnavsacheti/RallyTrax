@@ -49,6 +49,12 @@ interface MaintenanceDao {
     @Query("SELECT * FROM maintenance_schedules WHERE status != 'COMPLETED'")
     suspend fun getAllActiveSchedules(): List<MaintenanceScheduleEntity>
 
+    @Query("SELECT * FROM maintenance_schedules ORDER BY createdAt DESC")
+    suspend fun getAllSchedulesOnce(): List<MaintenanceScheduleEntity>
+
+    @Query("SELECT * FROM maintenance_records ORDER BY date DESC")
+    suspend fun getAllRecordsOnce(): List<MaintenanceRecordEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSchedule(schedule: MaintenanceScheduleEntity)
 
