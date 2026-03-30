@@ -76,11 +76,17 @@ import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatElevation
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.GpsNotFixed
 import androidx.compose.material.icons.filled.GpsOff
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
+import androidx.core.content.ContextCompat
 import com.rallytrax.app.recording.SensorHudData
 
 @Composable
@@ -123,6 +129,17 @@ fun RecordingScreen(
 
     val sensorData by viewModel.sensorHudData.collectAsStateWithLifecycle()
     var showSensorHud by remember { mutableStateOf(false) }
+
+    val isRecordingVoice by viewModel.isRecordingVoiceNote.collectAsStateWithLifecycle()
+
+    // Permission launcher for RECORD_AUDIO
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            viewModel.toggleVoiceNote(context)
+        }
+    }
 
     val isRecording = status == RecordingStatus.RECORDING
     val isPaused = status == RecordingStatus.PAUSED
@@ -357,6 +374,31 @@ fun RecordingScreen(
                     Icon(
                         imageVector = Icons.Filled.Flag,
                         contentDescription = "Mark Segment",
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White,
+                    )
+                }
+
+                // Voice note button
+                FilledIconButton(
+                    onClick = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                            == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            viewModel.toggleVoiceNote(context)
+                        } else {
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = if (isRecordingVoice) Color.Red else Color(0xFF2C2C2C),
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = "Voice note",
                         modifier = Modifier.size(20.dp),
                         tint = Color.White,
                     )

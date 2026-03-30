@@ -36,6 +36,9 @@ class RecordingViewModel @Inject constructor(
     val sensorHudData: StateFlow<SensorHudData> = TrackingService.sensorHudData
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SensorHudData.EMPTY)
 
+    val isRecordingVoiceNote: StateFlow<Boolean> = TrackingService.isRecordingVoiceNote
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _navigateToTrackDetail = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val navigateToTrackDetail = _navigateToTrackDetail.asSharedFlow()
 
@@ -81,6 +84,13 @@ class RecordingViewModel @Inject constructor(
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_MARK_SEGMENT
             putExtra(TrackingService.EXTRA_SEGMENT_TYPE, segmentType)
+        }
+        context.startService(intent)
+    }
+
+    fun toggleVoiceNote(context: Context) {
+        val intent = Intent(context, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_VOICE_NOTE
         }
         context.startService(intent)
     }
