@@ -96,12 +96,15 @@ class SocialRepository @Inject constructor(
                 .collection(subcollection)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    // Emit empty list on permission/network errors instead of crashing
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 val uids = snapshot?.documents?.mapNotNull { it.id } ?: emptyList()
                 launch {
-                    val profiles = uids.mapNotNull { uid -> getUserProfile(uid) }
+                    val profiles = uids.mapNotNull { friendUid ->
+                        try { getUserProfile(friendUid) } catch (_: Exception) { null }
+                    }
                     trySend(profiles)
                 }
             }
@@ -128,16 +131,20 @@ class SocialRepository @Inject constructor(
         return coroutineScope {
             followingUids.map { uid ->
                 async {
-                    usersCollection.document(uid)
-                        .collection("sharedTracks")
-                        .orderBy("publishedAt", Query.Direction.DESCENDING)
-                        .limit(limit.toLong())
-                        .get()
-                        .await()
-                        .toObjects(SharedTrack::class.java)
+                    try {
+                        usersCollection.document(uid)
+                            .collection("sharedTracks")
+                            .orderBy("recordedAt", Query.Direction.DESCENDING)
+                            .limit(limit.toLong())
+                            .get()
+                            .await()
+                            .toObjects(SharedTrack::class.java)
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
                 }
             }.flatMap { it.await() }
-                .sortedByDescending { it.publishedAt }
+                .sortedByDescending { it.recordedAt }
                 .take(limit)
         }
     }
