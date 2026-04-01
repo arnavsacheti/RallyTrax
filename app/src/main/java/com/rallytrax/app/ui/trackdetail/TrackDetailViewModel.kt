@@ -26,6 +26,7 @@ import com.rallytrax.app.data.local.entity.TrackPointEntity
 import com.rallytrax.app.data.local.entity.WeatherEntity
 import com.rallytrax.app.data.analytics.ConsistencyAnalyzer
 import com.rallytrax.app.data.analytics.CrossSensorAnalytics
+import com.rallytrax.app.data.analytics.GripEventDetector
 import com.rallytrax.app.data.classification.ValhallaRouteClient
 import com.rallytrax.app.data.local.dao.SegmentDao
 import com.rallytrax.app.data.preferences.UserPreferencesData
@@ -161,6 +162,8 @@ data class TrackDetailUiState(
     // Corner analysis
     val cornerAnalysis: List<CornerAnalysis> = emptyList(),
     val accelProfile: List<AccelPoint> = emptyList(),
+    // Grip event detection
+    val gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
 )
 
 enum class MapLayer {
@@ -217,6 +220,7 @@ class TrackDetailViewModel @Inject constructor(
             val yawRateDeferred = async(defaultDispatcher) { buildYawRateProfile(points) }
             val rollRateDeferred = async(defaultDispatcher) { buildRollRateProfile(points) }
             val accelDeferred = async(defaultDispatcher) { buildAccelProfile(points) }
+            val gripEventsDeferred = async(defaultDispatcher) { GripEventDetector.detect(points) }
 
             // Parallelize independent DB queries on IO dispatcher
             val weatherDeferred = async(ioDispatcher) { weatherDao.getWeatherForTrack(trackId) }
@@ -327,6 +331,7 @@ class TrackDetailViewModel @Inject constructor(
                 elevationAdjustedAvgSpeedMps = elevAdjSpeed,
                 cornerAnalysis = cornerAnalysis,
                 accelProfile = accelProfile,
+                gripEvents = gripEventsDeferred.await(),
             )
         }
     }

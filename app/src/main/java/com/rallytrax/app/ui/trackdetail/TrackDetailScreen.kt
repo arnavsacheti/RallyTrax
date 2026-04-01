@@ -37,12 +37,15 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -116,6 +119,10 @@ import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
 import com.rallytrax.app.ui.map.OsmPolylineData
 import com.rallytrax.app.ui.map.PaceNoteIconRenderer
+import com.rallytrax.app.data.analytics.GripEventDetector
+import com.rallytrax.app.ui.theme.DifficultyAmber
+import com.rallytrax.app.ui.theme.DifficultyOrange
+import com.rallytrax.app.ui.theme.DifficultyRed
 import com.rallytrax.app.ui.theme.HeatmapCold
 import com.rallytrax.app.ui.theme.LayerAccel
 import com.rallytrax.app.ui.theme.LayerCallout
@@ -1620,6 +1627,12 @@ private fun ViewTab(
             SensorStatsCard(uiState.sensorStats, uiState.lateralGProfile, uiState.yawRateProfile, uiState.rollRateProfile)
         }
 
+        // Grip events
+        if (uiState.gripEvents.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            GripEventsCard(uiState.gripEvents)
+        }
+
         // Corner analysis
         if (uiState.cornerAnalysis.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -2667,4 +2680,146 @@ private fun ColorBadge(text: String, color: Color) {
             )
             .padding(horizontal = 6.dp, vertical = 2.dp),
     )
+}
+
+// ── Grip Events Card ──────────────────────────────────────────────────
+
+@Composable
+private fun GripEventsCard(gripEvents: List<GripEventDetector.GripEvent>) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val oversteerCount = gripEvents.count { it.type == GripEventDetector.GripEventType.OVERSTEER }
+    val understeerCount = gripEvents.count { it.type == GripEventDetector.GripEventType.UNDERSTEER }
+    val absCount = gripEvents.count { it.type == GripEventDetector.GripEventType.ABS_ACTIVATION }
+    val tractionCount = gripEvents.count { it.type == GripEventDetector.GripEventType.TRACTION_LOSS }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Title row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = DifficultyOrange,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Grip Events",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${gripEvents.size}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Summary badges
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (oversteerCount > 0) ColorBadge("$oversteerCount oversteer", DifficultyOrange)
+                if (understeerCount > 0) ColorBadge("$understeerCount understeer", DifficultyAmber)
+                if (absCount > 0) ColorBadge("$absCount ABS", DifficultyRed)
+                if (tractionCount > 0) ColorBadge("$tractionCount traction", DifficultyAmber)
+            }
+
+            // Expand/collapse toggle
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (expanded) "Hide details" else "Show details",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+
+            // Expandable event list
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider()
+                    gripEvents.forEach { event ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GripEventRow(event)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GripEventRow(event: GripEventDetector.GripEvent) {
+    val severityColor = when (event.severity) {
+        GripEventDetector.Severity.MILD -> DifficultyAmber
+        GripEventDetector.Severity.MODERATE -> DifficultyOrange
+        GripEventDetector.Severity.SEVERE -> DifficultyRed
+    }
+
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        // Severity dot
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .size(8.dp)
+                .background(severityColor, RoundedCornerShape(4.dp)),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = event.description,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = "${String.format("%.0f", event.distanceFromStart)}m from start",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = event.severity.name.lowercase()
+                .replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.labelSmall,
+            color = severityColor,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }

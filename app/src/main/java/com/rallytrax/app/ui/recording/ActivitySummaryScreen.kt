@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -209,6 +210,17 @@ fun ActivitySummaryScreen(
                                 }
                             }
                         }
+                    }
+
+                    // Grip events stat
+                    if (state.gripEventCount > 0) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HeroStatCard(
+                            icon = Icons.Filled.Warning,
+                            label = "Grip Events",
+                            value = "${state.gripEventCount}",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
 
                     // Personal Record celebration
