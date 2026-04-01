@@ -8,6 +8,7 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
+import com.rallytrax.app.data.sync.FirestoreSyncHelper
 import com.rallytrax.app.data.sync.SyncManager
 import dagger.Module
 import dagger.Provides
@@ -31,5 +32,16 @@ object SyncModule {
         vehicleDao: VehicleDao,
         maintenanceDao: MaintenanceDao,
         fuelLogDao: FuelLogDao,
-    ): SyncManager = SyncManager(context, preferencesRepository, trackDao, trackPointDao, paceNoteDao, vehicleDao, maintenanceDao, fuelLogDao)
+        firestoreSyncHelper: FirestoreSyncHelper,
+    ): SyncManager = SyncManager(
+        context,
+        preferencesRepository,
+        trackDao,
+        trackPointDao,
+        paceNoteDao,
+        vehicleDao,
+        maintenanceDao,
+        fuelLogDao,
+        firestoreSyncHelper,
+    )
 }
