@@ -11,6 +11,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.rallytrax.app.data.analytics.GripEventDetector
 import com.rallytrax.app.data.ThumbnailGenerator
 import com.rallytrax.app.data.achievements.AchievementTracker
+import com.rallytrax.app.data.classification.FrequentRouteDetector
 import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.data.classification.SurfaceFusion
 import com.rallytrax.app.data.classification.ValhallaSurfaceClient
@@ -65,6 +66,9 @@ data class ActivitySummaryState(
     val gripEventCount: Int = 0,
     val isPersonalRecord: Boolean = false,
     val prDeltaMs: Long? = null, // negative = improvement (faster)
+    val routeSuggestion: FrequentRouteDetector.RouteSuggestion? = null,
+    val routeSuggestionDismissed: Boolean = false,
+    val isSavingRoute: Boolean = false,
 )
 
 @HiltViewModel
@@ -76,6 +80,7 @@ class ActivitySummaryViewModel @Inject constructor(
     private val vehicleDao: VehicleDao,
     private val achievementTracker: AchievementTracker,
     private val valhallaSurfaceClient: ValhallaSurfaceClient,
+    private val frequentRouteDetector: FrequentRouteDetector,
     private val socialRepository: SocialRepository,
     private val auth: FirebaseAuth,
     preferencesRepository: UserPreferencesRepository,
@@ -169,6 +174,20 @@ class ActivitySummaryViewModel @Inject constructor(
             trackDao.updateGripEvents(track.id, gripEventCount, summary)
         }
 
+        // Detect frequent routes in background
+        viewModelScope.launch {
+            try {
+                val suggestion = withContext(defaultDispatcher) {
+                    frequentRouteDetector.detectFrequentRoute(trackId)
+                }
+                if (suggestion != null) {
+                    _state.value = _state.value.copy(routeSuggestion = suggestion)
+                }
+            } catch (e: Exception) {
+                Log.w("ActivitySummaryVM", "Frequent route detection failed", e)
+            }
+        }
+
         // Check for personal record
         val otherTracks = trackDao.getTracksForRoute(track.name).filter { it.id != track.id }
         val previousBestMs = otherTracks
@@ -217,6 +236,28 @@ class ActivitySummaryViewModel @Inject constructor(
 
     fun updateVehicle(vehicleId: String?) {
         _state.value = _state.value.copy(selectedVehicleId = vehicleId)
+    }
+
+    fun saveRouteSuggestion(routeName: String) {
+        val suggestion = _state.value.routeSuggestion ?: return
+        _state.value = _state.value.copy(isSavingRoute = true)
+        viewModelScope.launch {
+            try {
+                frequentRouteDetector.saveAsRoute(suggestion, routeName)
+                _state.value = _state.value.copy(
+                    routeSuggestion = null,
+                    isSavingRoute = false,
+                    editedName = routeName,
+                )
+            } catch (e: Exception) {
+                Log.w("ActivitySummaryVM", "Failed to save route suggestion", e)
+                _state.value = _state.value.copy(isSavingRoute = false)
+            }
+        }
+    }
+
+    fun dismissRouteSuggestion() {
+        _state.value = _state.value.copy(routeSuggestionDismissed = true)
     }
 
     fun saveAndViewDetails() {
