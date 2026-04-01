@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.rallytrax.app.data.analytics.GripEventDetector
 import com.rallytrax.app.data.ThumbnailGenerator
 import com.rallytrax.app.data.achievements.AchievementTracker
 import com.rallytrax.app.data.classification.RouteClassifier
@@ -61,6 +62,7 @@ data class ActivitySummaryState(
     val isSaving: Boolean = false,
     val newlyUnlockedAchievements: List<AchievementEntity> = emptyList(),
     val sensorStats: SensorStats = SensorStats(),
+    val gripEventCount: Int = 0,
     val isPersonalRecord: Boolean = false,
     val prDeltaMs: Long? = null, // negative = improvement (faster)
 )
@@ -159,6 +161,14 @@ class ActivitySummaryViewModel @Inject constructor(
             hasSensorData = hasSensorData,
         )
 
+        // Grip event detection
+        val gripEvents = withContext(defaultDispatcher) { GripEventDetector.detect(points) }
+        val gripEventCount = gripEvents.size
+        if (gripEvents.isNotEmpty()) {
+            val summary = gripEvents.joinToString(";") { "${it.type}:${it.severity}:${it.pointIndex}" }
+            trackDao.updateGripEvents(track.id, gripEventCount, summary)
+        }
+
         // Check for personal record
         val otherTracks = trackDao.getTracksForRoute(track.name).filter { it.id != track.id }
         val previousBestMs = otherTracks
@@ -176,6 +186,7 @@ class ActivitySummaryViewModel @Inject constructor(
             selectedDifficulty = classification?.difficultyRating ?: "",
             selectedVehicleId = track.vehicleId ?: activeVehicle?.id,
             sensorStats = sensorStats,
+            gripEventCount = gripEventCount,
             isPersonalRecord = isNewPR,
             prDeltaMs = if (isNewPR) track.durationMs - previousBestMs!! else null,
         )

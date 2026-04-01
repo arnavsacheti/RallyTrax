@@ -48,7 +48,7 @@ import com.rallytrax.app.data.local.entity.WeatherEntity
         SegmentRunEntity::class,
         WeatherEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -394,6 +394,13 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE vehicles ADD COLUMN oilType TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE vehicles ADD COLUMN engineConfiguration TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE vehicles ADD COLUMN wheelDiameter REAL DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tracks ADD COLUMN gripEventCount INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN gripEventSummary TEXT DEFAULT NULL")
             }
         }
 

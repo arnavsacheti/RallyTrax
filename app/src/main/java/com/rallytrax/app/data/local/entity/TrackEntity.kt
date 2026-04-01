@@ -46,4 +46,7 @@ data class TrackEntity(
     val roadRoughnessIndex: Double? = null,
     val brakingEfficiencyScore: Int? = null,
     val elevationAdjustedAvgSpeedMps: Double? = null,
+    // Grip event detection cache
+    val gripEventCount: Int? = null,
+    val gripEventSummary: String? = null, // semicolon-delimited GripEvent summaries
 )

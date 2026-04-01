@@ -134,4 +134,9 @@ interface TrackDao {
 
     @Query("SELECT AVG(brakingEfficiencyScore) FROM tracks WHERE brakingEfficiencyScore IS NOT NULL")
     suspend fun getAvgBrakingEfficiency(): Double?
+
+    // --- Grip event detection ---
+
+    @Query("UPDATE tracks SET gripEventCount = :count, gripEventSummary = :summary WHERE id = :trackId")
+    suspend fun updateGripEvents(trackId: String, count: Int, summary: String?)
 }
