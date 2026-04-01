@@ -7,14 +7,8 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
-import com.google.android.gms.auth.api.identity.AuthorizationRequest
-import com.google.android.gms.auth.api.identity.AuthorizationResult
-import com.google.android.gms.auth.api.identity.Identity
-import com.google.android.gms.common.api.Scope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
-import com.google.api.services.drive.DriveScopes
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -114,33 +108,6 @@ class AuthRepository @Inject constructor(
         return GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
             .build()
-    }
-
-    suspend fun authorizeDrive(activity: Activity): Result<AuthorizationResult> {
-        return try {
-            val scopes = listOf(Scope(DriveScopes.DRIVE_APPDATA))
-            val request = AuthorizationRequest.Builder()
-                .setRequestedScopes(scopes)
-                .build()
-            val result = Identity.getAuthorizationClient(activity)
-                .authorize(request)
-                .await()
-            Result.success(result)
-        } catch (e: Exception) {
-            Log.e(TAG, "Drive authorization failed", e)
-            Result.failure(e)
-        }
-    }
-
-    fun getDriveCredential(activity: Activity): GoogleAccountCredential {
-        val account = firebaseAuth.currentUser?.email
-            ?: throw IllegalStateException("Not signed in")
-        val credential = GoogleAccountCredential.usingOAuth2(
-            activity,
-            listOf(DriveScopes.DRIVE_APPDATA),
-        )
-        credential.selectedAccountName = account
-        return credential
     }
 
     fun signOut() {

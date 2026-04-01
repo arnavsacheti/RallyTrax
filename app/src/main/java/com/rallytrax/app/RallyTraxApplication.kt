@@ -11,6 +11,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.auth.FirebaseAuth
 import com.rallytrax.app.data.local.BackfillWorker
 import com.rallytrax.app.data.sync.SyncManager
@@ -33,6 +35,11 @@ class RallyTraxApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize Firebase App Check for attestation
+        FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
+            PlayIntegrityAppCheckProviderFactory.getInstance()
+        )
 
         // Configure osmdroid (user-agent is required for tile downloads)
         org.osmdroid.config.Configuration.getInstance().apply {

@@ -91,13 +91,11 @@
 -keep class androidx.credentials.** { *; }
 -keep class com.google.android.libraries.identity.googleid.** { *; }
 
-# Google Drive API / HTTP Client
--keep class com.google.api.services.drive.** { *; }
--keep class com.google.api.client.** { *; }
--keep class com.google.http.client.** { *; }
--dontwarn com.google.api.client.**
--dontwarn com.google.http.client.**
--dontwarn org.apache.http.**
+# Firebase Cloud Storage
+-keep class com.google.firebase.storage.** { *; }
+
+# Firebase App Check
+-keep class com.google.firebase.appcheck.** { *; }
 
 # Coil
 -keep class coil.** { *; }

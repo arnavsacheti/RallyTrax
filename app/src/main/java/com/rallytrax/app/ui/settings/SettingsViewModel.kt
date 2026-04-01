@@ -7,12 +7,9 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
-import com.google.api.services.drive.DriveScopes
 import com.rallytrax.app.data.auth.AuthRepository
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.data.export.CsvExporter
-import com.rallytrax.app.data.sync.DriveServiceHelper
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -262,7 +259,7 @@ class SettingsViewModel @Inject constructor(
 
     // ── Cloud Restore ────────────────────────────────────────────────────────
 
-    fun restoreFromCloud(context: Context) {
+    fun restoreFromCloud() {
         if (_isRestoring.value) return
         viewModelScope.launch {
             _isRestoring.value = true
@@ -273,14 +270,7 @@ class SettingsViewModel @Inject constructor(
                     return@launch
                 }
 
-                val credential = GoogleAccountCredential.usingOAuth2(
-                    context,
-                    listOf(DriveScopes.DRIVE_APPDATA),
-                )
-                credential.selectedAccountName = email
-
-                val driveHelper = DriveServiceHelper(credential)
-                val restoredCount = syncManager.restoreTracks(driveHelper)
+                val restoredCount = syncManager.restoreTracks()
 
                 if (restoredCount > 0) {
                     _uiState.value = _uiState.value.copy(

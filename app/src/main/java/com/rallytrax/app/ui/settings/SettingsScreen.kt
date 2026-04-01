@@ -201,13 +201,13 @@ fun SettingsScreen(
                         FilledTonalButton(
                             onClick = {
                                 settingsViewModel.clearSyncError()
-                                onSignIn()
+                                settingsViewModel.syncNow()
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Filled.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Re-authorize Drive")
+                            Text("Retry sync")
                         }
                     }
 
@@ -267,7 +267,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedButton(
-                        onClick = { settingsViewModel.restoreFromCloud(context) },
+                        onClick = { settingsViewModel.restoreFromCloud() },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isRestoring,
                     ) {

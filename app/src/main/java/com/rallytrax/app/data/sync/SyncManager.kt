@@ -9,9 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.rallytrax.app.data.gpx.GpxExporter
-import com.google.api.services.drive.DriveScopes
 import com.rallytrax.app.data.gpx.TrackImporter
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
@@ -21,24 +19,24 @@ import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
-import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @Singleton
 class SyncManager @Inject constructor(
@@ -50,6 +48,7 @@ class SyncManager @Inject constructor(
     private val vehicleDao: VehicleDao,
     private val maintenanceDao: MaintenanceDao,
     private val fuelLogDao: FuelLogDao,
+    private val firestoreSyncHelper: FirestoreSyncHelper,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var debounceJob: Job? = null
@@ -74,46 +73,31 @@ class SyncManager @Inject constructor(
     }
 
     /**
-     * Perform a full sync cycle using the provided Drive credential.
+     * Perform a full sync cycle using Firestore and Cloud Storage.
      */
-    suspend fun performSync(credential: GoogleAccountCredential) {
+    suspend fun performSync() {
         _syncStatus.value = _syncStatus.value.copy(isSyncing = true, error = null)
         try {
-            val driveHelper = DriveServiceHelper(credential)
-
-            // 1. Get or create manifest
-            var manifest = driveHelper.getOrCreateManifest()
-
-            // 2. Get local settings
+            // 1. Sync settings (single Firestore read for both settings + md5)
             val localSettings = preferencesRepository.toSyncableSettings()
             val localJson = localSettings.toJson()
-            val localMd5 = DriveServiceHelper.md5Hash(localJson)
+            val localMd5 = FirestoreSyncHelper.md5Hash(localJson)
 
-            // 3. Compare and sync
-            if (manifest.settingsFileId != null && manifest.settingsMd5 != localMd5) {
-                // Remote exists and differs from local — download and merge
-                val remoteJson = driveHelper.downloadSettings(manifest)
-                if (remoteJson != null) {
-                    val remoteSettings = SyncableSettings.fromJson(remoteJson)
+            val (remoteSettings, remoteMd5) = firestoreSyncHelper.getSettingsDoc()
+            if (remoteSettings != null) {
+                if (remoteMd5 != localMd5) {
                     val merged = localSettings.mergeWith(remoteSettings)
                     preferencesRepository.applySyncableSettings(merged)
-
-                    // Upload merged result
-                    val mergedJson = merged.toJson()
-                    manifest = driveHelper.uploadSettings(mergedJson, manifest)
-                    driveHelper.uploadManifest(manifest)
+                    firestoreSyncHelper.setSettings(merged)
                 }
-            } else if (manifest.settingsFileId == null || manifest.settingsMd5 != localMd5) {
-                // No remote or local has changed — upload local
-                manifest = driveHelper.uploadSettings(localJson, manifest)
-                driveHelper.uploadManifest(manifest)
+            } else {
+                firestoreSyncHelper.setSettings(localSettings)
             }
-            // else: hashes match, nothing to do
 
-            // 3b. Backup garage data (vehicles, maintenance, fuel logs)
-            manifest = backupGarageData(driveHelper, manifest)
+            // 2. Backup garage data
+            backupGarageData()
 
-            // 4. Update sync time
+            // 3. Update sync time
             val now = System.currentTimeMillis()
             preferencesRepository.setLastSyncTime(now)
             _syncStatus.value = SyncStatus(
@@ -123,10 +107,10 @@ class SyncManager @Inject constructor(
                 error = null,
             )
 
-            // 5. GPX track backup — upload tracks not yet in manifest
+            // 4. GPX track backup
             val prefs = preferencesRepository.preferences.first()
             if (prefs.backupTracksEnabled) {
-                backupTracks(driveHelper, manifest)
+                backupTracks()
             }
 
             Log.d(TAG, "Sync completed successfully")
@@ -140,21 +124,19 @@ class SyncManager @Inject constructor(
     }
 
     /**
-     * Back up all local GPX tracks to Google Drive that are not yet in the manifest.
-     * Each track is exported to GPX format and uploaded to the appDataFolder.
+     * Back up all local GPX tracks to Cloud Storage that are not yet backed up.
      */
-    private suspend fun backupTracks(driveHelper: DriveServiceHelper, manifest: SyncManifest) {
+    private suspend fun backupTracks() {
         val allTracks = trackDao.getAllTracksOnce()
-        val existingIds = manifest.gpxFileIds
-        val tracksToBackup = allTracks.filter { it.id !in existingIds }
+        val backedUpIds = firestoreSyncHelper.listBackedUpTrackIds().toSet()
+        val tracksToBackup = allTracks.filter { it.id !in backedUpIds }
 
         if (tracksToBackup.isEmpty()) {
             Log.d(TAG, "All tracks already backed up (${allTracks.size} total)")
             return
         }
 
-        Log.d(TAG, "Backing up ${tracksToBackup.size} tracks to Google Drive")
-        val updatedGpxFileIds = existingIds.toMutableMap()
+        Log.d(TAG, "Backing up ${tracksToBackup.size} tracks to Cloud Storage")
 
         for (track in tracksToBackup) {
             try {
@@ -164,29 +146,20 @@ class SyncManager @Inject constructor(
                     GpxExporter.export(track, points, stream, paceNotes)
                 }.toByteArray()
 
-                val driveFileId = driveHelper.uploadGpxFile(track.id, gpxBytes)
-                updatedGpxFileIds[track.id] = driveFileId
+                firestoreSyncHelper.uploadGpxFile(track.id, gpxBytes)
                 Log.d(TAG, "Backed up track ${track.id} (${gpxBytes.size} bytes)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to back up track ${track.id}", e)
             }
         }
 
-        // Persist updated manifest with new gpxFileIds
-        val updatedManifest = manifest.copy(gpxFileIds = updatedGpxFileIds)
-        driveHelper.uploadManifest(updatedManifest)
-        Log.d(TAG, "GPX backup complete: ${updatedGpxFileIds.size} tracks in manifest")
+        Log.d(TAG, "GPX backup complete")
     }
 
     /**
-     * Back up all garage data (vehicles, maintenance schedules/records, fuel logs) to Drive.
-     * Loads all entities in parallel, serializes to JSON, computes MD5 to skip unchanged data.
-     * Returns the updated manifest (or the original if nothing changed).
+     * Back up all garage data (vehicles, maintenance schedules/records, fuel logs) to Firestore.
      */
-    private suspend fun backupGarageData(
-        driveHelper: DriveServiceHelper,
-        manifest: SyncManifest,
-    ): SyncManifest {
+    private suspend fun backupGarageData() {
         val garageData = coroutineScope {
             val vehiclesDeferred = async { vehicleDao.getAllVehiclesOnce() }
             val schedulesDeferred = async { maintenanceDao.getAllSchedulesOnce() }
@@ -202,17 +175,16 @@ class SyncManager @Inject constructor(
         }
 
         val garageJson = garageData.toJson()
-        val garageMd5 = DriveServiceHelper.md5Hash(garageJson)
+        val garageMd5 = FirestoreSyncHelper.md5Hash(garageJson)
 
-        if (garageMd5 == manifest.garageMd5) {
+        val remoteMd5 = firestoreSyncHelper.getGarageMd5()
+        if (garageMd5 == remoteMd5) {
             Log.d(TAG, "Garage data unchanged — skipping upload")
-            return manifest
+            return
         }
 
-        val updatedManifest = driveHelper.uploadGarageData(garageJson, manifest)
-        driveHelper.uploadManifest(updatedManifest)
+        firestoreSyncHelper.setGarageData(garageJson)
         Log.d(TAG, "Garage data backed up successfully")
-        return updatedManifest
     }
 
     /**
@@ -291,50 +263,44 @@ class SyncManager @Inject constructor(
     }
 
     /**
-     * Restore tracks from Google Drive that don't already exist locally.
+     * Restore tracks from Cloud Storage that don't already exist locally.
      * Returns the number of tracks restored.
      */
-    suspend fun restoreTracks(driveHelper: DriveServiceHelper): Int =
-        withContext(Dispatchers.IO) {
-            val gpxFiles = driveHelper.listGpxFiles()
-            var restoredCount = 0
+    suspend fun restoreTracks(): Int = withContext(Dispatchers.IO) {
+        val trackIds = firestoreSyncHelper.listBackedUpTrackIds()
+        var restoredCount = 0
 
-            for (file in gpxFiles) {
-                try {
-                    // Extract trackId from filename pattern: track_<id>.gpx
-                    val trackId = file.fileName
-                        .removePrefix("track_")
-                        .removeSuffix(".gpx")
-
-                    // Skip if track already exists locally
-                    if (trackDao.getTrackById(trackId) != null) {
-                        Log.d(TAG, "Track $trackId already exists locally, skipping")
-                        continue
-                    }
-
-                    // Download and parse
-                    val bytes = driveHelper.downloadFile(file.fileId)
-                    val result = TrackImporter.import(ByteArrayInputStream(bytes))
-
-                    // Insert track, points, and pace notes
-                    trackDao.insertTrack(result.track)
-                    result.points.chunked(1000).forEach { chunk ->
-                        trackPointDao.insertPoints(chunk)
-                    }
-                    if (result.paceNotes.isNotEmpty()) {
-                        paceNoteDao.insertNotes(result.paceNotes)
-                    }
-
-                    restoredCount++
-                    Log.d(TAG, "Restored track: ${file.fileName}")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to restore ${file.fileName}", e)
+        for (trackId in trackIds) {
+            try {
+                // Skip if track already exists locally
+                if (trackDao.getTrackById(trackId) != null) {
+                    Log.d(TAG, "Track $trackId already exists locally, skipping")
+                    continue
                 }
-            }
 
-            Log.d(TAG, "Restore complete: $restoredCount tracks restored from ${gpxFiles.size} files")
-            restoredCount
+                // Download and parse
+                val bytes = firestoreSyncHelper.downloadGpxFile(trackId) ?: continue
+                val result = TrackImporter.import(ByteArrayInputStream(bytes))
+
+                // Insert track, points, and pace notes
+                trackDao.insertTrack(result.track)
+                result.points.chunked(1000).forEach { chunk ->
+                    trackPointDao.insertPoints(chunk)
+                }
+                if (result.paceNotes.isNotEmpty()) {
+                    paceNoteDao.insertNotes(result.paceNotes)
+                }
+
+                restoredCount++
+                Log.d(TAG, "Restored track: $trackId")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to restore track $trackId", e)
+            }
         }
+
+        Log.d(TAG, "Restore complete: $restoredCount tracks restored from ${trackIds.size} files")
+        restoredCount
+    }
 
     private fun enqueueOneTimeSync() {
         val constraints = Constraints.Builder()

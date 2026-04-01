@@ -37,22 +37,13 @@ class AuthViewModel @Inject constructor(
                 // Store email for background sync
                 preferencesRepository.setSignedInEmail(user.email)
 
-                // Authorize Drive access
-                val driveResult = authRepository.authorizeDrive(activity)
-                driveResult.onSuccess { authResult ->
-                    if (!authResult.hasResolution()) {
-                        // Drive authorized — perform initial sync
-                        try {
-                            val credential = authRepository.getDriveCredential(activity)
-                            syncManager.performSync(credential)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Initial sync failed", e)
-                        }
-                        syncManager.schedulePeriodicSync()
-                    }
-                    // If hasResolution, the UI layer needs to handle the PendingIntent
-                    // For now, we proceed without sync — it'll happen on next periodic cycle
+                // Perform initial sync via Firestore (no Drive authorization needed)
+                try {
+                    syncManager.performSync()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Initial sync failed", e)
                 }
+                syncManager.schedulePeriodicSync()
 
                 _showFirstSignInSheet.value = true
             }
