@@ -433,7 +433,8 @@ object PaceNoteGenerator {
         val crossProduct = abs(x1 * y3 - x3 * y1)
         if (crossProduct < 0.01) return MAX_RADIUS_CAP // Nearly collinear
 
-        return (a * b * c) / (2.0 * crossProduct)
+        val radius = (a * b * c) / (2.0 * crossProduct)
+        return radius.coerceAtLeast(1.0) // Minimum 1m radius to avoid degenerate values
     }
 
     // ── Turn Segmentation ───────────────────────────────────────────────

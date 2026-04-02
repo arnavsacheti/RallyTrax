@@ -189,7 +189,7 @@ class ReplayEngine(
         val turnRadius = nextNote.turnRadiusM
             ?: return baseDistance.coerceIn(40.0, 400.0)
 
-        val radiusBucket = (turnRadius / 10.0).toInt() * 10 // Round to nearest 10m
+        val radiusBucket = (turnRadius / 10.0).toInt().coerceAtLeast(1) * 10 // Round to nearest 10m, min 10m
         val expectedSpeed = driverProfile[radiusBucket]
 
         if (expectedSpeed != null && expectedSpeed < speedMps) {

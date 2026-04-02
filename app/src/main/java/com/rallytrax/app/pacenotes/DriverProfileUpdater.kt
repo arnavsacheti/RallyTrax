@@ -37,9 +37,9 @@ object DriverProfileUpdater {
 
         for (note in notes) {
             val radiusM = note.turnRadiusM ?: continue
-            if (radiusM <= 0 || radiusM > 200) continue // Only corners, not straights
+            if (radiusM < 5 || radiusM > 200) continue // Only meaningful corners
 
-            val bucket = (radiusM / 10.0).toInt() * 10
+            val bucket = (radiusM / 10.0).toInt().coerceAtLeast(1) * 10
 
             // Find speeds of track points within ~30m of the note's position
             val noteDistance = note.distanceFromStart
