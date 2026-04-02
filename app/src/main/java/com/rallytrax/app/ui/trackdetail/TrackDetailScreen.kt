@@ -495,24 +495,20 @@ private fun GoogleTrackMap(
             }
         }
 
-        // Curvature layer: colored segments from green (straight) to red (tight curves)
+        // Curvature layer: colored segments from green (straight) to pink (tight curves)
+        // Uses absolute thresholds (0–10 deg/m) instead of per-track normalization
         if (MapLayer.CURVATURE in activeLayers && trackPoints.size >= 2) {
-            val curvatures = trackPoints.mapNotNull { it.curvatureDegPerM?.let { c -> abs(c) } }
-            if (curvatures.isNotEmpty()) {
-                val maxCurv = curvatures.max().coerceAtLeast(1.0)
-                for (i in 0 until trackPoints.size - 1) {
-                    val curv = trackPoints[i].curvatureDegPerM?.let { abs(it) } ?: continue
-                    val fraction = (curv / maxCurv).coerceIn(0.0, 1.0).toFloat()
-                    // Green (straight) -> Red (tight)
-                    val color = lerpColor(LayerSpeedLow, LayerCurvature, fraction)
-                    Polyline(
-                        points = listOf(
-                            com.google.android.gms.maps.model.LatLng(trackPoints[i].lat, trackPoints[i].lon),
-                            com.google.android.gms.maps.model.LatLng(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
-                        ),
-                        color = color, width = 12f,
-                    )
-                }
+            for (i in 0 until trackPoints.size - 1) {
+                val curv = trackPoints[i].curvatureDegPerM?.let { abs(it) } ?: continue
+                val fraction = curvatureToFraction(curv)
+                val color = lerpColor(LayerSpeedLow, LayerCurvature, fraction)
+                Polyline(
+                    points = listOf(
+                        com.google.android.gms.maps.model.LatLng(trackPoints[i].lat, trackPoints[i].lon),
+                        com.google.android.gms.maps.model.LatLng(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                    ),
+                    color = color, width = 12f,
+                )
             }
         }
 
@@ -668,22 +664,19 @@ private fun OsmTrackMap(
         }
     }
 
-    // Curvature layer: green (straight) to red (tight)
+    // Curvature layer: green (straight) to pink (tight)
+    // Uses absolute thresholds (0–10 deg/m) instead of per-track normalization
     if (MapLayer.CURVATURE in activeLayers && trackPoints.size >= 2) {
-        val curvatures = trackPoints.mapNotNull { it.curvatureDegPerM?.let { c -> abs(c) } }
-        if (curvatures.isNotEmpty()) {
-            val maxCurv = curvatures.max().coerceAtLeast(1.0)
-            for (i in 0 until trackPoints.size - 1) {
-                val curv = trackPoints[i].curvatureDegPerM?.let { abs(it) } ?: continue
-                val fraction = (curv / maxCurv).coerceIn(0.0, 1.0).toFloat()
-                polylines.add(OsmPolylineData(
-                    points = listOf(
-                        GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
-                        GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
-                    ),
-                    color = lerpColor(LayerSpeedLow, LayerCurvature, fraction), width = 12f,
-                ))
-            }
+        for (i in 0 until trackPoints.size - 1) {
+            val curv = trackPoints[i].curvatureDegPerM?.let { abs(it) } ?: continue
+            val fraction = curvatureToFraction(curv)
+            polylines.add(OsmPolylineData(
+                points = listOf(
+                    GeoPoint(trackPoints[i].lat, trackPoints[i].lon),
+                    GeoPoint(trackPoints[i + 1].lat, trackPoints[i + 1].lon),
+                ),
+                color = lerpColor(LayerSpeedLow, LayerCurvature, fraction), width = 12f,
+            ))
         }
     }
 
@@ -2352,6 +2345,12 @@ private fun lerpColor(start: Color, end: Color, fraction: Float): Color {
         blue = start.blue + (end.blue - start.blue) * f,
         alpha = start.alpha + (end.alpha - start.alpha) * f,
     )
+}
+
+/** Maps absolute curvature (deg/m) to a 0–1 fraction for color interpolation.
+ *  Aligns with CurvatureDistribution thresholds: 10 deg/m = hairpin = full pink. */
+private fun curvatureToFraction(curvatureDegPerM: Double): Float {
+    return (curvatureDegPerM / 10.0).coerceIn(0.0, 1.0).toFloat()
 }
 
 private fun formatCurvature(trackPoints: List<TrackPointEntity>): String {
