@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rallytrax.app.data.ThumbnailGenerator
 import com.rallytrax.app.data.gpx.GpxImportResult
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.local.dao.AchievementDao
@@ -69,6 +70,7 @@ data class HomeFeedState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    private val application: android.app.Application,
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
@@ -293,6 +295,13 @@ class HomeViewModel @Inject constructor(
             }
             if (result.paceNotes.isNotEmpty()) {
                 paceNoteDao.insertNotes(result.paceNotes)
+            }
+        }
+        // Generate thumbnail for the imported track
+        val thumbnailPath = ThumbnailGenerator.generate(result.points, context = application)
+        if (thumbnailPath != null) {
+            withContext(ioDispatcher) {
+                trackDao.updateTrack(result.track.copy(trackCategory = "route", thumbnailPath = thumbnailPath))
             }
         }
     }

@@ -172,6 +172,7 @@ enum class MapLayer {
 
 @HiltViewModel
 class TrackDetailViewModel @Inject constructor(
+    private val application: android.app.Application,
     savedStateHandle: SavedStateHandle,
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
@@ -206,7 +207,7 @@ class TrackDetailViewModel @Inject constructor(
     private fun loadTrack() {
         viewModelScope.launch {
             // Load core data from DB on IO dispatcher
-            val track = withContext(ioDispatcher) { trackDao.getTrackById(trackId) }
+            var track = withContext(ioDispatcher) { trackDao.getTrackById(trackId) }
             val points = withContext(ioDispatcher) { trackPointDao.getPointsForTrackOnce(trackId) }
             cachedPoints = points
 
@@ -225,8 +226,9 @@ class TrackDetailViewModel @Inject constructor(
             // Parallelize independent DB queries on IO dispatcher
             val weatherDeferred = async(ioDispatcher) { weatherDao.getWeatherForTrack(trackId) }
             val paceNotesDeferred = async(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
+            val currentTrack = track // Capture for lambda smart-cast
             val routeTracksDeferred = async(ioDispatcher) {
-                if (track != null) trackDao.getTracksForRoute(track.name) else emptyList()
+                if (currentTrack != null) trackDao.getTracksForRoute(currentTrack.name) else emptyList()
             }
             val segmentMatchesDeferred = async(ioDispatcher) {
                 try { segmentRepository.detectSegmentsForTrack(trackId) }
@@ -300,6 +302,18 @@ class TrackDetailViewModel @Inject constructor(
                         brakingEfficiencyScore = brakingEff,
                         elevationAdjustedAvgSpeedMps = elevAdjSpeed,
                     )
+                }
+            }
+
+            // Backfill thumbnail if missing
+            if (track != null && track.thumbnailPath == null && points.size >= 2) {
+                val thumbPath = withContext(defaultDispatcher) {
+                    com.rallytrax.app.data.ThumbnailGenerator.generate(points, context = application)
+                }
+                if (thumbPath != null) {
+                    val updatedTrack = track.copy(thumbnailPath = thumbPath)
+                    withContext(ioDispatcher) { trackDao.updateTrack(updatedTrack) }
+                    track = updatedTrack
                 }
             }
 
