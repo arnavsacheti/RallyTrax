@@ -961,18 +961,44 @@ private fun DrivingInsightsCard(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     if (uiState.smoothnessScore != null) {
-                        GoalRing(
-                            progress = uiState.smoothnessScore / 100f,
-                            label = "Smoothness",
-                            progressColor = MaterialTheme.colorScheme.primary,
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            GoalRing(
+                                progress = uiState.smoothnessScore / 100f,
+                                label = "Smoothness",
+                                progressColor = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = when {
+                                    uiState.smoothnessScore >= 80 -> "Very smooth inputs"
+                                    uiState.smoothnessScore >= 60 -> "Fairly smooth"
+                                    uiState.smoothnessScore >= 40 -> "Some abrupt inputs"
+                                    else -> "Jerky inputs"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     if (uiState.brakingEfficiencyScore != null) {
-                        GoalRing(
-                            progress = uiState.brakingEfficiencyScore / 100f,
-                            label = "Braking",
-                            progressColor = MaterialTheme.colorScheme.tertiary,
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            GoalRing(
+                                progress = uiState.brakingEfficiencyScore / 100f,
+                                label = "Braking",
+                                progressColor = MaterialTheme.colorScheme.tertiary,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = when {
+                                    uiState.brakingEfficiencyScore >= 80 -> "Progressive trail braking"
+                                    uiState.brakingEfficiencyScore >= 60 -> "Mostly progressive"
+                                    uiState.brakingEfficiencyScore >= 40 -> "Some late braking"
+                                    else -> "Abrupt braking"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
