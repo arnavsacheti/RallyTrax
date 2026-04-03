@@ -7,8 +7,10 @@ import com.rallytrax.app.data.fuel.MpgCalculator
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.SegmentDao
+import com.rallytrax.app.data.local.dao.VehiclePartDao
 import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.FuelLogEntity
+import com.rallytrax.app.data.local.entity.VehiclePartEntity
 import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.TrackEntity
@@ -73,6 +75,7 @@ class VehicleDetailViewModel @Inject constructor(
     private val fuelLogDao: FuelLogDao,
     private val maintenanceDao: MaintenanceDao,
     private val segmentDao: SegmentDao,
+    private val vehiclePartDao: VehiclePartDao,
     private val syncManager: SyncManager,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
@@ -98,6 +101,10 @@ class VehicleDetailViewModel @Inject constructor(
 
     val maintenanceSchedules: StateFlow<List<MaintenanceScheduleEntity>> =
         maintenanceDao.getSchedulesForVehicle(vehicleId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val parts: StateFlow<List<VehiclePartEntity>> =
+        vehiclePartDao.getActivePartsForVehicle(vehicleId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
@@ -271,6 +278,27 @@ class VehicleDetailViewModel @Inject constructor(
                 )
             )
 
+            syncManager.scheduleDebouncedSync()
+        }
+    }
+
+    fun addPart(part: VehiclePartEntity) {
+        viewModelScope.launch {
+            vehiclePartDao.insertPart(part)
+            syncManager.scheduleDebouncedSync()
+        }
+    }
+
+    fun retirePart(partId: String) {
+        viewModelScope.launch {
+            vehiclePartDao.retirePart(partId)
+            syncManager.scheduleDebouncedSync()
+        }
+    }
+
+    fun updatePart(part: VehiclePartEntity) {
+        viewModelScope.launch {
+            vehiclePartDao.updatePart(part.copy(updatedAt = System.currentTimeMillis()))
             syncManager.scheduleDebouncedSync()
         }
     }
