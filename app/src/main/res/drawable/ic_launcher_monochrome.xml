@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Sun (circle partially behind mountains) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M64,39a10,10 0,1,0 0.01,0z" />
+
+    <!-- Mountain range silhouette -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M22,56 L36,38 L42,46 L54,31 L63,43 L72,36 L86,56z" />
+
+    <!-- Rally car body with wheel arches -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M30,67 L30,61 L39,61 L44,54 L70,54 L74,61 L78,61 L78,67 L75,67 A4,4 0,0,0 67,67 L41,67 A4,4 0,0,0 33,67z" />
+
+    <!-- Front wheel -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M37,69a3.5,3.5 0,1,0 0.01,0z" />
+
+    <!-- Rear wheel -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M71,69a3.5,3.5 0,1,0 0.01,0z" />
+
+</vector>
