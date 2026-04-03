@@ -43,18 +43,47 @@ object TrackPointComputer {
         return dv / dt
     }
 
+    /**
+     * Distance window (metres) over which bearing change is accumulated.
+     * At low speeds (~5 mph / 2.2 m/s, 1 Hz GPS) this spans ~11 points,
+     * smoothing out GPS noise that otherwise inflates parking-lot curvature.
+     * At road speeds (~40 mph / 18 m/s) this covers 1-2 segments, preserving
+     * real turn curvature.
+     */
+    private const val CURVATURE_WINDOW_M = 25.0
+
     private fun computeCurvature(
         index: Int,
         bearings: DoubleArray,
         distances: DoubleArray,
     ): Double? {
         if (index == 0 || index >= bearings.size - 1) return null
-        val dd = distances[index + 1] - distances[index - 1]
-        if (dd < 1.0) return null // avoid division by near-zero
-        val bearingDelta = normalizeDelta(bearings[index] - bearings[index - 1])
-        val segmentDist = distances[index] - distances[index - 1]
-        if (segmentDist < 0.5) return null
-        return abs(bearingDelta) / segmentDist
+
+        val halfWindow = CURVATURE_WINDOW_M / 2.0
+        val centerDist = distances[index]
+
+        // Walk backward to find the start of the window
+        var backIdx = index
+        while (backIdx > 0 && (centerDist - distances[backIdx]) < halfWindow) {
+            backIdx--
+        }
+
+        // Walk forward to find the end of the window
+        var fwdIdx = index
+        while (fwdIdx < distances.size - 1 && (distances[fwdIdx] - centerDist) < halfWindow) {
+            fwdIdx++
+        }
+
+        val spanDist = distances[fwdIdx] - distances[backIdx]
+        if (spanDist < 2.0) return null // too short to be meaningful
+
+        // Accumulate total bearing change across the window
+        var totalBearingChange = 0.0
+        for (j in (backIdx + 1)..fwdIdx) {
+            totalBearingChange += abs(normalizeDelta(bearings[j] - bearings[j - 1]))
+        }
+
+        return totalBearingChange / spanDist
     }
 
     private fun smoothSpeeds(points: List<TrackPointEntity>, windowSize: Int): DoubleArray {
