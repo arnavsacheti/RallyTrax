@@ -25,8 +25,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.rallytrax.app.data.analytics.TireWearAnalyzer
 import com.rallytrax.app.data.fuel.MpgCalculator
 import com.rallytrax.app.data.local.entity.FuelLogEntity
+import com.rallytrax.app.data.local.entity.VehiclePartEntity
+import com.rallytrax.app.ui.components.GoalRing
+import com.rallytrax.app.ui.components.Sparkline
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Star
@@ -35,7 +39,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -87,11 +93,13 @@ fun VehicleDetailScreen(
     val fuelLogs by viewModel.fuelLogs.collectAsStateWithLifecycle()
     val maintenanceRecords by viewModel.maintenanceRecords.collectAsStateWithLifecycle()
     val maintenanceSchedules by viewModel.maintenanceSchedules.collectAsStateWithLifecycle()
+    val parts by viewModel.parts.collectAsStateWithLifecycle()
     val vehicle = uiState.vehicle
     var selectedTab by remember { mutableIntStateOf(0) }
     var showFillUpSheet by remember { mutableStateOf(false) }
     var showAddServiceSheet by remember { mutableStateOf(false) }
     var showAddScheduleSheet by remember { mutableStateOf(false) }
+    var showAddPartSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -137,7 +145,7 @@ fun VehicleDetailScreen(
                     .padding(innerPadding),
             ) {
                 // Tab row – M3 secondary tabs
-                val tabLabels = listOf("Overview", "Fuel", "Maintenance", "Analytics")
+                val tabLabels = listOf("Overview", "Fuel", "Maintenance", "Parts", "Analytics")
                 PrimaryScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     edgePadding = 16.dp,
@@ -161,7 +169,14 @@ fun VehicleDetailScreen(
                 }
 
                 when (selectedTab) {
-                    0 -> OverviewTab(vehicle, uiState.totalDistanceM, tracks, onTrackClick, preferences.unitSystem)
+                    0 -> OverviewTab(
+                        vehicle = vehicle,
+                        totalDistanceM = uiState.totalDistanceM,
+                        tracks = tracks,
+                        parts = parts,
+                        onTrackClick = onTrackClick,
+                        unitSystem = preferences.unitSystem,
+                    )
                     1 -> FuelTab(vehicle, fuelLogs, uiState.lifetimeMpg, uiState.costPerMile) {
                         showFillUpSheet = true
                     }
@@ -172,7 +187,13 @@ fun VehicleDetailScreen(
                         onAddSchedule = { showAddScheduleSheet = true },
                         onCompleteSchedule = { viewModel.completeSchedule(it) },
                     )
-                    3 -> AnalyticsTab(analytics = uiState.analytics, unitSystem = preferences.unitSystem)
+                    3 -> PartsTab(
+                        vehicle = vehicle,
+                        parts = parts,
+                        onAddPart = { showAddPartSheet = true },
+                        onRetirePart = { viewModel.retirePart(it) },
+                    )
+                    4 -> AnalyticsTab(analytics = uiState.analytics, unitSystem = preferences.unitSystem)
                 }
             }
 
@@ -202,6 +223,16 @@ fun VehicleDetailScreen(
                     )
                 }
             }
+            if (showAddPartSheet) {
+                vehicle?.let { v ->
+                    AddPartSheet(
+                        vehicleId = v.id,
+                        vehicleOdometerKm = v.odometerKm,
+                        onSave = { viewModel.addPart(it) },
+                        onDismiss = { showAddPartSheet = false },
+                    )
+                }
+            }
         }
     }
 }
@@ -211,6 +242,7 @@ private fun OverviewTab(
     vehicle: VehicleEntity,
     totalDistanceM: Double,
     tracks: List<TrackEntity>,
+    parts: List<VehiclePartEntity>,
     onTrackClick: (String) -> Unit,
     unitSystem: UnitSystem = UnitSystem.METRIC,
 ) {
@@ -292,6 +324,23 @@ private fun OverviewTab(
                         text = mods,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // Parts Health card
+                if (parts.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PartsConditionCard(parts = parts, vehicleOdometerKm = vehicle.odometerKm)
+                }
+
+                // Tire performance card
+                val tireParts = parts.filter { it.category == "Tires" }
+                if (tireParts.isNotEmpty() && tracks.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TirePerformanceCard(
+                        tirePart = tireParts.first(),
+                        tracks = tracks,
+                        vehicleOdometerKm = vehicle.odometerKm,
                     )
                 }
 
@@ -1103,5 +1152,408 @@ private fun PerformanceByCategoryCard(
                 }
             }
         }
+    }
+}
+
+// --- Part condition helpers ---
+
+private fun computePartCondition(
+    part: VehiclePartEntity,
+    vehicleOdometerKm: Double,
+): Int {
+    val kmSinceInstall = (vehicleOdometerKm - part.installOdometerKm).coerceAtLeast(0.0)
+    val kmWearPercent = if (part.lifeExpectancyKm != null && part.lifeExpectancyKm > 0) {
+        (kmSinceInstall / part.lifeExpectancyKm * 100).coerceIn(0.0, 100.0)
+    } else {
+        0.0
+    }
+    val monthsSinceInstall = ((System.currentTimeMillis() - part.installDate) / (30L * 24 * 60 * 60 * 1000)).toInt()
+    val timeWearPercent = if (part.lifeExpectancyMonths != null && part.lifeExpectancyMonths > 0) {
+        (monthsSinceInstall.toDouble() / part.lifeExpectancyMonths * 100).coerceIn(0.0, 100.0)
+    } else {
+        0.0
+    }
+    return (100 - maxOf(kmWearPercent, timeWearPercent).toInt()).coerceIn(0, 100)
+}
+
+private fun conditionColor(remainingPercent: Int): Color {
+    return when {
+        remainingPercent > 70 -> DifficultyGreen
+        remainingPercent > 40 -> DifficultyAmber
+        else -> DifficultyRed
+    }
+}
+
+@Composable
+private fun PartsConditionCard(
+    parts: List<VehiclePartEntity>,
+    vehicleOdometerKm: Double,
+) {
+    Text(
+        text = "Parts Health",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    val partsNeedingAttention = parts.count { computePartCondition(it, vehicleOdometerKm) < 40 }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            if (partsNeedingAttention > 0) {
+                Text(
+                    text = "$partsNeedingAttention part${if (partsNeedingAttention > 1) "s" else ""} need${if (partsNeedingAttention == 1) "s" else ""} attention",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DifficultyAmber,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            parts.forEach { part ->
+                val condition = computePartCondition(part, vehicleOdometerKm)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.width(100.dp)) {
+                        Text(
+                            text = part.partName,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = part.category,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    LinearProgressIndicator(
+                        progress = { condition / 100f },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(8.dp),
+                        color = conditionColor(condition),
+                        trackColor = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${condition}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.width(36.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TirePerformanceCard(
+    tirePart: VehiclePartEntity,
+    tracks: List<TrackEntity>,
+    vehicleOdometerKm: Double,
+) {
+    val performancePoints = TireWearAnalyzer.analyze(
+        stints = tracks,
+        tireInstallDate = tirePart.installDate,
+        tireInstallOdometerKm = tirePart.installOdometerKm,
+    )
+    if (performancePoints.isEmpty()) return
+
+    val condition = computePartCondition(tirePart, vehicleOdometerKm)
+
+    Text(
+        text = "Tire Performance",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = tirePart.partName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    tirePart.brand?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                GoalRing(
+                    progress = condition / 100f,
+                    label = "Tire",
+                    size = 56.dp,
+                    strokeWidth = 6.dp,
+                    progressColor = conditionColor(condition),
+                )
+            }
+
+            // Avg cornering G sparkline
+            val corneringData = performancePoints.mapNotNull { it.avgCorneringG?.toFloat() }
+            if (corneringData.size >= 2) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Avg Cornering G",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Sparkline(
+                    data = corneringData,
+                    color = MaterialTheme.colorScheme.primary,
+                    height = 32.dp,
+                )
+            }
+
+            // Grip events per stint sparkline
+            val gripData = performancePoints.map { it.gripEventCount.toFloat() }
+            if (gripData.size >= 2 && gripData.any { it > 0f }) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Grip Events per Stint",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Sparkline(
+                    data = gripData,
+                    color = DifficultyAmber,
+                    height = 32.dp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartsTab(
+    vehicle: VehicleEntity,
+    parts: List<VehiclePartEntity>,
+    onAddPart: () -> Unit,
+    onRetirePart: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Cost summary header
+        if (parts.isNotEmpty()) {
+            val totalCost = parts.mapNotNull { it.costAmount }.sum()
+            val oldestInstallOdometer = parts.minOf { it.installOdometerKm }
+            val kmSinceOldest = (vehicle.odometerKm - oldestInstallOdometer).coerceAtLeast(1.0)
+            val costPerKm = if (totalCost > 0) totalCost / kmSinceOldest else null
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (totalCost > 0) "$${"%,.0f".format(totalCost)}" else "--",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "Total Parts Cost",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                    costPerKm?.let { cpk ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "$${"%,.2f".format(cpk)}",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                text = "Cost/km",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Parts list
+        Text(
+            text = "Active Parts (${parts.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (parts.isEmpty()) {
+            Text(
+                text = "No parts tracked yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            // Compute vehicle age for predictive replacement
+            val vehicleAgeMonths = ((System.currentTimeMillis() - vehicle.createdAt) / (30L * 24 * 60 * 60 * 1000)).toInt().coerceAtLeast(1)
+            val avgKmPerMonth = vehicle.odometerKm / vehicleAgeMonths
+
+            parts.forEach { part ->
+                val condition = computePartCondition(part, vehicle.odometerKm)
+                val kmSinceInstall = (vehicle.odometerKm - part.installOdometerKm).coerceAtLeast(0.0)
+
+                // Predictive replacement
+                val kmRemaining = if (part.lifeExpectancyKm != null) {
+                    (part.lifeExpectancyKm - kmSinceInstall).coerceAtLeast(0.0)
+                } else null
+                val predictedMonths = if (kmRemaining != null && avgKmPerMonth > 0) {
+                    (kmRemaining / avgKmPerMonth).toInt()
+                } else null
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = part.partName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(
+                                        text = part.category,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    part.brand?.let {
+                                        Text(
+                                            text = it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                            part.costAmount?.let { cost ->
+                                Text(
+                                    text = "$${"%,.0f".format(cost)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Condition bar
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LinearProgressIndicator(
+                                progress = { condition / 100f },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(8.dp),
+                                color = conditionColor(condition),
+                                trackColor = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${condition}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = conditionColor(condition),
+                            )
+                        }
+
+                        // Predictive replacement
+                        if (predictedMonths != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val replacementText = if (predictedMonths <= 0) {
+                                "Replacement due now"
+                            } else if (kmRemaining != null) {
+                                "Replace in ~$predictedMonths months (~${"%,.0f".format(kmRemaining)} km)"
+                            } else {
+                                "Replace in ~$predictedMonths months"
+                            }
+                            Text(
+                                text = replacementText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (predictedMonths <= 3) {
+                                    Color(0xFFFFC107)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+
+                        // Retire button
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Retire",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .clickable { onRetirePart(part.id) }
+                                .padding(vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        FilledTonalButton(
+            onClick = onAddPart,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Add Part")
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }

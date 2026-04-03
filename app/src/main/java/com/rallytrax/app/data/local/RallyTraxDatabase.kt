@@ -27,8 +27,10 @@ import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.SegmentRunEntity
+import com.rallytrax.app.data.local.dao.VehiclePartDao
 import com.rallytrax.app.data.local.dao.WeatherDao
 import com.rallytrax.app.data.local.entity.VehicleEntity
+import com.rallytrax.app.data.local.entity.VehiclePartEntity
 import com.rallytrax.app.data.local.entity.WeatherEntity
 
 @Database(
@@ -47,8 +49,9 @@ import com.rallytrax.app.data.local.entity.WeatherEntity
         SegmentEntity::class,
         SegmentRunEntity::class,
         WeatherEntity::class,
+        VehiclePartEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -64,6 +67,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun driverProfileDao(): DriverProfileDao
     abstract fun segmentDao(): SegmentDao
     abstract fun weatherDao(): WeatherDao
+    abstract fun vehiclePartDao(): VehiclePartDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -401,6 +405,32 @@ abstract class RallyTraxDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tracks ADD COLUMN gripEventCount INTEGER DEFAULT NULL")
                 db.execSQL("ALTER TABLE tracks ADD COLUMN gripEventSummary TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS vehicle_parts (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        vehicleId TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        partName TEXT NOT NULL,
+                        brand TEXT,
+                        installDate INTEGER NOT NULL,
+                        installOdometerKm REAL NOT NULL DEFAULT 0.0,
+                        lifeExpectancyKm REAL,
+                        lifeExpectancyMonths INTEGER,
+                        costAmount REAL,
+                        notes TEXT,
+                        isActive INTEGER NOT NULL DEFAULT 1,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_parts_vehicleId ON vehicle_parts(vehicleId)")
             }
         }
 
