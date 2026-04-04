@@ -46,6 +46,9 @@ class RecordingScreen(
     private var prefs: UserPreferencesData = UserPreferencesData()
     private var refreshJob: Job? = null
 
+    /** Guards against multiple navigationEnded() calls per session. */
+    private var navigationActive = false
+
     init {
         // Register map surface callback so the host delivers surface events
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(mapRenderer)
@@ -53,16 +56,19 @@ class RecordingScreen(
         // Start navigation session (required before returning NavigationTemplate)
         navigationManager.setNavigationManagerCallback(object : NavigationManagerCallback {
             override fun onStopNavigation() {
-                stopRecording()
+                // Host requested navigation stop — end recording without calling
+                // navigationEnded() again (the host already considers it stopped).
+                stopRecordingOnly()
             }
             override fun onAutoDriveEnabled() { }
         })
         navigationManager.navigationStarted()
+        navigationActive = true
 
         lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
                 refreshJob?.cancel()
-                navigationManager.navigationEnded()
+                endNavigationIfActive()
                 navigationManager.clearNavigationManagerCallback()
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
                 scope.cancel()
@@ -235,12 +241,36 @@ class RecordingScreen(
         invalidate()
     }
 
+    /**
+     * Ends navigation if still active. Safe to call multiple times —
+     * only the first call reaches NavigationManager.
+     */
+    private fun endNavigationIfActive() {
+        if (navigationActive) {
+            navigationActive = false
+            navigationManager.navigationEnded()
+        }
+    }
+
+    /**
+     * Full stop: stops the recording service AND ends the navigation session.
+     * Called by user-initiated stop (button press).
+     */
     private fun stopRecording() {
+        stopRecordingOnly()
+        endNavigationIfActive()
+    }
+
+    /**
+     * Stops only the recording service and pops the screen.
+     * Does NOT call navigationEnded() — used when the host already ended navigation
+     * via [NavigationManagerCallback.onStopNavigation].
+     */
+    private fun stopRecordingOnly() {
         val intent = Intent(carContext, TrackingService::class.java).apply {
             action = TrackingService.ACTION_STOP
         }
         carContext.startService(intent)
-        navigationManager.navigationEnded()
         scope.launch {
             delay(500)
             screenManager.pop()
