@@ -44,6 +44,9 @@ class MainTabScreen(
 
     init {
         lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+                loadData()
+            }
             override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
                 scope.cancel()
             }

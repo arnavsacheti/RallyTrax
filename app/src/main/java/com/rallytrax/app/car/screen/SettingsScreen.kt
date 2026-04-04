@@ -28,14 +28,23 @@ class SettingsScreen(
     private var prefs: UserPreferencesData = UserPreferencesData()
     private var activeVehicleName: String? = null
     private var loaded = false
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
         lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+                loadData()
+            }
             override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
                 scope.cancel()
             }
         })
-        scope.launch {
+        loadData()
+    }
+
+    private fun loadData() {
+        loadJob?.cancel()
+        loadJob = scope.launch {
             prefs = session.preferencesRepository.preferences.first()
             val vehicles = session.vehicleDao.getAllVehicles().first()
             activeVehicleName = vehicles.firstOrNull { it.isActive }?.name
