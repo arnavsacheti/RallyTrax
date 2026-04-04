@@ -104,6 +104,11 @@
 # Keep sync data classes for serialization
 -keep @kotlinx.serialization.Serializable class com.rallytrax.app.data.sync.** { *; }
 
+# Android Auto (Car App Library)
+-keep class com.rallytrax.app.car.** { *; }
+-keep class androidx.car.app.** { *; }
+-dontwarn androidx.car.app.**
+
 # Remove logging in release
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
