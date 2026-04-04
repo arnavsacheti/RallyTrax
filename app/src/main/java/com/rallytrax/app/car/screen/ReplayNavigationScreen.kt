@@ -51,6 +51,9 @@ class ReplayNavigationScreen(
     private var prefs: UserPreferencesData = UserPreferencesData()
     private var refreshJob: Job? = null
 
+    /** Guards against multiple navigationEnded() calls per session. */
+    private var navigationActive = false
+
     init {
         // Register map surface callback so the host delivers surface events
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(mapRenderer)
@@ -58,17 +61,20 @@ class ReplayNavigationScreen(
         // Start navigation session (required before returning NavigationTemplate)
         navigationManager.setNavigationManagerCallback(object : NavigationManagerCallback {
             override fun onStopNavigation() {
+                // Host requested navigation stop — stop replay without calling
+                // navigationEnded() again (the host already considers it stopped).
                 replayManager.stopReplay()
                 screenManager.pop()
             }
             override fun onAutoDriveEnabled() { }
         })
         navigationManager.navigationStarted()
+        navigationActive = true
 
         lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
                 refreshJob?.cancel()
-                navigationManager.navigationEnded()
+                endNavigationIfActive()
                 navigationManager.clearNavigationManagerCallback()
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
                 replayManager.destroy()
@@ -160,21 +166,12 @@ class ReplayNavigationScreen(
                     Distance.UNIT_METERS,
                 )
 
-                val routingBuilder = RoutingInfo.Builder()
-                    .setCurrentStep(step, distance)
-                    .setLoading(false)
-
-                // Show upcoming note as next step for rally look-ahead
-                val currentNote = state.currentNote
-                if (currentNote != null && currentNote != nextNote) {
-                    val previewManeuver = currentNote.toManeuver()
-                    val previewStep = Step.Builder(currentNote.callText)
-                        .setManeuver(previewManeuver)
+                builder.setNavigationInfo(
+                    RoutingInfo.Builder()
+                        .setCurrentStep(step, distance)
+                        .setLoading(false)
                         .build()
-                    routingBuilder.setNextStep(previewStep)
-                }
-
-                builder.setNavigationInfo(routingBuilder.build())
+                )
             } else {
                 // No next note — show finish or following state
                 val statusText = when {
@@ -217,7 +214,7 @@ class ReplayNavigationScreen(
                 .setTitle("Back")
                 .setOnClickListener {
                     replayManager.stopReplay()
-                    navigationManager.navigationEnded()
+                    endNavigationIfActive()
                     screenManager.pop()
                 }
                 .build()
@@ -240,7 +237,7 @@ class ReplayNavigationScreen(
                     .setBackgroundColor(CarColor.RED)
                     .setOnClickListener {
                         replayManager.stopReplay()
-                        navigationManager.navigationEnded()
+                        endNavigationIfActive()
                         screenManager.pop()
                     }
                     .build()
@@ -250,7 +247,7 @@ class ReplayNavigationScreen(
                 Action.Builder()
                     .setTitle("Done")
                     .setOnClickListener {
-                        navigationManager.navigationEnded()
+                        endNavigationIfActive()
                         screenManager.pop()
                     }
                     .build()
@@ -260,5 +257,16 @@ class ReplayNavigationScreen(
         builder.setActionStrip(actionStripBuilder.build())
 
         return builder.build()
+    }
+
+    /**
+     * Ends navigation if still active. Safe to call multiple times —
+     * only the first call reaches NavigationManager.
+     */
+    private fun endNavigationIfActive() {
+        if (navigationActive) {
+            navigationActive = false
+            navigationManager.navigationEnded()
+        }
     }
 }
