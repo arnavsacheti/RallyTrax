@@ -77,6 +77,14 @@ class ReplayMapRenderer(carContext: CarContext) : CarMapRenderer(carContext) {
         render()
     }
 
+    override fun centerOnPosition() {
+        driverPosition?.let {
+            centerLat = it.latitude
+            centerLon = it.longitude
+            render()
+        }
+    }
+
     override fun render() {
         val s = surface ?: return
         if (surfaceWidth <= 0 || surfaceHeight <= 0) return

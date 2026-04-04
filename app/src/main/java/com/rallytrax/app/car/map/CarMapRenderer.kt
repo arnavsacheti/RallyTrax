@@ -120,7 +120,7 @@ open class CarMapRenderer(
         render()
     }
 
-    fun centerOnPosition() {
+    open fun centerOnPosition() {
         currentPosition?.let {
             centerLat = it.latitude
             centerLon = it.longitude
