@@ -296,8 +296,14 @@ object PaceNoteGenerator {
                 } else {
                     points[i].elevation ?: points[i - 1].elevation
                 }
-                // Assign original index of the closer point
-                val origIdx = if (frac < 0.5) points[i - 1].index else points[i].index
+                // Distance-proportional original index (D006): distribute indices across sparse GPS gaps
+                val prevIdx = points[i - 1].index
+                val nextIdx = points[i].index
+                val origIdx = if (nextIdx > prevIdx) {
+                    prevIdx + ((nextIdx - prevIdx).toDouble() * frac).toInt()
+                } else {
+                    prevIdx  // same index or shouldn't happen — keep safe
+                }
                 result.add(InterpPoint(lat, lon, ele, nextTargetDist, origIdx))
                 nextTargetDist += segmentM
             }
