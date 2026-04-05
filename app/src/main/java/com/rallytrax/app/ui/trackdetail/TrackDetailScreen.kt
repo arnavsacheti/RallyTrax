@@ -121,6 +121,7 @@ import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
 import com.rallytrax.app.ui.map.OsmPolylineData
 import com.rallytrax.app.ui.map.PaceNoteIconRenderer
+import com.rallytrax.app.ui.map.buildColoredSegments
 import com.rallytrax.app.data.analytics.GripEventDetector
 import com.rallytrax.app.ui.theme.DifficultyAmber
 import com.rallytrax.app.ui.theme.DifficultyOrange
@@ -554,22 +555,19 @@ private fun GoogleTrackMap(
         // Callouts layer: colored segments + rally icons
         if (MapLayer.CALLOUTS in activeLayers) {
             val allMapPoints = points.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
-            // Draw colored segments for features
-            paceNotes.filter { it.noteType != NoteType.STRAIGHT }
-                .forEach { note ->
-                    // Use segment indices if available, otherwise fallback to region around pointIndex
-                    val start = (note.segmentStartIndex ?: (note.pointIndex - 5).coerceAtLeast(0))
-                        .coerceIn(0, allMapPoints.size - 1)
-                    val end = (note.segmentEndIndex ?: (note.pointIndex + 5).coerceAtMost(allMapPoints.size - 1))
-                        .coerceIn(0, allMapPoints.size - 1)
-                    if (end > start) {
-                        Polyline(
-                            points = allMapPoints.subList(start, end + 1),
-                            color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
-                            width = 12f,
-                        )
-                    }
+            // Draw full-coverage colored segments via shared builder
+            val coloredSegs = buildColoredSegments(allMapPoints.size, paceNotes)
+            for (seg in coloredSegs) {
+                val start = seg.startIndex.coerceIn(0, allMapPoints.size - 1)
+                val end = seg.endIndex.coerceIn(0, allMapPoints.size - 1)
+                if (end > start) {
+                    Polyline(
+                        points = allMapPoints.subList(start, end + 1),
+                        color = seg.color,
+                        width = if (seg.isFeature) 12f else 8f,
+                    )
                 }
+            }
             // Rally-style icon markers (skip straights)
             val density = (LocalDensity.current.density * 160f).toInt()
             paceNotes.forEach { note ->
@@ -738,23 +736,21 @@ private fun OsmTrackMap(
         }
     }
 
-    // Colored segments for callouts
+    // Full-coverage colored segments for callouts via shared builder
     if (calloutsActive && points.size >= 2) {
         val geoPoints = points.map { GeoPoint(it.latitude, it.longitude) }
-        paceNotes.filter { it.noteType != NoteType.STRAIGHT }
-            .forEach { note ->
-                val start = (note.segmentStartIndex ?: (note.pointIndex - 5).coerceAtLeast(0))
-                    .coerceIn(0, geoPoints.size - 1)
-                val end = (note.segmentEndIndex ?: (note.pointIndex + 5).coerceAtMost(geoPoints.size - 1))
-                    .coerceIn(0, geoPoints.size - 1)
-                if (end > start) {
-                    polylines.add(OsmPolylineData(
-                        points = geoPoints.subList(start, end + 1),
-                        color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
-                        width = 12f,
-                    ))
-                }
+        val coloredSegs = buildColoredSegments(geoPoints.size, paceNotes)
+        for (seg in coloredSegs) {
+            val start = seg.startIndex.coerceIn(0, geoPoints.size - 1)
+            val end = seg.endIndex.coerceIn(0, geoPoints.size - 1)
+            if (end > start) {
+                polylines.add(OsmPolylineData(
+                    points = geoPoints.subList(start, end + 1),
+                    color = seg.color,
+                    width = if (seg.isFeature) 12f else 8f,
+                ))
             }
+        }
     }
 
     val markers = mutableListOf<OsmMarkerData>()

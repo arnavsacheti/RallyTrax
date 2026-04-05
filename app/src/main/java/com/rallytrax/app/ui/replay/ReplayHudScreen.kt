@@ -87,7 +87,9 @@ import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmMarkerData
 import com.rallytrax.app.ui.map.OsmPolylineData
+import com.rallytrax.app.ui.map.ColoredSegment
 import com.rallytrax.app.ui.map.PaceNoteIconRenderer
+import com.rallytrax.app.ui.map.buildColoredSegments
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
@@ -573,63 +575,8 @@ private fun OsmReplayMap(uiState: com.rallytrax.app.replay.ReplayUiState) {
     OsmMapView(Modifier.fillMaxSize(), polylines = osmPolylines, markers = osmMarkers, darkMode = true, followPosition = followPos, fitBounds = fitBounds)
 }
 
-// ── Colored Segment Builder ──────────────────────────────────────────────────
-
-private data class ColoredSegment(
-    val startIndex: Int,
-    val endIndex: Int,
-    val color: Color,
-    val isFeature: Boolean,
-)
-
-private val BASE_TRACK_COLOR = Color(0xFF1A73E8).copy(alpha = 0.3f) // dimmed Rally Blue
-
-private fun buildColoredSegments(
-    totalPoints: Int,
-    paceNotes: List<PaceNoteEntity>,
-): List<ColoredSegment> {
-    if (totalPoints < 2) return emptyList()
-
-    // Collect feature segments (skip straights)
-    data class Feature(val start: Int, val end: Int, val color: Color)
-
-    val features = paceNotes
-        .filter { it.noteType != NoteType.STRAIGHT }
-        .map { note ->
-            // Use segment indices if available, fallback to region around pointIndex
-            val start = (note.segmentStartIndex ?: (note.pointIndex - 5).coerceAtLeast(0))
-                .coerceIn(0, totalPoints - 1)
-            val end = (note.segmentEndIndex ?: (note.pointIndex + 5).coerceAtMost(totalPoints - 1))
-                .coerceIn(0, totalPoints - 1)
-            Feature(
-                start = start,
-                end = end,
-                color = PaceNoteIconRenderer.severityColor(note.noteType, note.severity),
-            )
-        }
-        .filter { it.end > it.start }
-        .sortedBy { it.start }
-
-    val segments = mutableListOf<ColoredSegment>()
-    var cursor = 0
-
-    for (feat in features) {
-        // Gap before this feature
-        if (feat.start > cursor) {
-            segments.add(ColoredSegment(cursor, feat.start, BASE_TRACK_COLOR, isFeature = false))
-        }
-        // The feature segment
-        segments.add(ColoredSegment(feat.start, feat.end, feat.color, isFeature = true))
-        cursor = feat.end
-    }
-
-    // Trailing gap
-    if (cursor < totalPoints - 1) {
-        segments.add(ColoredSegment(cursor, totalPoints - 1, BASE_TRACK_COLOR, isFeature = false))
-    }
-
-    return segments
-}
+// Colored segment building is provided by the shared utility:
+// com.rallytrax.app.ui.map.ColoredSegmentBuilder
 
 // ── Utilities ───────────────────────────────────────────────────────────────
 
