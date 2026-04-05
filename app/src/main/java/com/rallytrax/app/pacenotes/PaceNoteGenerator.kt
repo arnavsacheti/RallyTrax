@@ -24,7 +24,7 @@ import kotlin.math.sqrt
  * 6. Detect modifiers (tightens/opens/long/short)
  * 7. Determine conjunctions (into/and/distance)
  * 8. Detect elevation events (small/normal/big crests and dips)
- * 9. Insert straights for long gaps
+ * 9. Insert straights for all inter-note gaps and trailing gap
  * 10. Compute call distances and assemble text
  */
 object PaceNoteGenerator {
@@ -176,8 +176,8 @@ object PaceNoteGenerator {
         // 8. Determine conjunctions between consecutive turn notes
         val withConjunctions = applyConjunctions(rawNotes)
 
-        // 9. Insert straights for long gaps
-        val withStraights = insertStraights(trackId, withConjunctions, sensitivity)
+        // 9. Insert straights for all inter-note gaps and trailing gap
+        val withStraights = insertStraights(trackId, withConjunctions, sensitivity, points.lastIndex)
 
         // 10. Compute call distances and assemble text
         val withCallDistances = computeCallDistances(withStraights)
@@ -710,24 +710,25 @@ object PaceNoteGenerator {
         trackId: String,
         notes: List<PaceNoteEntity>,
         sensitivity: Sensitivity,
+        lastPointIndex: Int,
     ): List<PaceNoteEntity> {
         if (notes.isEmpty()) return notes
         val result = mutableListOf<PaceNoteEntity>()
 
-        // Gap before first note
-        if (notes.first().distanceFromStart > sensitivity.minStraightM) {
-            val endIdx = notes.first().segmentStartIndex ?: notes.first().pointIndex
+        // Gap before first note — fill unconditionally (no minStraightM threshold)
+        val firstSegEnd = notes.first().segmentStartIndex ?: notes.first().pointIndex
+        if (firstSegEnd > 0) {
             result.add(
                 PaceNoteEntity(
                     trackId = trackId,
-                    pointIndex = endIdx / 2, // midpoint for icon placement
+                    pointIndex = firstSegEnd / 2, // midpoint for icon placement
                     distanceFromStart = 0.0,
                     noteType = NoteType.STRAIGHT,
                     severity = 0,
                     modifier = NoteModifier.NONE,
                     callText = "",
                     segmentStartIndex = 0,
-                    segmentEndIndex = endIdx,
+                    segmentEndIndex = firstSegEnd,
                 )
             )
         }
@@ -735,12 +736,13 @@ object PaceNoteGenerator {
         for (i in notes.indices) {
             result.add(notes[i])
 
+            // Inter-note gaps — fill unconditionally (no minStraightM threshold)
             if (i < notes.size - 1) {
-                val gap = notes[i + 1].distanceFromStart - notes[i].distanceFromStart
-                if (gap > sensitivity.minStraightM) {
-                    val midDist = notes[i].distanceFromStart + gap / 2
-                    val segStart = notes[i].segmentEndIndex ?: notes[i].pointIndex
-                    val segEnd = notes[i + 1].segmentStartIndex ?: notes[i + 1].pointIndex
+                val segStart = notes[i].segmentEndIndex ?: notes[i].pointIndex
+                val segEnd = notes[i + 1].segmentStartIndex ?: notes[i + 1].pointIndex
+                if (segEnd > segStart) {
+                    val midDist = notes[i].distanceFromStart +
+                        (notes[i + 1].distanceFromStart - notes[i].distanceFromStart) / 2
                     result.add(
                         PaceNoteEntity(
                             trackId = trackId,
@@ -756,6 +758,25 @@ object PaceNoteGenerator {
                     )
                 }
             }
+        }
+
+        // Trailing gap after last note
+        val lastNote = notes.last()
+        val trailStart = lastNote.segmentEndIndex ?: lastNote.pointIndex
+        if (lastPointIndex > trailStart) {
+            result.add(
+                PaceNoteEntity(
+                    trackId = trackId,
+                    pointIndex = (trailStart + lastPointIndex) / 2,
+                    distanceFromStart = lastNote.distanceFromStart,
+                    noteType = NoteType.STRAIGHT,
+                    severity = 0,
+                    modifier = NoteModifier.NONE,
+                    callText = "",
+                    segmentStartIndex = trailStart,
+                    segmentEndIndex = lastPointIndex,
+                )
+            )
         }
 
         return result
