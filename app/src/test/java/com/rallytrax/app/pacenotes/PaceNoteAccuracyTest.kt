@@ -156,6 +156,10 @@ class PaceNoteAccuracyTest {
             println("  Avg gap: %.1f m".format(gapLengthsM.average()))
         }
 
+        // Hard assertions — regression guard (R014)
+        assertTrue("Nordschleife turn avg segment length should be > 0m (got ${segLengths.average()})", segLengths.average() > 0.0)
+        assertTrue("Nordschleife coverage should be >= 95% (got ${"%.1f".format(coveragePct)}%)", coveragePct >= 95.0)
+
         // Print first 30 notes for manual inspection
         println("\nFirst 30 notes:")
         println("%-4s  %-16s  Sev  %-12s  %8s  %s".format("#", "Type", "Modifier", "SegLen", "CallText"))
@@ -213,7 +217,12 @@ class PaceNoteAccuracyTest {
         notes.filter { it.segmentStartIndex != null && it.segmentEndIndex != null }.forEach { note ->
             for (j in note.segmentStartIndex!!..note.segmentEndIndex!!) coveredPoints.add(j)
         }
-        println("  Coverage: %.1f%% of track points".format(coveredPoints.size * 100.0 / points.size))
+        val coveragePct = coveredPoints.size * 100.0 / points.size
+        println("  Coverage: %.1f%% of track points".format(coveragePct))
+
+        // Hard assertions — regression guard (R014)
+        assertTrue("Stelvio should have >= 40 hairpins (got ${hairpins.size})", hairpins.size >= 40)
+        assertTrue("Stelvio coverage should be >= 95% (got ${"%.1f".format(coveragePct)}%)", coveragePct >= 95.0)
     }
 
     /**
@@ -257,6 +266,10 @@ class PaceNoteAccuracyTest {
         notes.filter { it.segmentStartIndex != null && it.segmentEndIndex != null }.forEach { note ->
             for (j in note.segmentStartIndex!!..note.segmentEndIndex!!) coveredPoints.add(j)
         }
-        println("  Coverage: %.1f%% of track points".format(coveredPoints.size * 100.0 / points.size))
+        val coveragePct = coveredPoints.size * 100.0 / points.size
+        println("  Coverage: %.1f%% of track points".format(coveragePct))
+
+        // Hard assertions — regression guard (R014)
+        assertTrue("Pikes Peak coverage should be >= 95% (got ${"%.1f".format(coveragePct)}%)", coveragePct >= 95.0)
     }
 }
