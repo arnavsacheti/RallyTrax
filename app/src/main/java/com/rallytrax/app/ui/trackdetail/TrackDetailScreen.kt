@@ -264,6 +264,24 @@ fun TrackDetailScreen(
                     val end = candidate.endIdxA.coerceIn(0, points.size - 1)
                     if (end > start) points.subList(start, end + 1) else emptyList()
                 }
+                // Compute selected pace note segment points for map highlight
+                val selectedPaceNotePoints = remember(uiState.selectedPaceNoteIndex, uiState.paceNotes, points) {
+                    val idx = uiState.selectedPaceNoteIndex ?: return@remember emptyList<LatLng>()
+                    val note = uiState.paceNotes.getOrNull(idx) ?: return@remember emptyList<LatLng>()
+                    val segStart = note.segmentStartIndex
+                    val segEnd = note.segmentEndIndex
+                    val start: Int
+                    val end: Int
+                    if (segStart != null && segEnd != null) {
+                        start = segStart.coerceIn(0, points.size - 1)
+                        end = segEnd.coerceIn(0, points.size - 1)
+                    } else {
+                        // Fallback: use pointIndex ± 5
+                        start = (note.pointIndex - 5).coerceIn(0, points.size - 1)
+                        end = (note.pointIndex + 5).coerceIn(0, points.size - 1)
+                    }
+                    if (end > start) points.subList(start, end + 1) else emptyList()
+                }
                 if (points.isNotEmpty()) {
                     Box {
                         TrackMap(
@@ -276,6 +294,7 @@ fun TrackDetailScreen(
                             highlightedSegmentPoints = highlightedSegmentPoints,
                             gripEvents = uiState.gripEvents,
                             selectedGripEventIndex = uiState.selectedGripEventIndex,
+                            selectedPaceNotePoints = selectedPaceNotePoints,
                         )
 
                         // Gradient legend
@@ -361,6 +380,23 @@ fun TrackDetailScreen(
     if (isMapFullscreen) {
         val points = uiState.polylinePoints
         if (points.isNotEmpty()) {
+            // Recompute selected pace note points for fullscreen (same logic as above)
+            val fullscreenPaceNotePoints = remember(uiState.selectedPaceNoteIndex, uiState.paceNotes, points) {
+                val idx = uiState.selectedPaceNoteIndex ?: return@remember emptyList<LatLng>()
+                val note = uiState.paceNotes.getOrNull(idx) ?: return@remember emptyList<LatLng>()
+                val segStart = note.segmentStartIndex
+                val segEnd = note.segmentEndIndex
+                val start: Int
+                val end: Int
+                if (segStart != null && segEnd != null) {
+                    start = segStart.coerceIn(0, points.size - 1)
+                    end = segEnd.coerceIn(0, points.size - 1)
+                } else {
+                    start = (note.pointIndex - 5).coerceIn(0, points.size - 1)
+                    end = (note.pointIndex + 5).coerceIn(0, points.size - 1)
+                }
+                if (end > start) points.subList(start, end + 1) else emptyList()
+            }
             FullscreenMapDialog(
                 points = points,
                 trackPoints = uiState.trackPoints,
@@ -372,6 +408,7 @@ fun TrackDetailScreen(
                 onDismiss = { isMapFullscreen = false },
                 gripEvents = uiState.gripEvents,
                 selectedGripEventIndex = uiState.selectedGripEventIndex,
+                selectedPaceNotePoints = fullscreenPaceNotePoints,
             )
         }
     }
@@ -391,11 +428,12 @@ private fun TrackMap(
     highlightedSegmentPoints: List<LatLng> = emptyList(),
     gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
     selectedGripEventIndex: Int? = null,
+    selectedPaceNotePoints: List<LatLng> = emptyList(),
 ) {
     if (useGoogleMaps) {
-        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding, highlightedSegmentPoints, gripEvents, selectedGripEventIndex)
+        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding, highlightedSegmentPoints, gripEvents, selectedGripEventIndex, selectedPaceNotePoints)
     } else {
-        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, highlightedSegmentPoints, gripEvents, selectedGripEventIndex)
+        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, highlightedSegmentPoints, gripEvents, selectedGripEventIndex, selectedPaceNotePoints)
     }
 }
 
@@ -410,6 +448,7 @@ private fun GoogleTrackMap(
     highlightedSegmentPoints: List<LatLng> = emptyList(),
     gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
     selectedGripEventIndex: Int? = null,
+    selectedPaceNotePoints: List<LatLng> = emptyList(),
 ) {
     val cameraPositionState = rememberCameraPositionState()
     val bounds = remember(points) {
@@ -440,6 +479,14 @@ private fun GoogleTrackMap(
                     17f,
                 ),
             )
+        }
+    }
+    // Animate camera to selected pace note segment bounds
+    LaunchedEffect(selectedPaceNotePoints) {
+        if (selectedPaceNotePoints.size >= 2) {
+            val segBoundsBuilder = LatLngBounds.builder()
+            selectedPaceNotePoints.forEach { segBoundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(segBoundsBuilder.build(), 96))
         }
     }
 
@@ -618,6 +665,14 @@ private fun GoogleTrackMap(
                 color = Color(0xFF1A73E8), width = 10f,
             )
         }
+
+        // Highlighted selected pace note segment — amber/orange to distinguish from blue suggestion highlight
+        if (selectedPaceNotePoints.size >= 2) {
+            Polyline(
+                points = selectedPaceNotePoints.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
+                color = Color(0xFFFFA726), width = 12f,
+            )
+        }
     }
 }
 
@@ -631,6 +686,7 @@ private fun OsmTrackMap(
     highlightedSegmentPoints: List<LatLng> = emptyList(),
     gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
     selectedGripEventIndex: Int? = null,
+    selectedPaceNotePoints: List<LatLng> = emptyList(),
 ) {
     val lats = points.map { it.latitude }
     val lngs = points.map { it.longitude }
@@ -790,7 +846,15 @@ private fun OsmTrackMap(
         ))
     }
 
-    // Focus on selected grip event
+    // Highlighted selected pace note segment — amber/orange
+    if (selectedPaceNotePoints.size >= 2) {
+        polylines.add(OsmPolylineData(
+            points = selectedPaceNotePoints.map { GeoPoint(it.latitude, it.longitude) },
+            color = Color(0xFFFFA726), width = 12f,
+        ))
+    }
+
+    // Focus on selected grip event, then pace note, then suggestion highlight
     val osmFitBounds = if (selectedGripEventIndex != null) {
         val event = gripEvents.getOrNull(selectedGripEventIndex)
         if (event != null && event.pointIndex in points.indices) {
@@ -799,6 +863,10 @@ private fun OsmTrackMap(
             val d = 0.002 // ~200m
             BoundingBox(p.latitude + d, p.longitude + d, p.latitude - d, p.longitude - d)
         } else fitBounds
+    } else if (selectedPaceNotePoints.size >= 2) {
+        val pnLats = selectedPaceNotePoints.map { it.latitude }
+        val pnLngs = selectedPaceNotePoints.map { it.longitude }
+        BoundingBox(pnLats.max(), pnLngs.max(), pnLats.min(), pnLngs.min())
     } else if (highlightedSegmentPoints.size >= 2) {
         val hLats = highlightedSegmentPoints.map { it.latitude }
         val hLngs = highlightedSegmentPoints.map { it.longitude }
@@ -827,6 +895,7 @@ private fun FullscreenMapDialog(
     onDismiss: () -> Unit,
     gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
     selectedGripEventIndex: Int? = null,
+    selectedPaceNotePoints: List<LatLng> = emptyList(),
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -847,6 +916,7 @@ private fun FullscreenMapDialog(
                 contentPadding = PaddingValues(bottom = 56.dp),
                 gripEvents = gripEvents,
                 selectedGripEventIndex = selectedGripEventIndex,
+                selectedPaceNotePoints = selectedPaceNotePoints,
             )
 
             // Exit fullscreen button

@@ -166,6 +166,8 @@ data class TrackDetailUiState(
     val gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
     // Selected grip event for map focus (index into gripEvents list)
     val selectedGripEventIndex: Int? = null,
+    // Selected pace note for map focus (index into paceNotes list)
+    val selectedPaceNoteIndex: Int? = null,
 )
 
 enum class MapLayer {
@@ -465,6 +467,25 @@ class TrackDetailViewModel @Inject constructor(
         }
         _uiState.value = _uiState.value.copy(
             selectedGripEventIndex = newIndex,
+            // Mutual exclusion: clear pace note selection when selecting a grip event
+            selectedPaceNoteIndex = if (newIndex != null) null else _uiState.value.selectedPaceNoteIndex,
+            activeLayers = layers,
+        )
+    }
+
+    fun selectPaceNote(index: Int?) {
+        val current = _uiState.value.selectedPaceNoteIndex
+        // Toggle: tap again to deselect
+        val newIndex = if (current == index) null else index
+        val layers = _uiState.value.activeLayers.toMutableSet()
+        // Auto-enable callouts layer when selecting a pace note
+        if (newIndex != null && MapLayer.CALLOUTS !in layers) {
+            layers.add(MapLayer.CALLOUTS)
+        }
+        _uiState.value = _uiState.value.copy(
+            selectedPaceNoteIndex = newIndex,
+            // Mutual exclusion: clear grip event selection when selecting a pace note
+            selectedGripEventIndex = if (newIndex != null) null else _uiState.value.selectedGripEventIndex,
             activeLayers = layers,
         )
     }
