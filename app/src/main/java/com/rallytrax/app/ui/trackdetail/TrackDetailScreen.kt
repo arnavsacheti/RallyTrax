@@ -3,6 +3,7 @@ package com.rallytrax.app.ui.trackdetail
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -370,6 +371,8 @@ fun TrackDetailScreen(
                         onDismissSuggestions = { viewModel.clearSuggestions() },
                         onToggleHighlightSuggestion = { viewModel.toggleHighlightedSuggestion(it) },
                         onGripEventClick = { viewModel.selectGripEvent(it) },
+                        onPaceNoteClick = { viewModel.selectPaceNote(it) },
+                        selectedPaceNoteIndex = uiState.selectedPaceNoteIndex,
                     )
                 }
             }
@@ -1484,12 +1487,23 @@ private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, m
 }
 
 @Composable
-private fun PaceNoteItem(note: PaceNoteEntity, unitSystem: UnitSystem) {
+private fun PaceNoteItem(
+    note: PaceNoteEntity,
+    unitSystem: UnitSystem,
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {},
+) {
     var expanded by remember { mutableStateOf(false) }
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+        else Color.Transparent,
+        label = "paceNoteSelectionBg",
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
+            .background(backgroundColor)
+            .clickable { onClick(); expanded = !expanded }
             .padding(vertical = 4.dp),
     ) {
         Row(
@@ -1704,6 +1718,8 @@ private fun ViewTab(
     onDismissSuggestions: () -> Unit = {},
     onToggleHighlightSuggestion: (Int) -> Unit = {},
     onGripEventClick: (Int) -> Unit = {},
+    onPaceNoteClick: (Int) -> Unit = {},
+    selectedPaceNoteIndex: Int? = null,
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1810,6 +1826,8 @@ private fun ViewTab(
                 isStale = uiState.paceNotesStale,
                 isRegenerating = uiState.isGeneratingNotes,
                 onRegenerate = onRegeneratePaceNotes,
+                onPaceNoteClick = onPaceNoteClick,
+                selectedPaceNoteIndex = selectedPaceNoteIndex,
             )
         }
 
@@ -2377,6 +2395,8 @@ private fun PaceNotesList(
     isStale: Boolean = false,
     isRegenerating: Boolean = false,
     onRegenerate: () -> Unit = {},
+    onPaceNoteClick: (Int) -> Unit = {},
+    selectedPaceNoteIndex: Int? = null,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -2432,8 +2452,13 @@ private fun PaceNotesList(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            paceNotes.take(20).forEach { note ->
-                PaceNoteItem(note, unitSystem)
+            paceNotes.take(20).forEachIndexed { index, note ->
+                PaceNoteItem(
+                    note = note,
+                    unitSystem = unitSystem,
+                    isSelected = index == selectedPaceNoteIndex,
+                    onClick = { onPaceNoteClick(index) },
+                )
             }
             if (paceNotes.size > 20) {
                 Text(
