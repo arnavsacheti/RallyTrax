@@ -164,10 +164,12 @@ data class TrackDetailUiState(
     val accelProfile: List<AccelPoint> = emptyList(),
     // Grip event detection
     val gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
+    // Selected grip event for map focus (index into gripEvents list)
+    val selectedGripEventIndex: Int? = null,
 )
 
 enum class MapLayer {
-    ROUTE, SPEED, ACCEL, ELEVATION, CURVATURE, CALLOUTS, SURFACE
+    ROUTE, SPEED, ACCEL, ELEVATION, CURVATURE, CALLOUTS, SURFACE, GRIP
 }
 
 @HiltViewModel
@@ -450,6 +452,21 @@ class TrackDetailViewModel @Inject constructor(
         if (layer == MapLayer.ROUTE) return // Route is always on
         if (layer in current) current.remove(layer) else current.add(layer)
         _uiState.value = _uiState.value.copy(activeLayers = current)
+    }
+
+    fun selectGripEvent(index: Int?) {
+        val current = _uiState.value.selectedGripEventIndex
+        // Toggle: tap again to deselect
+        val newIndex = if (current == index) null else index
+        val layers = _uiState.value.activeLayers.toMutableSet()
+        // Auto-enable grip layer when selecting an event
+        if (newIndex != null && MapLayer.GRIP !in layers) {
+            layers.add(MapLayer.GRIP)
+        }
+        _uiState.value = _uiState.value.copy(
+            selectedGripEventIndex = newIndex,
+            activeLayers = layers,
+        )
     }
 
     private fun buildElevationProfile(points: List<TrackPointEntity>): List<ElevationPoint> {

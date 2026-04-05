@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -96,6 +97,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
@@ -271,6 +273,8 @@ fun TrackDetailScreen(
                             useGoogleMaps = MapProvider.useGoogleMaps(preferences.mapProvider),
                             modifier = Modifier.fillMaxWidth().height(300.dp),
                             highlightedSegmentPoints = highlightedSegmentPoints,
+                            gripEvents = uiState.gripEvents,
+                            selectedGripEventIndex = uiState.selectedGripEventIndex,
                         )
 
                         // Gradient legend
@@ -345,6 +349,7 @@ fun TrackDetailScreen(
                         onSaveSegment = viewModel::saveSegmentSuggestion,
                         onDismissSuggestions = { viewModel.clearSuggestions() },
                         onToggleHighlightSuggestion = { viewModel.toggleHighlightedSuggestion(it) },
+                        onGripEventClick = { viewModel.selectGripEvent(it) },
                     )
                 }
             }
@@ -364,6 +369,8 @@ fun TrackDetailScreen(
                 isRoute = uiState.track?.trackCategory == "route",
                 onToggleLayer = { viewModel.toggleLayer(it) },
                 onDismiss = { isMapFullscreen = false },
+                gripEvents = uiState.gripEvents,
+                selectedGripEventIndex = uiState.selectedGripEventIndex,
             )
         }
     }
@@ -381,11 +388,13 @@ private fun TrackMap(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 100.dp),
     highlightedSegmentPoints: List<LatLng> = emptyList(),
+    gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
+    selectedGripEventIndex: Int? = null,
 ) {
     if (useGoogleMaps) {
-        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding, highlightedSegmentPoints)
+        GoogleTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, contentPadding, highlightedSegmentPoints, gripEvents, selectedGripEventIndex)
     } else {
-        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, highlightedSegmentPoints)
+        OsmTrackMap(points, trackPoints, paceNotes, activeLayers, modifier, highlightedSegmentPoints, gripEvents, selectedGripEventIndex)
     }
 }
 
@@ -398,6 +407,8 @@ private fun GoogleTrackMap(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 100.dp),
     highlightedSegmentPoints: List<LatLng> = emptyList(),
+    gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
+    selectedGripEventIndex: Int? = null,
 ) {
     val cameraPositionState = rememberCameraPositionState()
     val bounds = remember(points) {
@@ -415,6 +426,19 @@ private fun GoogleTrackMap(
             val segBoundsBuilder = LatLngBounds.builder()
             highlightedSegmentPoints.forEach { segBoundsBuilder.include(com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude)) }
             cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(segBoundsBuilder.build(), 96))
+        }
+    }
+    // Animate camera to selected grip event
+    LaunchedEffect(selectedGripEventIndex) {
+        val event = selectedGripEventIndex?.let { gripEvents.getOrNull(it) }
+        if (event != null && event.pointIndex in points.indices) {
+            val p = points[event.pointIndex]
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(
+                    com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude),
+                    17f,
+                ),
+            )
         }
     }
 
@@ -571,6 +595,24 @@ private fun GoogleTrackMap(
             }
         }
 
+        // Grip event markers
+        if (MapLayer.GRIP in activeLayers && gripEvents.isNotEmpty()) {
+            gripEvents.forEachIndexed { eventIdx, event ->
+                if (event.pointIndex in points.indices) {
+                    val p = points[event.pointIndex]
+                    val isSelected = selectedGripEventIndex == eventIdx
+                    val markerColor = gripEventMarkerColor(event.type)
+                    Circle(
+                        center = com.google.android.gms.maps.model.LatLng(p.latitude, p.longitude),
+                        radius = if (isSelected) 12.0 else 8.0,
+                        fillColor = markerColor.copy(alpha = if (isSelected) 1f else 0.8f),
+                        strokeColor = if (isSelected) Color.White else markerColor,
+                        strokeWidth = if (isSelected) 4f else 2f,
+                    )
+                }
+            }
+        }
+
         // Highlighted suggested segment — full opacity over dimmed base
         if (hasHighlight) {
             Polyline(
@@ -589,6 +631,8 @@ private fun OsmTrackMap(
     activeLayers: Set<MapLayer>,
     modifier: Modifier = Modifier,
     highlightedSegmentPoints: List<LatLng> = emptyList(),
+    gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
+    selectedGripEventIndex: Int? = null,
 ) {
     val lats = points.map { it.latitude }
     val lngs = points.map { it.longitude }
@@ -731,6 +775,17 @@ private fun OsmTrackMap(
         }
     }
 
+    // Grip event markers (OSM uses hue-colored default markers)
+    if (MapLayer.GRIP in activeLayers && gripEvents.isNotEmpty()) {
+        gripEvents.forEach { event ->
+            if (event.pointIndex in points.indices) {
+                val p = points[event.pointIndex]
+                val hue = gripEventMarkerHue(event.type)
+                markers.add(OsmMarkerData(GeoPoint(p.latitude, p.longitude), gripEventLabel(event), hue = hue))
+            }
+        }
+    }
+
     // Highlighted suggested segment — full opacity over dimmed base
     if (hasHighlight) {
         polylines.add(OsmPolylineData(
@@ -739,7 +794,16 @@ private fun OsmTrackMap(
         ))
     }
 
-    val osmFitBounds = if (highlightedSegmentPoints.size >= 2) {
+    // Focus on selected grip event
+    val osmFitBounds = if (selectedGripEventIndex != null) {
+        val event = gripEvents.getOrNull(selectedGripEventIndex)
+        if (event != null && event.pointIndex in points.indices) {
+            val p = points[event.pointIndex]
+            // Small bounding box centered on the event point
+            val d = 0.002 // ~200m
+            BoundingBox(p.latitude + d, p.longitude + d, p.latitude - d, p.longitude - d)
+        } else fitBounds
+    } else if (highlightedSegmentPoints.size >= 2) {
         val hLats = highlightedSegmentPoints.map { it.latitude }
         val hLngs = highlightedSegmentPoints.map { it.longitude }
         BoundingBox(hLats.max(), hLngs.max(), hLats.min(), hLngs.min())
@@ -765,6 +829,8 @@ private fun FullscreenMapDialog(
     isRoute: Boolean = false,
     onToggleLayer: (MapLayer) -> Unit = {},
     onDismiss: () -> Unit,
+    gripEvents: List<GripEventDetector.GripEvent> = emptyList(),
+    selectedGripEventIndex: Int? = null,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -783,6 +849,8 @@ private fun FullscreenMapDialog(
                 useGoogleMaps = useGoogleMaps,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 56.dp),
+                gripEvents = gripEvents,
+                selectedGripEventIndex = selectedGripEventIndex,
             )
 
             // Exit fullscreen button
@@ -841,6 +909,7 @@ private fun LayerToolbar(activeLayers: Set<MapLayer>, onToggle: (MapLayer) -> Un
         LayerChip("Elevation", MapLayer.ELEVATION, activeLayers, onToggle)
         LayerChip("Curve", MapLayer.CURVATURE, activeLayers, onToggle)
         LayerChip("Surface", MapLayer.SURFACE, activeLayers, onToggle)
+        LayerChip("Grip", MapLayer.GRIP, activeLayers, onToggle)
         LayerChip("Callouts", MapLayer.CALLOUTS, activeLayers, onToggle)
     }
 }
@@ -1568,6 +1637,7 @@ private fun ViewTab(
     onSaveSegment: (SegmentMatcher.OverlapCandidate, String) -> Unit = { _, _ -> },
     onDismissSuggestions: () -> Unit = {},
     onToggleHighlightSuggestion: (Int) -> Unit = {},
+    onGripEventClick: (Int) -> Unit = {},
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1649,7 +1719,11 @@ private fun ViewTab(
         // Grip events
         if (uiState.gripEvents.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
-            GripEventsCard(uiState.gripEvents)
+            GripEventsCard(
+                gripEvents = uiState.gripEvents,
+                selectedIndex = uiState.selectedGripEventIndex,
+                onEventClick = onGripEventClick,
+            )
         }
 
         // Corner analysis
@@ -2710,13 +2784,17 @@ private fun ColorBadge(text: String, color: Color) {
 // ── Grip Events Card ──────────────────────────────────────────────────
 
 @Composable
-private fun GripEventsCard(gripEvents: List<GripEventDetector.GripEvent>) {
+private fun GripEventsCard(
+    gripEvents: List<GripEventDetector.GripEvent>,
+    selectedIndex: Int? = null,
+    onEventClick: (Int) -> Unit = {},
+) {
     var expanded by remember { mutableStateOf(false) }
 
-    val oversteerCount = gripEvents.count { it.type == GripEventDetector.GripEventType.OVERSTEER }
-    val understeerCount = gripEvents.count { it.type == GripEventDetector.GripEventType.UNDERSTEER }
-    val absCount = gripEvents.count { it.type == GripEventDetector.GripEventType.ABS_ACTIVATION }
-    val tractionCount = gripEvents.count { it.type == GripEventDetector.GripEventType.TRACTION_LOSS }
+    // Count by type using the enum values
+    val typeCounts = GripEventDetector.GripEventType.entries.associateWith { type ->
+        gripEvents.count { it.type == type }
+    }.filter { it.value > 0 }
 
     Card(
         colors = CardDefaults.cardColors(
@@ -2755,15 +2833,14 @@ private fun GripEventsCard(gripEvents: List<GripEventDetector.GripEvent>) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Summary badges
+            // Summary badges — one per type that has events, colored by type
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (oversteerCount > 0) ColorBadge("$oversteerCount oversteer", DifficultyOrange)
-                if (understeerCount > 0) ColorBadge("$understeerCount understeer", DifficultyAmber)
-                if (absCount > 0) ColorBadge("$absCount ABS", DifficultyRed)
-                if (tractionCount > 0) ColorBadge("$tractionCount traction", DifficultyAmber)
+                typeCounts.forEach { (type, count) ->
+                    ColorBadge("$count ${gripEventBadgeText(type)}", gripEventMarkerColor(type))
+                }
             }
 
             // Expand/collapse toggle
@@ -2776,7 +2853,7 @@ private fun GripEventsCard(gripEvents: List<GripEventDetector.GripEvent>) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = if (expanded) "Hide details" else "Show details",
+                    text = if (expanded) "Hide details" else "Show details · tap to locate on map",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -2797,9 +2874,12 @@ private fun GripEventsCard(gripEvents: List<GripEventDetector.GripEvent>) {
                 Column {
                     Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider()
-                    gripEvents.forEach { event ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        GripEventRow(event)
+                    gripEvents.forEachIndexed { index, event ->
+                        GripEventRow(
+                            event = event,
+                            isSelected = selectedIndex == index,
+                            onClick = { onEventClick(index) },
+                        )
                     }
                 }
             }
@@ -2808,23 +2888,40 @@ private fun GripEventsCard(gripEvents: List<GripEventDetector.GripEvent>) {
 }
 
 @Composable
-private fun GripEventRow(event: GripEventDetector.GripEvent) {
+private fun GripEventRow(
+    event: GripEventDetector.GripEvent,
+    isSelected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
     val severityColor = when (event.severity) {
         GripEventDetector.Severity.MILD -> DifficultyAmber
         GripEventDetector.Severity.MODERATE -> DifficultyOrange
         GripEventDetector.Severity.SEVERE -> DifficultyRed
     }
+    val typeColor = gripEventMarkerColor(event.type)
 
     Row(
-        verticalAlignment = Alignment.Top,
-        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelected) Modifier.background(
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    RoundedCornerShape(8.dp),
+                ) else Modifier,
+            )
+            .then(
+                if (onClick != null) Modifier
+                    .clickable(onClick = onClick)
+                    .padding(vertical = 4.dp, horizontal = 4.dp)
+                else Modifier.padding(vertical = 4.dp, horizontal = 4.dp),
+            ),
     ) {
-        // Severity dot
+        // Type dot (colored by event type for map correspondence)
         Box(
             modifier = Modifier
-                .padding(top = 6.dp)
-                .size(8.dp)
-                .background(severityColor, RoundedCornerShape(4.dp)),
+                .size(10.dp)
+                .background(typeColor, RoundedCornerShape(5.dp)),
         )
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -2832,11 +2929,24 @@ private fun GripEventRow(event: GripEventDetector.GripEvent) {
                 text = event.description,
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text(
-                text = "${String.format("%.0f", event.distanceFromStart)}m from start",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${String.format("%.0f", event.distanceFromStart)}m from start",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (onClick != null) {
+                    Icon(
+                        imageVector = Icons.Filled.MyLocation,
+                        contentDescription = "Show on map",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -2847,4 +2957,46 @@ private fun GripEventRow(event: GripEventDetector.GripEvent) {
             fontWeight = FontWeight.SemiBold,
         )
     }
+}
+
+// ── Grip Event Helpers ──────────────────────────────────────────────────────
+
+/** Returns a color for each grip event type — used for map markers and card dots. */
+private fun gripEventMarkerColor(type: GripEventDetector.GripEventType): Color = when (type) {
+    GripEventDetector.GripEventType.OVERSTEER -> Color(0xFFE53935)     // red
+    GripEventDetector.GripEventType.UNDERSTEER -> Color(0xFFFB8C00)    // orange
+    GripEventDetector.GripEventType.ABS_ACTIVATION -> Color(0xFF8E24AA) // purple
+    GripEventDetector.GripEventType.TRACTION_LOSS -> Color(0xFFFFB300)  // amber
+    GripEventDetector.GripEventType.WHEELSPIN -> Color(0xFF43A047)      // green
+    GripEventDetector.GripEventType.CORNER_ENTRY_LOCK -> Color(0xFF1E88E5) // blue
+}
+
+/** Returns an OSM marker hue (0–360) for each grip event type. */
+private fun gripEventMarkerHue(type: GripEventDetector.GripEventType): Float = when (type) {
+    GripEventDetector.GripEventType.OVERSTEER -> 0f         // red
+    GripEventDetector.GripEventType.UNDERSTEER -> 30f       // orange
+    GripEventDetector.GripEventType.ABS_ACTIVATION -> 280f  // purple
+    GripEventDetector.GripEventType.TRACTION_LOSS -> 45f    // amber
+    GripEventDetector.GripEventType.WHEELSPIN -> 120f       // green
+    GripEventDetector.GripEventType.CORNER_ENTRY_LOCK -> 210f // blue
+}
+
+/** Returns a short label for an event — used for OSM marker titles. */
+private fun gripEventLabel(event: GripEventDetector.GripEvent): String = when (event.type) {
+    GripEventDetector.GripEventType.OVERSTEER -> "Oversteer (${event.severity.name.lowercase()})"
+    GripEventDetector.GripEventType.UNDERSTEER -> "Understeer (${event.severity.name.lowercase()})"
+    GripEventDetector.GripEventType.ABS_ACTIVATION -> "ABS (${event.severity.name.lowercase()})"
+    GripEventDetector.GripEventType.TRACTION_LOSS -> "Traction loss (${event.severity.name.lowercase()})"
+    GripEventDetector.GripEventType.WHEELSPIN -> "Wheelspin (${event.severity.name.lowercase()})"
+    GripEventDetector.GripEventType.CORNER_ENTRY_LOCK -> "Entry lock (${event.severity.name.lowercase()})"
+}
+
+/** Short badge text for each event type. */
+private fun gripEventBadgeText(type: GripEventDetector.GripEventType): String = when (type) {
+    GripEventDetector.GripEventType.OVERSTEER -> "oversteer"
+    GripEventDetector.GripEventType.UNDERSTEER -> "understeer"
+    GripEventDetector.GripEventType.ABS_ACTIVATION -> "ABS"
+    GripEventDetector.GripEventType.TRACTION_LOSS -> "traction"
+    GripEventDetector.GripEventType.WHEELSPIN -> "wheelspin"
+    GripEventDetector.GripEventType.CORNER_ENTRY_LOCK -> "entry lock"
 }

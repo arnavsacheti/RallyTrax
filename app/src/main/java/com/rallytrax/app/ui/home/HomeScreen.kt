@@ -204,7 +204,7 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // Sign-in card
                 if (!isSignedIn) {
@@ -271,6 +271,18 @@ fun HomeScreen(
                 if (feedState.totalStintCount < 3) {
                     item(key = "motivational") {
                         MotivationalCard(onRecord = { requestRecording() })
+                    }
+                }
+
+                // Activity feed header
+                if (feedState.feedItems.isNotEmpty() || feedState.totalStintCount >= 3) {
+                    item(key = "feed_header") {
+                        Text(
+                            text = "Recent Drives",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
                     }
                 }
 
@@ -410,12 +422,12 @@ private fun WeeklySummaryStrip(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
         ),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -423,7 +435,7 @@ private fun WeeklySummaryStrip(
                 GoalRing(
                     progress = weeklyGoalProgress,
                     label = "Goal",
-                    size = 56.dp,
+                    size = 60.dp,
                     strokeWidth = 6.dp,
                 )
             } else {
@@ -434,8 +446,8 @@ private fun WeeklySummaryStrip(
                 )
             }
             VerticalDivider(
-                modifier = Modifier.height(32.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+                modifier = Modifier.height(36.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
             )
             SummaryMetric(
                 label = "Drives",
@@ -443,8 +455,8 @@ private fun WeeklySummaryStrip(
                 modifier = Modifier.weight(1f),
             )
             VerticalDivider(
-                modifier = Modifier.height(32.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+                modifier = Modifier.height(36.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
             )
             SummaryMetric(
                 label = "Time",
@@ -467,10 +479,11 @@ private fun SummaryMetric(
     ) {
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
