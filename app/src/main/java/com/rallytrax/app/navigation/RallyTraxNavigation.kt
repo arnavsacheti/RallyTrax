@@ -247,6 +247,9 @@ fun RallyTraxNavHost(
                 onSegmentClick = { segmentId ->
                     navController.navigate(SegmentDetailRoute(segmentId))
                 },
+                onVehicleClick = { vehicleId ->
+                    navController.navigate(VehicleDetailRoute(vehicleId))
+                },
             )
         }
         composable<SegmentsListRoute> {
