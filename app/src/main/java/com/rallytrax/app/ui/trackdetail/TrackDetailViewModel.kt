@@ -33,6 +33,7 @@ import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.SegmentRepository
 import com.rallytrax.app.data.repository.TrackSegmentMatch
+import com.rallytrax.app.data.repository.TripRepository
 import com.rallytrax.app.di.DefaultDispatcher
 import com.rallytrax.app.di.IoDispatcher
 import com.rallytrax.app.pacenotes.PaceNoteGenerator
@@ -185,6 +186,7 @@ class TrackDetailViewModel @Inject constructor(
     private val vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao,
     private val segmentRepository: SegmentRepository,
     private val segmentDao: SegmentDao,
+    private val tripRepository: TripRepository,
     private val valhallaRouteClient: ValhallaRouteClient,
     preferencesRepository: UserPreferencesRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -987,6 +989,29 @@ class TrackDetailViewModel @Inject constructor(
             withContext(ioDispatcher) { trackDao.updateTrack(updated) }
             _uiState.value = _uiState.value.copy(track = updated)
             _snackbarMessage.tryEmit("Vehicle removed")
+        }
+    }
+
+    // ── Trip assignment ─────────────────────────────────────────────────────
+
+    val allTrips = tripRepository.getAllTrips()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun assignTrip(tripId: String) {
+        val track = _uiState.value.track ?: return
+        viewModelScope.launch {
+            tripRepository.assignTrackToTrip(track.id, tripId)
+            _uiState.value = _uiState.value.copy(track = track.copy(tripId = tripId))
+            _snackbarMessage.tryEmit("Added to trip")
+        }
+    }
+
+    fun clearTrip() {
+        val track = _uiState.value.track ?: return
+        viewModelScope.launch {
+            tripRepository.assignTrackToTrip(track.id, null)
+            _uiState.value = _uiState.value.copy(track = track.copy(tripId = null))
+            _snackbarMessage.tryEmit("Removed from trip")
         }
     }
 

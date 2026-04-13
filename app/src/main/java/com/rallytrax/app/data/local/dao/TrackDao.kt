@@ -139,4 +139,12 @@ interface TrackDao {
 
     @Query("UPDATE tracks SET gripEventCount = :count, gripEventSummary = :summary WHERE id = :trackId")
     suspend fun updateGripEvents(trackId: String, count: Int, summary: String?)
+
+    // --- Trip assignment ---
+
+    @Query("UPDATE tracks SET tripId = :tripId WHERE id = :trackId")
+    suspend fun updateTripId(trackId: String, tripId: String?)
+
+    @Query("UPDATE tracks SET tripId = NULL WHERE tripId = :tripId")
+    suspend fun clearTripAssignments(tripId: String)
 }

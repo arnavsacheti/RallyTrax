@@ -27,8 +27,10 @@ import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.SegmentRunEntity
+import com.rallytrax.app.data.local.dao.TripDao
 import com.rallytrax.app.data.local.dao.VehiclePartDao
 import com.rallytrax.app.data.local.dao.WeatherDao
+import com.rallytrax.app.data.local.entity.TripEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.local.entity.VehiclePartEntity
 import com.rallytrax.app.data.local.entity.WeatherEntity
@@ -50,8 +52,9 @@ import com.rallytrax.app.data.local.entity.WeatherEntity
         SegmentRunEntity::class,
         WeatherEntity::class,
         VehiclePartEntity::class,
+        TripEntity::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -68,6 +71,7 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun segmentDao(): SegmentDao
     abstract fun weatherDao(): WeatherDao
     abstract fun vehiclePartDao(): VehiclePartDao
+    abstract fun tripDao(): TripDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -431,6 +435,23 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_parts_vehicleId ON vehicle_parts(vehicleId)")
+            }
+        }
+
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `trips` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `description` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """)
+                db.execSQL("ALTER TABLE `tracks` ADD COLUMN `tripId` TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_tripId` ON `tracks` (`tripId`)")
             }
         }
 
