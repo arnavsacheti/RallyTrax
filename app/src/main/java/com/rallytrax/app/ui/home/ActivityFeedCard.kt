@@ -1,6 +1,7 @@
 package com.rallytrax.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,7 @@ fun ActivityFeedCard(
     feedItem: ActivityFeedItem,
     unitSystem: UnitSystem,
     onClick: () -> Unit,
+    onVehicleClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val track = feedItem.track
@@ -273,10 +275,13 @@ fun ActivityFeedCard(
                 feedItem.vehicleName?.let { name ->
                     Row(
                         modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
                             .background(
                                 MaterialTheme.colorScheme.secondaryContainer,
-                                RoundedCornerShape(12.dp),
                             )
+                            .clickable {
+                                feedItem.track.vehicleId?.let { onVehicleClick(it) }
+                            }
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),

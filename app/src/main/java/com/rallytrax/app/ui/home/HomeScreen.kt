@@ -100,6 +100,8 @@ fun HomeScreen(
     userPhotoUrl: String? = null,
     onSignIn: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onVehicleClick: (String) -> Unit = {},
+    onViewAllAchievements: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -253,7 +255,7 @@ fun HomeScreen(
                 ) { achievement ->
                     MilestoneCard(
                         achievement = achievement,
-                        onViewAll = { /* TODO: navigate to achievements */ },
+                        onViewAll = onViewAllAchievements,
                     )
                 }
 
@@ -262,7 +264,7 @@ fun HomeScreen(
                     item(key = "maintenance") {
                         MaintenanceWarningCard(
                             items = feedState.maintenanceDueItems,
-                            onItemClick = { /* TODO: navigate to vehicle detail */ },
+                            onItemClick = onVehicleClick,
                         )
                     }
                 }
@@ -309,6 +311,7 @@ fun HomeScreen(
                         feedItem = feedItem,
                         unitSystem = preferences.unitSystem,
                         onClick = { onTrackClick(feedItem.track.id) },
+                        onVehicleClick = onVehicleClick,
                         modifier = Modifier.animateItem(),
                     )
                 }

@@ -71,6 +71,12 @@ fun RallyTraxNavHost(
                 userPhotoUrl = userPhotoUrl,
                 onSignIn = onSignIn,
                 onProfileClick = onProfileClick,
+                onVehicleClick = { vehicleId ->
+                    navController.navigate(VehicleDetailRoute(vehicleId))
+                },
+                onViewAllAchievements = {
+                    navController.navigate(AchievementsRoute)
+                },
             )
         }
         composable<ExploreRoute> { backStackEntry ->
