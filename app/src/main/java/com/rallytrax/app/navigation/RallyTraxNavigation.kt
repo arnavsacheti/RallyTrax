@@ -20,6 +20,8 @@ import com.rallytrax.app.ui.profile.ProfileScreen
 import com.rallytrax.app.ui.recording.ActivitySummaryScreen
 import com.rallytrax.app.ui.recording.RecordingScreen
 import com.rallytrax.app.ui.stints.StintsScreen
+import com.rallytrax.app.ui.trips.TripDetailScreen
+import com.rallytrax.app.ui.trips.TripsScreen
 import com.rallytrax.app.ui.trackdetail.EditTrackScreen
 import com.rallytrax.app.ui.replay.ReplayScreen
 import com.rallytrax.app.ui.replay.ReplayHudScreen
@@ -122,6 +124,9 @@ fun RallyTraxNavHost(
                 onNavigateToStints = {
                     navController.navigate(StintsRoute)
                 },
+                onNavigateToTrips = {
+                    navController.navigate(TripsRoute)
+                },
                 onNavigateToAchievements = {
                     navController.navigate(AchievementsRoute)
                 },
@@ -160,6 +165,18 @@ fun RallyTraxNavHost(
                     navController.navigate(VehicleDetailRoute(vehicleId))
                 },
                 onBack = { navController.popBackStack() },
+            )
+        }
+        composable<TripsRoute> {
+            TripsScreen(
+                onTripClick = { tripId -> navController.navigate(TripDetailRoute(tripId)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<TripDetailRoute> {
+            TripDetailScreen(
+                onBack = { navController.popBackStack() },
+                onTrackClick = { trackId -> navController.navigate(TrackDetailRoute(trackId)) },
             )
         }
         composable<GarageRoute> {
@@ -258,6 +275,9 @@ fun RallyTraxNavHost(
                 },
                 onVehicleClick = { vehicleId ->
                     navController.navigate(VehicleDetailRoute(vehicleId))
+                },
+                onNavigateToTrip = { tripId ->
+                    navController.navigate(TripDetailRoute(tripId))
                 },
             )
         }

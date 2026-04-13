@@ -76,6 +76,7 @@ import java.util.Locale
 fun ProfileScreen(
     onNavigateToGarage: () -> Unit = {},
     onNavigateToStints: () -> Unit = {},
+    onNavigateToTrips: () -> Unit = {},
     onNavigateToAchievements: () -> Unit = {},
     onNavigateToFriends: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -375,6 +376,50 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Outlined.ChevronRight,
                         contentDescription = "Go to Stints",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // My Trips button
+            Card(
+                onClick = onNavigateToTrips,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.DirectionsCar,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "My Trips",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "Group drives into trips",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Outlined.ChevronRight,
+                        contentDescription = "Go to Trips",
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }

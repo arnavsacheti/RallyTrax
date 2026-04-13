@@ -157,20 +157,39 @@ fun TrackDetailScreen(
     onViewAllSegments: () -> Unit = {},
     onSegmentClick: (String) -> Unit = {},
     onVehicleClick: (String) -> Unit = {},
+    onNavigateToTrip: (String) -> Unit = {},
     viewModel: TrackDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val allVehicles by viewModel.allVehicles.collectAsStateWithLifecycle()
+    val allTrips by viewModel.allTrips.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var isMapFullscreen by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
+    var showTripPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
             snackbarHostState.showSnackbar(message)
         }
+    }
+
+    if (showTripPicker) {
+        TripPickerDialog(
+            trips = allTrips,
+            currentTripId = uiState.track?.tripId,
+            onDismiss = { showTripPicker = false },
+            onSelect = { tripId ->
+                viewModel.assignTrip(tripId)
+                showTripPicker = false
+            },
+            onClear = {
+                viewModel.clearTrip()
+                showTripPicker = false
+            },
+        )
     }
 
     Scaffold(
@@ -240,6 +259,15 @@ fun TrackDetailScreen(
                                 },
                                 enabled = !uiState.isGeneratingNotes,
                                 leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                            )
+                            val tripLabel = if (uiState.track?.tripId != null) "Change Trip" else "Add to Trip"
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(tripLabel) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showTripPicker = true
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Add, null) },
                             )
                         }
                     }
@@ -358,6 +386,10 @@ fun TrackDetailScreen(
                         ?.let { "${it.year} ${it.make} ${it.model}" }
                 }
 
+                val tripName = remember(uiState.track?.tripId, allTrips) {
+                    uiState.track?.tripId?.let { tid -> allTrips.find { it.id == tid } }?.name
+                }
+
                 uiState.track?.let { track ->
                     ViewTab(
                         track = track,
@@ -365,6 +397,8 @@ fun TrackDetailScreen(
                         unitSystem = preferences.unitSystem,
                         activeLayers = uiState.activeLayers,
                         vehicleName = vehicleName,
+                        tripName = tripName,
+                        onTripClick = { track.tripId?.let { onNavigateToTrip(it) } },
                         onDetectSegments = { viewModel.detectNewSegments() },
                         onSegmentClick = onSegmentClick,
                         onViewAllSegments = onViewAllSegments,
@@ -1713,6 +1747,8 @@ private fun ViewTab(
     unitSystem: UnitSystem,
     activeLayers: Set<MapLayer>,
     vehicleName: String?,
+    tripName: String? = null,
+    onTripClick: () -> Unit = {},
     onDetectSegments: () -> Unit = {},
     onSegmentClick: (String) -> Unit = {},
     onViewAllSegments: () -> Unit = {},
@@ -1737,7 +1773,7 @@ private fun ViewTab(
         SummaryCard(track, uiState, unitSystem)
 
         Spacer(modifier = Modifier.height(12.dp))
-        TrackInfoChips(track, vehicleName, onVehicleClick)
+        TrackInfoChips(track, vehicleName, onVehicleClick, tripName, onTripClick)
 
         // Weather context badge
         val weather = uiState.weatherCondition
@@ -2369,7 +2405,13 @@ private fun RouteHistoryCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TrackInfoChips(track: com.rallytrax.app.data.local.entity.TrackEntity, vehicleName: String?, onVehicleClick: (String) -> Unit = {}) {
+private fun TrackInfoChips(
+    track: com.rallytrax.app.data.local.entity.TrackEntity,
+    vehicleName: String?,
+    onVehicleClick: (String) -> Unit = {},
+    tripName: String? = null,
+    onTripClick: () -> Unit = {},
+) {
     FlowRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2381,6 +2423,9 @@ private fun TrackInfoChips(track: com.rallytrax.app.data.local.entity.TrackEntit
                 label = { Text(it) },
                 leadingIcon = { Icon(Icons.Default.DirectionsCar, contentDescription = null, modifier = Modifier.size(18.dp)) },
             )
+        }
+        tripName?.let {
+            AssistChip(onClick = onTripClick, label = { Text("Trip: $it") })
         }
         track.routeType?.let {
             AssistChip(onClick = {}, label = { Text(it) })
@@ -3098,4 +3143,61 @@ private fun gripEventBadgeText(type: GripEventDetector.GripEventType): String = 
     GripEventDetector.GripEventType.TRACTION_LOSS -> "traction"
     GripEventDetector.GripEventType.WHEELSPIN -> "wheelspin"
     GripEventDetector.GripEventType.CORNER_ENTRY_LOCK -> "entry lock"
+}
+
+// ── Trip Picker Dialog ─────────────────────────────────────────────────────
+
+@Composable
+private fun TripPickerDialog(
+    trips: List<com.rallytrax.app.data.local.entity.TripEntity>,
+    currentTripId: String?,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Trip") },
+        text = {
+            if (trips.isEmpty()) {
+                Text("No trips available. Create a trip from the Profile screen first.")
+            } else {
+                Column {
+                    trips.forEach { trip ->
+                        Card(
+                            onClick = { onSelect(trip.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (trip.id == currentTripId) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                            ),
+                        ) {
+                            Text(
+                                text = trip.name,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (currentTripId != null) {
+                TextButton(onClick = onClear) {
+                    Text("Remove from trip")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }

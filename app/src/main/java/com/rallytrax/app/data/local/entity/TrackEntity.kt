@@ -10,6 +10,7 @@ import java.util.UUID
     indices = [
         Index("recordedAt"),
         Index("vehicleId"),
+        Index("tripId"),
     ],
 )
 data class TrackEntity(
@@ -49,4 +50,5 @@ data class TrackEntity(
     // Grip event detection cache
     val gripEventCount: Int? = null,
     val gripEventSummary: String? = null, // semicolon-delimited GripEvent summaries
+    val tripId: String? = null,
 )
