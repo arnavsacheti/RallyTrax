@@ -88,6 +88,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.core.content.ContextCompat
 import com.rallytrax.app.recording.SensorHudData
+import com.rallytrax.app.ui.theme.rallyTraxColors
 
 @Composable
 fun RecordingScreen(
@@ -172,7 +173,7 @@ fun RecordingScreen(
                     if (segment.size >= 2) {
                         Polyline(
                             points = segment.map { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) },
-                            color = Color(0xFF1A73E8), width = 12f,
+                            color = MaterialTheme.colorScheme.primary, width = 12f,
                         )
                     }
                 }
@@ -217,7 +218,7 @@ fun RecordingScreen(
                         modifier = Modifier
                             .size(10.dp)
                             .alpha(pulseAlpha)
-                            .background(Color.Red, CircleShape),
+                            .background(MaterialTheme.rallyTraxColors.recordingActive, CircleShape),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("REC", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -232,10 +233,10 @@ fun RecordingScreen(
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(Color(0xFFFBBC04), CircleShape),
+                            .background(MaterialTheme.rallyTraxColors.fuelWarning, CircleShape),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("AUTO-PAUSED", color = Color(0xFFFBBC04), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("AUTO-PAUSED", color = MaterialTheme.rallyTraxColors.fuelWarning, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
             } else {
                 Spacer(modifier = Modifier.width(1.dp))
@@ -261,7 +262,7 @@ fun RecordingScreen(
                     .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp)),
             ) {
                 Icon(Icons.Filled.Speed, if (showSensorHud) "Hide sensors" else "Show sensors",
-                    tint = if (showSensorHud) Color(0xFF1A73E8) else Color.White.copy(alpha = 0.7f))
+                    tint = if (showSensorHud) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f))
             }
         }
 
@@ -369,7 +370,7 @@ fun RecordingScreen(
                     onClick = { viewModel.markSegment(context) },
                     modifier = Modifier.size(44.dp),
                     shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF2C2C2C)),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Flag,
@@ -393,7 +394,7 @@ fun RecordingScreen(
                     modifier = Modifier.size(44.dp),
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = if (isRecordingVoice) Color.Red else Color(0xFF2C2C2C),
+                        containerColor = if (isRecordingVoice) MaterialTheme.rallyTraxColors.recordingActive else MaterialTheme.colorScheme.surfaceContainerHighest,
                     ),
                 ) {
                     Icon(
@@ -415,7 +416,7 @@ fun RecordingScreen(
                     },
                     modifier = Modifier.size(56.dp),
                     shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF2C2C2C)),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
                 ) {
                     Icon(
                         imageVector = if (isPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
@@ -432,7 +433,7 @@ fun RecordingScreen(
                     label = "stop_corner",
                 )
                 val stopContainerColor by animateColorAsState(
-                    targetValue = if (isRecording) Color(0xFFEA4335) else Color(0xFF2C2C2C),
+                    targetValue = if (isRecording) MaterialTheme.rallyTraxColors.fuelCritical else MaterialTheme.colorScheme.surfaceContainerHighest,
                     label = "stop_color",
                 )
 
@@ -457,7 +458,7 @@ fun RecordingScreen(
                 Text(
                     "PAUSED",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFFFBBC04),
+                    color = MaterialTheme.rallyTraxColors.fuelWarning,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -493,9 +494,9 @@ private fun MetricColumn(value: String, label: String) {
 private fun GpsQualityBadge(accuracy: Float?) {
     val gpsColor = when {
         accuracy == null -> Color.Gray
-        accuracy < 10f -> Color(0xFF34A853)  // Green: excellent
-        accuracy < 25f -> Color(0xFFFBBC04)  // Yellow: acceptable
-        else -> Color(0xFFEA4335)            // Red: poor
+        accuracy < 10f -> MaterialTheme.rallyTraxColors.speedSafe
+        accuracy < 25f -> MaterialTheme.rallyTraxColors.fuelWarning
+        else -> MaterialTheme.rallyTraxColors.fuelCritical
     }
     val gpsIcon = when {
         accuracy == null -> Icons.Filled.GpsOff
@@ -552,7 +553,7 @@ private fun SensorHudOverlay(sensorData: SensorHudData, modifier: Modifier = Mod
 
     val latGAlertActive = latG != null && latG > SensorHudData.LATERAL_G_ALERT_THRESHOLD
     val latGRowBg by animateColorAsState(
-        targetValue = if (latGAlertActive) Color(0xFFEA4335).copy(alpha = 0.35f) else Color.Transparent,
+        targetValue = if (latGAlertActive) MaterialTheme.rallyTraxColors.fuelCritical.copy(alpha = 0.35f) else Color.Transparent,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "lat_g_alert_bg",
     )
@@ -566,7 +567,7 @@ private fun SensorHudOverlay(sensorData: SensorHudData, modifier: Modifier = Mod
                 text = "\u26A0 ${sensorData.alertCount} alerts",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFFBBC04),
+                color = MaterialTheme.rallyTraxColors.fuelWarning,
                 modifier = Modifier.align(Alignment.End),
             )
         }
@@ -577,12 +578,12 @@ private fun SensorHudOverlay(sensorData: SensorHudData, modifier: Modifier = Mod
                 .background(latGRowBg, RoundedCornerShape(4.dp)),
         ) {
             SensorRow("Lat G", latG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "\u2014",
-                when { latG == null -> Color.Gray; latG < 0.3 -> Color(0xFF34A853); latG < 0.5 -> Color(0xFFFBBC04); else -> Color(0xFFEA4335) })
+                when { latG == null -> Color.Gray; latG < 0.3 -> MaterialTheme.rallyTraxColors.speedSafe; latG < 0.5 -> MaterialTheme.rallyTraxColors.fuelWarning; else -> MaterialTheme.rallyTraxColors.fuelCritical })
         }
 
         SensorRow(if (longG != null && longG < -0.05) "Brake" else "Accel",
             longG?.let { String.format(java.util.Locale.US, "%.2f", kotlin.math.abs(it)) } ?: "\u2014",
-            when { longG == null -> Color.Gray; longG > 0.05 -> Color(0xFF34A853); longG < -0.05 -> Color(0xFFEA4335); else -> Color.White.copy(alpha = 0.5f) })
+            when { longG == null -> Color.Gray; longG > 0.05 -> MaterialTheme.rallyTraxColors.speedSafe; longG < -0.05 -> MaterialTheme.rallyTraxColors.fuelCritical; else -> Color.White.copy(alpha = 0.5f) })
 
         val brakingFraction = kotlin.math.abs(longG ?: 0.0).toFloat().coerceIn(0f, 1f)
         Box(
@@ -596,7 +597,7 @@ private fun SensorHudOverlay(sensorData: SensorHudData, modifier: Modifier = Mod
                 modifier = Modifier
                     .fillMaxWidth(brakingFraction)
                     .height(4.dp)
-                    .background(if (brakingFraction > 0.4f) Color.Red else Color(0xFFFBBC04)),
+                    .background(if (brakingFraction > 0.4f) MaterialTheme.rallyTraxColors.fuelCritical else MaterialTheme.rallyTraxColors.fuelWarning),
             )
         }
 
