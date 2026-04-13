@@ -78,6 +78,7 @@ data class LibraryUiState(
     val attemptCounts: Map<String, Int> = emptyMap(),
     // Active filter summary
     val activeFilterCount: Int = 0,
+    val isLoading: Boolean = true,
 )
 
 private data class CategoryFilters(
@@ -292,6 +293,7 @@ class LibraryViewModel @Inject constructor(
             nearMeFilter = rngFilters.nearMeFilter,
             attemptCounts = attemptCounts,
             activeFilterCount = activeFilterCount,
+            isLoading = false,
         )
     }.stateIn(
         viewModelScope,

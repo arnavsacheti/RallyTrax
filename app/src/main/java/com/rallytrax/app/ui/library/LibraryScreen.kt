@@ -74,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.ui.components.ShimmerLoadingList
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -338,36 +339,38 @@ fun LibraryScreen(
                 }
             }
 
-            val visibleTracks = remember(uiState.tracks, pendingDeletes) {
-                val pendingIds = pendingDeletes.map { it.id }.toSet()
-                if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
-            }
-
-            if (visibleTracks.isEmpty()) {
-                // Empty state
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) "No routes found" else "No routes yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) {
-                                "Try a different search or adjust filters"
-                            } else {
-                                "Import a GPX or KML file to add a route"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+            if (uiState.isLoading) {
+                ShimmerLoadingList(modifier = Modifier.fillMaxSize())
             } else {
+                val visibleTracks = remember(uiState.tracks, pendingDeletes) {
+                    val pendingIds = pendingDeletes.map { it.id }.toSet()
+                    if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
+                }
+
+                if (visibleTracks.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) "No routes found" else "No routes yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) {
+                                    "Try a different search or adjust filters"
+                                } else {
+                                    "Import a GPX or KML file to add a route"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -456,6 +459,8 @@ fun LibraryScreen(
                         }
                     }
                 }
+            }
+
             }
         }
     }

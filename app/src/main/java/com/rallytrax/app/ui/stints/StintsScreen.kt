@@ -67,6 +67,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.ui.components.ShimmerLoadingList
 import com.rallytrax.app.ui.library.SortOption
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
@@ -227,35 +228,38 @@ fun StintsScreen(
                 }
             }
 
-            val visibleTracks = remember(uiState.tracks, pendingDeletes) {
-                val pendingIds = pendingDeletes.map { it.id }.toSet()
-                if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
-            }
-
-            if (visibleTracks.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = if (uiState.searchQuery.isNotEmpty()) "No stints found" else "No stints yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (uiState.searchQuery.isNotEmpty()) {
-                                "Try a different search"
-                            } else {
-                                "Record your first drive to create a stint"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+            if (uiState.isLoading) {
+                ShimmerLoadingList(modifier = Modifier.fillMaxSize())
             } else {
+                val visibleTracks = remember(uiState.tracks, pendingDeletes) {
+                    val pendingIds = pendingDeletes.map { it.id }.toSet()
+                    if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
+                }
+
+                if (visibleTracks.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (uiState.searchQuery.isNotEmpty()) "No stints found" else "No stints yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = if (uiState.searchQuery.isNotEmpty()) {
+                                    "Try a different search"
+                                } else {
+                                    "Record your first drive to create a stint"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -340,6 +344,8 @@ fun StintsScreen(
                         }
                     }
                 }
+            }
+
             }
         }
     }
