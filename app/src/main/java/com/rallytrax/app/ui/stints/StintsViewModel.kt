@@ -34,6 +34,7 @@ data class StintsUiState(
     val availableTags: Set<String> = emptySet(),
     val selectedTrackIds: Set<String> = emptySet(),
     val isMultiSelectMode: Boolean = false,
+    val isLoading: Boolean = true,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -117,6 +118,7 @@ class StintsViewModel @Inject constructor(
             availableTags = availableTags,
             selectedTrackIds = selectedIds,
             isMultiSelectMode = _isMultiSelectMode.value,
+            isLoading = false,
         )
     }.stateIn(
         viewModelScope,
