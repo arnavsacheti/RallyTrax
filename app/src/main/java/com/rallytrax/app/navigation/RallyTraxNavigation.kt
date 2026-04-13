@@ -150,6 +150,9 @@ fun RallyTraxNavHost(
                 onReplayTrack = { trackId ->
                     navController.navigate(ReplayHudRoute(trackId))
                 },
+                onVehicleClick = { vehicleId ->
+                    navController.navigate(VehicleDetailRoute(vehicleId))
+                },
                 onBack = { navController.popBackStack() },
             )
         }

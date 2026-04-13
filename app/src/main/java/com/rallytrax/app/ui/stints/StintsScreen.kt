@@ -23,10 +23,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -79,6 +82,7 @@ import com.rallytrax.app.util.speedUnit
 fun StintsScreen(
     onTrackClick: (String) -> Unit = {},
     onReplayTrack: (String) -> Unit = {},
+    onVehicleClick: (String) -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: StintsViewModel = hiltViewModel(),
 ) {
@@ -320,21 +324,25 @@ fun StintsScreen(
                             ) {
                                 StintListItem(
                                     track = track,
+                                    vehicleName = track.vehicleId?.let { uiState.vehicleNames[it] },
                                     isSelected = track.id in uiState.selectedTrackIds,
                                     isMultiSelectMode = false,
                                     unitSystem = preferences.unitSystem,
                                     onClick = { onTrackClick(track.id) },
                                     onLongClick = { viewModel.toggleMultiSelect(track.id) },
+                                    onVehicleClick = { track.vehicleId?.let { onVehicleClick(it) } },
                                 )
                             }
                         } else {
                             StintListItem(
                                 track = track,
+                                vehicleName = track.vehicleId?.let { uiState.vehicleNames[it] },
                                 isSelected = track.id in uiState.selectedTrackIds,
                                 isMultiSelectMode = true,
                                 unitSystem = preferences.unitSystem,
                                 onClick = { viewModel.toggleMultiSelect(track.id) },
                                 onLongClick = { viewModel.toggleMultiSelect(track.id) },
+                                onVehicleClick = { track.vehicleId?.let { onVehicleClick(it) } },
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -349,10 +357,12 @@ fun StintsScreen(
 @Composable
 private fun StintListItem(
     track: TrackEntity,
+    vehicleName: String?,
     isSelected: Boolean,
     isMultiSelectMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onVehicleClick: () -> Unit,
     modifier: Modifier = Modifier,
     unitSystem: UnitSystem = UnitSystem.METRIC,
 ) {
@@ -419,6 +429,30 @@ private fun StintListItem(
                         value = "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                     )
                 }
+            }
+
+            if (vehicleName != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AssistChip(
+                    onClick = onVehicleClick,
+                    label = {
+                        Text(
+                            text = vehicleName,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.DirectionsCar,
+                            contentDescription = null,
+                            modifier = Modifier.height(18.dp),
+                        )
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
             }
 
             if (track.tags.isNotBlank()) {
