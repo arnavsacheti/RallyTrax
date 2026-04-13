@@ -47,9 +47,10 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 // ButtonDefaults removed — moved to EditTrackScreen
@@ -155,6 +156,7 @@ fun TrackDetailScreen(
     onEdit: (String) -> Unit = {},
     onViewAllSegments: () -> Unit = {},
     onSegmentClick: (String) -> Unit = {},
+    onVehicleClick: (String) -> Unit = {},
     viewModel: TrackDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -373,6 +375,7 @@ fun TrackDetailScreen(
                         onGripEventClick = { viewModel.selectGripEvent(it) },
                         onPaceNoteClick = { viewModel.selectPaceNote(it) },
                         selectedPaceNoteIndex = uiState.selectedPaceNoteIndex,
+                        onVehicleClick = onVehicleClick,
                     )
                 }
             }
@@ -1720,6 +1723,7 @@ private fun ViewTab(
     onGripEventClick: (Int) -> Unit = {},
     onPaceNoteClick: (Int) -> Unit = {},
     selectedPaceNoteIndex: Int? = null,
+    onVehicleClick: (String) -> Unit = {},
 ) {
     val visible = visibleCards(activeLayers)
     Column(
@@ -1733,7 +1737,7 @@ private fun ViewTab(
         SummaryCard(track, uiState, unitSystem)
 
         Spacer(modifier = Modifier.height(12.dp))
-        TrackInfoChips(track, vehicleName)
+        TrackInfoChips(track, vehicleName, onVehicleClick)
 
         // Weather context badge
         val weather = uiState.weatherCondition
@@ -2365,14 +2369,18 @@ private fun RouteHistoryCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TrackInfoChips(track: com.rallytrax.app.data.local.entity.TrackEntity, vehicleName: String?) {
+private fun TrackInfoChips(track: com.rallytrax.app.data.local.entity.TrackEntity, vehicleName: String?, onVehicleClick: (String) -> Unit = {}) {
     FlowRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         vehicleName?.let {
-            AssistChip(onClick = {}, label = { Text(it) })
+            AssistChip(
+                onClick = { track.vehicleId?.let { id -> onVehicleClick(id) } },
+                label = { Text(it) },
+                leadingIcon = { Icon(Icons.Default.DirectionsCar, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            )
         }
         track.routeType?.let {
             AssistChip(onClick = {}, label = { Text(it) })
