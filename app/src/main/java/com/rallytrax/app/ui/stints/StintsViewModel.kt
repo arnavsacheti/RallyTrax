@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
+import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
@@ -19,12 +20,14 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class StintsUiState(
     val tracks: List<TrackEntity> = emptyList(),
+    val vehicleNames: Map<String, String> = emptyMap(),
     val searchQuery: String = "",
     val sortOption: SortOption = SortOption.DATE_NEWEST,
     val selectedTags: Set<String> = emptySet(),
@@ -40,6 +43,7 @@ class StintsViewModel @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val paceNoteDao: PaceNoteDao,
     private val gridCellDao: com.rallytrax.app.data.local.dao.GridCellDao,
+    private val vehicleDao: VehicleDao,
     preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -66,13 +70,17 @@ class StintsViewModel @Inject constructor(
         }
     }
 
+    private val vehicleNameMap = vehicleDao.observeAllVehicles().map { vehicles ->
+        vehicles.associate { it.id to it.name }
+    }
+
     val uiState: StateFlow<StintsUiState> = combine(
         allStints,
         _searchQuery,
         _sortOption,
         _selectedTags,
-        _selectedTrackIds,
-    ) { tracks, query, sort, tags, selectedIds ->
+        combine(_selectedTrackIds, vehicleNameMap) { ids, names -> ids to names },
+    ) { tracks, query, sort, tags, (selectedIds, vehicleNames) ->
         val availableTags = tracks
             .flatMap { it.tags.split(",").map { t -> t.trim() } }
             .filter { it.isNotBlank() }
@@ -102,6 +110,7 @@ class StintsViewModel @Inject constructor(
 
         StintsUiState(
             tracks = sorted,
+            vehicleNames = vehicleNames,
             searchQuery = query,
             sortOption = sort,
             selectedTags = tags,
