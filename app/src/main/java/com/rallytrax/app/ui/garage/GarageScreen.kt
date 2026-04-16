@@ -1,5 +1,10 @@
 package com.rallytrax.app.ui.garage
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -66,7 +71,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.ui.components.EmptyStateView
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.data.preferences.UserPreferencesData
@@ -148,32 +156,19 @@ fun GarageScreen(
         },
     ) { innerPadding ->
         if (uiState.vehicles.isEmpty() && !uiState.isLoading) {
-            // Empty state
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.DirectionsCar,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No vehicles yet",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Add your first car to start tracking per-vehicle stats!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    )
-                }
+                EmptyStateView(
+                    icon = Icons.Filled.DirectionsCar,
+                    title = "No vehicles yet",
+                    body = "Add your first car to start tracking per-vehicle stats.",
+                    actionLabel = "Add vehicle",
+                    onAction = { showAddVehicleSheet = true },
+                )
             }
         } else {
             LazyColumn(
@@ -202,15 +197,25 @@ fun GarageScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .clip(ShapeLargeIncreased)
+                                    .background(MaterialTheme.colorScheme.errorContainer)
                                     .padding(horizontal = 20.dp),
                                 contentAlignment = Alignment.CenterEnd,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Archive,
-                                    contentDescription = "Archive",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Archive,
+                                        contentDescription = "Archive",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Archive",
+                                        style = RallyTraxTypeEmphasized.labelLarge,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                    )
+                                }
                             }
                         },
                         enableDismissFromStartToEnd = false,
@@ -253,9 +258,9 @@ private fun VehicleCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(MaterialTheme.shapes.medium)
+            .clip(ShapeLargeIncreased)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape = MaterialTheme.shapes.medium,
+        shape = ShapeLargeIncreased,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -267,14 +272,30 @@ private fun VehicleCard(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Leading tinted badge showing vehicle type
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = vehicleTypeIcon(vehicle.vehicleType),
+                            contentDescription = vehicle.vehicleType,
+                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = vehicle.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            style = RallyTraxTypeEmphasized.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -285,15 +306,6 @@ private fun VehicleCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                    if (vehicle.vehicleType != "CAR") {
-                        Icon(
-                            imageVector = vehicleTypeIcon(vehicle.vehicleType),
-                            contentDescription = vehicle.vehicleType,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                     }
                     if (vehicle.isActive) {
                         Icon(
@@ -311,13 +323,13 @@ private fun VehicleCard(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
+                    HeroStatItem(
+                        value = formatDistance(vehicleWithStats.totalDistanceM, unitSystem),
+                        label = "distance",
+                    )
                     StatItem(
                         value = "${vehicleWithStats.trackCount}",
                         label = "tracks",
-                    )
-                    StatItem(
-                        value = formatDistance(vehicleWithStats.totalDistanceM, unitSystem),
-                        label = "distance",
                     )
                     vehicle.epaCombinedMpg?.let { mpg ->
                         StatItem(
@@ -350,8 +362,23 @@ private fun StatItem(value: String, label: String) {
     Column {
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = RallyTraxTypeEmphasized.bodyLarge,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun HeroStatItem(value: String, label: String) {
+    Column {
+        Text(
+            text = value,
+            style = RallyTraxTypeEmphasized.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
         )
         Text(
             text = label,
@@ -372,6 +399,21 @@ private fun WarningLight(warning: VehicleWarning) {
         VehicleWarning.MAINTENANCE_DUE -> Triple(Icons.Filled.Build, rtColors.maintenanceDue, "Maintenance due")
     }
 
+    val pulsesUrgently = warning == VehicleWarning.MAINTENANCE_DUE
+    val alpha = if (pulsesUrgently) {
+        val transition = rememberInfiniteTransition(label = "warning_pulse")
+        val pulse by transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 900),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "warning_pulse_alpha",
+        )
+        pulse
+    } else 1f
+
     @Suppress("DEPRECATION")
     val tooltipPosition = TooltipDefaults.rememberTooltipPositionProvider()
     TooltipBox(
@@ -381,15 +423,15 @@ private fun WarningLight(warning: VehicleWarning) {
     ) {
         Box(
             modifier = Modifier
-                .size(20.dp)
-                .background(color.copy(alpha = 0.15f), CircleShape),
+                .size(22.dp)
+                .background(color.copy(alpha = 0.15f * alpha + 0.12f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = description,
                 modifier = Modifier.size(14.dp),
-                tint = color,
+                tint = color.copy(alpha = alpha),
             )
         }
     }

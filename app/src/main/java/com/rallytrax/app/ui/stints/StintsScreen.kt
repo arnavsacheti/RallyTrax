@@ -72,6 +72,9 @@ import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.components.ShimmerLoadingList
 import com.rallytrax.app.ui.library.SortOption
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeFullRound
+import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -382,12 +385,12 @@ private fun StintListItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(MaterialTheme.shapes.medium)
+            .clip(ShapeLargeIncreased)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ),
-        shape = MaterialTheme.shapes.medium,
+        shape = ShapeLargeIncreased,
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
@@ -401,8 +404,7 @@ private fun StintListItem(
             ) {
                 Text(
                     text = track.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = RallyTraxTypeEmphasized.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -415,23 +417,31 @@ private fun StintListItem(
                 )
             }
 
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Hero primary metric: distance
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = formatDistance(track.distanceMeters, unitSystem),
+                    style = RallyTraxTypeEmphasized.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Secondary metrics
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                StintStatChip(
-                    label = "Distance",
-                    value = formatDistance(track.distanceMeters, unitSystem),
-                )
                 StintStatChip(
                     label = "Duration",
                     value = formatElapsedTime(track.durationMs),
                 )
                 if (track.avgSpeedMps > 0) {
                     StintStatChip(
-                        label = "Avg",
+                        label = "Avg speed",
                         value = "${formatSpeed(track.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
                     )
                 }
@@ -488,8 +498,7 @@ private fun StintStatChip(label: String, value: String) {
     Column {
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            style = RallyTraxTypeEmphasized.bodyMedium,
         )
         Text(
             text = label,

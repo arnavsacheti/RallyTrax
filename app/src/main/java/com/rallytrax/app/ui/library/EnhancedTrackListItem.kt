@@ -10,16 +10,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rallytrax.app.data.local.entity.TrackEntity
@@ -27,6 +30,8 @@ import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.components.DifficultyChip
 import com.rallytrax.app.ui.components.StatLabel
 import com.rallytrax.app.ui.components.SurfaceBreakdownBar
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -56,12 +61,12 @@ fun EnhancedTrackListItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(MaterialTheme.shapes.medium)
+            .clip(ShapeLargeIncreased)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ),
-        shape = MaterialTheme.shapes.medium,
+        shape = ShapeLargeIncreased,
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
@@ -73,8 +78,7 @@ fun EnhancedTrackListItem(
             ) {
                 Text(
                     text = track.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = RallyTraxTypeEmphasized.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -119,11 +123,20 @@ fun EnhancedTrackListItem(
 
             if (attemptCount > 1) {
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "$attemptCount attempts",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.EmojiEvents,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "$attemptCount attempts",
+                        style = RallyTraxTypeEmphasized.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
             }
 
             if (track.tags.isNotBlank()) {

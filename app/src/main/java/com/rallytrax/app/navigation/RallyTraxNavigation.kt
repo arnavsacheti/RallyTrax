@@ -1,5 +1,8 @@
 package com.rallytrax.app.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -7,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.rallytrax.app.data.auth.AuthState
+import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.achievements.AchievementsScreen
 import com.rallytrax.app.ui.social.FriendsScreen
 import com.rallytrax.app.ui.explore.ExploreScreen
@@ -44,6 +48,34 @@ fun RallyTraxNavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
+        enterTransition = {
+            fadeIn(animationSpec = RallyTraxMotion.slowEffects()) +
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = RallyTraxMotion.slowSpatial(),
+                )
+        },
+        exitTransition = {
+            fadeOut(animationSpec = RallyTraxMotion.slowEffects()) +
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = RallyTraxMotion.slowSpatial(),
+                )
+        },
+        popEnterTransition = {
+            fadeIn(animationSpec = RallyTraxMotion.slowEffects()) +
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = RallyTraxMotion.slowSpatial(),
+                )
+        },
+        popExitTransition = {
+            fadeOut(animationSpec = RallyTraxMotion.slowEffects()) +
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = RallyTraxMotion.slowSpatial(),
+                )
+        },
     ) {
         composable<OnboardingRoute> {
             OnboardingScreen(
