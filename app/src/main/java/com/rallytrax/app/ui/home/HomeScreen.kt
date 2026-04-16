@@ -82,6 +82,10 @@ import com.rallytrax.app.ui.components.GoalRing
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.theme.RallyTraxMotion
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeExtraLargeIncreased
+import com.rallytrax.app.ui.theme.ShapeFullRound
+import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
@@ -281,8 +285,7 @@ fun HomeScreen(
                     item(key = "feed_header") {
                         Text(
                             text = "Recent Drives",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = RallyTraxTypeEmphasized.titleMedium,
                             modifier = Modifier.padding(top = 4.dp),
                         )
                     }
@@ -321,8 +324,7 @@ fun HomeScreen(
                     item(key = "friends_header") {
                         Text(
                             text = "Friends",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = RallyTraxTypeEmphasized.titleMedium,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
@@ -421,16 +423,23 @@ private fun WeeklySummaryStrip(
     unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
     weeklyGoalProgress: Float? = null,
 ) {
+    val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+    )
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = Color.Transparent,
         ),
-        shape = MaterialTheme.shapes.large,
+        shape = ShapeExtraLargeIncreased,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .background(brush = gradient, shape = ShapeExtraLargeIncreased)
+                .padding(horizontal = 16.dp, vertical = 24.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -438,7 +447,7 @@ private fun WeeklySummaryStrip(
                 GoalRing(
                     progress = weeklyGoalProgress,
                     label = "Goal",
-                    size = 60.dp,
+                    size = 64.dp,
                     strokeWidth = 6.dp,
                 )
             } else {
@@ -449,7 +458,7 @@ private fun WeeklySummaryStrip(
                 )
             }
             VerticalDivider(
-                modifier = Modifier.height(36.dp),
+                modifier = Modifier.height(44.dp),
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
             )
             SummaryMetric(
@@ -458,7 +467,7 @@ private fun WeeklySummaryStrip(
                 modifier = Modifier.weight(1f),
             )
             VerticalDivider(
-                modifier = Modifier.height(36.dp),
+                modifier = Modifier.height(44.dp),
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
             )
             SummaryMetric(
@@ -482,14 +491,13 @@ private fun SummaryMetric(
     ) {
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = RallyTraxTypeEmphasized.headlineMedium,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = RallyTraxTypeEmphasized.labelSmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
         )
     }
@@ -650,8 +658,7 @@ private fun MotivationalCard(onRecord: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Record your first rally stage!",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = RallyTraxTypeEmphasized.titleMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -661,10 +668,13 @@ private fun MotivationalCard(onRecord: () -> Unit) {
                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
             )
             Spacer(modifier = Modifier.height(16.dp))
-            FilledTonalButton(onClick = onRecord) {
+            FilledTonalButton(
+                onClick = onRecord,
+                shape = ShapeFullRound,
+            ) {
                 Icon(Icons.Filled.FiberManualRecord, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Start Recording")
+                Text("Start Recording", style = RallyTraxTypeEmphasized.labelLarge)
             }
         }
     }
@@ -678,36 +688,52 @@ private fun MilestoneCard(
     onViewAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.primaryContainer,
+        ),
+    )
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            containerColor = Color.Transparent,
         ),
-        shape = MaterialTheme.shapes.medium,
+        shape = ShapeLargeIncreased,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(brush = gradient, shape = ShapeLargeIncreased)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Filled.EmojiEvents,
-                contentDescription = null,
-                modifier = Modifier.size(32.dp),
-                tint = Color(0xFFFFD700),
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.12f),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.EmojiEvents,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Achievement Unlocked!",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = RallyTraxTypeEmphasized.labelSmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                 )
                 Text(
                     text = achievement.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = RallyTraxTypeEmphasized.titleMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
                 Text(

@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Close
@@ -59,6 +58,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,12 +69,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.ui.components.EmptyStateView
 import com.rallytrax.app.ui.components.ShimmerLoadingList
+import com.rallytrax.app.ui.theme.RallyTraxMotion
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeFullRound
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.SearchOff
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -203,11 +210,24 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Filter button with badge
+                        // Filter button with badge — pulses on count change
+                        val filterCount = uiState.activeFilterCount
+                        val badgeScale = remember { Animatable(1f) }
+                        LaunchedEffect(filterCount) {
+                            if (filterCount > 0) {
+                                badgeScale.animateTo(1.3f, RallyTraxMotion.fastSpatial())
+                                badgeScale.animateTo(1f, RallyTraxMotion.fastSpatial())
+                            }
+                        }
                         BadgedBox(
                             badge = {
-                                if (uiState.activeFilterCount > 0) {
-                                    Badge { Text("${uiState.activeFilterCount}") }
+                                if (filterCount > 0) {
+                                    Badge(
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = badgeScale.value
+                                            scaleY = badgeScale.value
+                                        },
+                                    ) { Text("$filterCount") }
                                 }
                             },
                         ) {
@@ -269,7 +289,7 @@ fun LibraryScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(28.dp),
+                shape = ShapeFullRound,
                 colors = TextFieldDefaults.colors(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
@@ -287,7 +307,7 @@ fun LibraryScreen(
                 ) {
                     Text(
                         text = "${uiState.activeFilterCount} filter${if (uiState.activeFilterCount > 1) "s" else ""} active",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = RallyTraxTypeEmphasized.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     TextButton(onClick = { viewModel.clearAllFilters() }) {
@@ -348,25 +368,38 @@ fun LibraryScreen(
                 }
 
                 if (visibleTracks.isEmpty()) {
+                    val filteringActive = uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) "No routes found" else "No routes yet",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = if (uiState.searchQuery.isNotEmpty() || uiState.activeFilterCount > 0) {
-                                    "Try a different search or adjust filters"
-                                } else {
-                                    "Import a GPX or KML file to add a route"
+                        if (filteringActive) {
+                            EmptyStateView(
+                                icon = Icons.Filled.SearchOff,
+                                title = "No routes found",
+                                body = "Try a different search or adjust filters",
+                                actionLabel = "Clear filters",
+                                onAction = {
+                                    viewModel.updateSearchQuery("")
+                                    viewModel.clearAllFilters()
                                 },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            EmptyStateView(
+                                icon = Icons.Filled.Route,
+                                title = "No routes yet",
+                                body = "Import a GPX or KML file to add your first route.",
+                                actionLabel = "Import",
+                                onAction = {
+                                    importLauncher.launch(
+                                        arrayOf(
+                                            "application/gpx+xml",
+                                            "application/xml",
+                                            "text/xml",
+                                            "*/*",
+                                        ),
+                                    )
+                                },
                             )
                         }
                     }

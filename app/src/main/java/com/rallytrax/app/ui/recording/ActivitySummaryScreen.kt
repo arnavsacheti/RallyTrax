@@ -1,5 +1,6 @@
 package com.rallytrax.app.ui.recording
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,7 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +53,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.ui.components.AchievementPopup
 import com.rallytrax.app.ui.components.ConfettiOverlay
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeExtraLargeIncreased
+import com.rallytrax.app.ui.theme.ShapeFullRound
+import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatSpeed
@@ -105,8 +110,8 @@ fun ActivitySummaryScreen(
                     // Header
                     Text(
                         text = "Activity Complete",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = RallyTraxTypeEmphasized.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -227,34 +232,42 @@ fun ActivitySummaryScreen(
                     val prDelta = state.prDeltaMs
                     if (state.isPersonalRecord && prDelta != null) {
                         Spacer(modifier = Modifier.height(16.dp))
+                        val prBrush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                                MaterialTheme.colorScheme.primaryContainer,
+                            ),
+                        )
                         Card(
+                            shape = ShapeExtraLargeIncreased,
                             colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFFFF8E1),
+                                containerColor = androidx.compose.ui.graphics.Color.Transparent,
                             ),
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .background(brush = prBrush, shape = ShapeExtraLargeIncreased)
+                                    .padding(24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.EmojiEvents,
                                     contentDescription = "Trophy",
-                                    modifier = Modifier.size(48.dp),
-                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(56.dp),
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
                                     text = "New Personal Record!",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    style = RallyTraxTypeEmphasized.headlineMedium,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "${formatElapsedTime(abs(prDelta))} faster!",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = RallyTraxTypeEmphasized.titleMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                             }
                         }
@@ -383,10 +396,11 @@ fun ActivitySummaryScreen(
                         onClick = { viewModel.saveAndViewDetails() },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.isSaving,
+                        shape = ShapeFullRound,
                     ) {
                         Icon(Icons.Filled.Check, null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save & View Details")
+                        Text("Save & View Details", style = RallyTraxTypeEmphasized.labelLarge)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -394,6 +408,7 @@ fun ActivitySummaryScreen(
                     OutlinedButton(
                         onClick = { viewModel.shareActivity(context) },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = ShapeFullRound,
                     ) {
                         Icon(Icons.Filled.Share, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -405,6 +420,7 @@ fun ActivitySummaryScreen(
                     OutlinedButton(
                         onClick = { viewModel.discardTrack() },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = ShapeFullRound,
                     ) {
                         Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -438,31 +454,40 @@ private fun HeroStatCard(
     value: String,
     modifier: Modifier = Modifier,
 ) {
+    val gradient = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    )
     Card(
         modifier = modifier,
+        shape = ShapeLargeIncreased,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .background(brush = gradient, shape = ShapeLargeIncreased)
+                .padding(16.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                style = RallyTraxTypeEmphasized.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
     }

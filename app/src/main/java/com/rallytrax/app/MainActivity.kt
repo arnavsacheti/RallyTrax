@@ -17,8 +17,10 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -149,6 +151,13 @@ class MainActivity : ComponentActivity() {
                                         },
                                         label = { Text(topLevelRoute.label) },
                                         selected = selected,
+                                        colors = NavigationBarItemDefaults.colors(
+                                            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
                                         onClick = {
                                             navController.navigate(topLevelRoute.route) {
                                                 popUpTo(navController.graph.findStartDestination().id) {

@@ -65,6 +65,8 @@ import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
 import com.rallytrax.app.ui.components.Sparkline
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatSpeed
@@ -131,8 +133,7 @@ fun ProfileScreen(
             // Hero Stats — Lifetime
             Text(
                 text = "Lifetime Stats",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = RallyTraxTypeEmphasized.titleMedium,
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -219,8 +220,7 @@ fun ProfileScreen(
                         Column {
                             Text(
                                 text = "${profile.currentStreak} day streak!",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                style = RallyTraxTypeEmphasized.titleMedium,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
                             Text(
@@ -244,8 +244,7 @@ fun ProfileScreen(
             // Yearly Stats
             Text(
                 text = "This Year",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = RallyTraxTypeEmphasized.titleMedium,
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -667,12 +666,13 @@ private fun HeroStatCard(
 ) {
     Card(
         modifier = modifier,
+        shape = ShapeLargeIncreased,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(16.dp),
         ) {
             Icon(
                 imageVector = icon,
@@ -683,15 +683,15 @@ private fun HeroStatCard(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                style = RallyTraxTypeEmphasized.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

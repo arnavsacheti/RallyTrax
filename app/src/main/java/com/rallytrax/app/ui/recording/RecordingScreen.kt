@@ -88,6 +88,9 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.core.content.ContextCompat
 import com.rallytrax.app.recording.SensorHudData
+import com.rallytrax.app.ui.theme.RallyTraxMotion
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
+import com.rallytrax.app.ui.theme.ShapeFullRound
 import com.rallytrax.app.ui.theme.rallyTraxColors
 
 @Composable
@@ -210,7 +213,7 @@ fun RecordingScreen(
                 )
                 Row(
                     modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.6f), ShapeFullRound)
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -221,12 +224,12 @@ fun RecordingScreen(
                             .background(MaterialTheme.rallyTraxColors.recordingActive, CircleShape),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("REC", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("REC", color = Color.White, style = RallyTraxTypeEmphasized.labelMedium)
                 }
             } else if (data.isAutoPaused) {
                 Row(
                     modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.6f), ShapeFullRound)
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -236,7 +239,7 @@ fun RecordingScreen(
                             .background(MaterialTheme.rallyTraxColors.fuelWarning, CircleShape),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("AUTO-PAUSED", color = MaterialTheme.rallyTraxColors.fuelWarning, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("AUTO-PAUSED", color = MaterialTheme.rallyTraxColors.fuelWarning, style = RallyTraxTypeEmphasized.labelMedium)
                 }
             } else {
                 Spacer(modifier = Modifier.width(1.dp))
@@ -295,14 +298,13 @@ fun RecordingScreen(
             // === SPEED (always visible, above pager) ===
             Text(
                 text = formatSpeed(data.currentSpeed, preferences.unitSystem),
-                style = MaterialTheme.typography.displayLarge,
-                fontWeight = FontWeight.Bold,
+                style = RallyTraxTypeEmphasized.displayLarge,
                 color = Color.White,
             )
             Text(
                 text = speedUnit(preferences.unitSystem),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f),
+                style = RallyTraxTypeEmphasized.labelLarge,
+                color = Color.White.copy(alpha = 0.7f),
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -429,11 +431,12 @@ fun RecordingScreen(
                 // Stop button — morphs from circle to rounded-square
                 val stopCornerRadius by animateDpAsState(
                     targetValue = if (isRecording) 16.dp else 28.dp,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    animationSpec = RallyTraxMotion.fastSpatial(),
                     label = "stop_corner",
                 )
                 val stopContainerColor by animateColorAsState(
                     targetValue = if (isRecording) MaterialTheme.rallyTraxColors.fuelCritical else MaterialTheme.colorScheme.surfaceContainerHighest,
+                    animationSpec = RallyTraxMotion.fastEffects(),
                     label = "stop_color",
                 )
 
@@ -485,8 +488,8 @@ fun RecordingScreen(
 @Composable
 private fun MetricColumn(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+        Text(value, style = RallyTraxTypeEmphasized.titleLarge, color = Color.White)
+        Text(label, style = RallyTraxTypeEmphasized.labelSmall, color = Color.White.copy(alpha = 0.7f))
     }
 }
 
@@ -507,28 +510,48 @@ private fun GpsQualityBadge(accuracy: Float?) {
         accuracy == null -> "No GPS"
         else -> "${accuracy.toInt()}m"
     }
+    // Signal-strength bars: 0 (no GPS), 1 (poor), 2 (fair), 3 (good)
+    val bars = when {
+        accuracy == null -> 0
+        accuracy < 10f -> 3
+        accuracy < 25f -> 2
+        else -> 1
+    }
 
     Row(
         modifier = Modifier
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+            .background(Color.Black.copy(alpha = 0.6f), ShapeFullRound)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(gpsColor, CircleShape),
-        )
         Icon(
             imageVector = gpsIcon,
             contentDescription = "GPS quality",
             modifier = Modifier.size(14.dp),
-            tint = Color.White,
+            tint = gpsColor,
         )
+        // Signal-strength bars
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(1.5.dp),
+        ) {
+            listOf(5.dp, 8.dp, 11.dp).forEachIndexed { index, barHeight ->
+                val isActive = index < bars
+                Box(
+                    modifier = Modifier
+                        .width(2.5.dp)
+                        .height(barHeight)
+                        .background(
+                            color = if (isActive) gpsColor else Color.White.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(1.dp),
+                        ),
+                )
+            }
+        }
         Text(
             text = gpsLabel,
-            style = MaterialTheme.typography.labelSmall,
+            style = RallyTraxTypeEmphasized.labelSmall,
             color = Color.White,
         )
     }
