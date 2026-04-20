@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.classification.RouteClassifier
@@ -454,40 +455,33 @@ private fun HeroStatCard(
     value: String,
     modifier: Modifier = Modifier,
 ) {
-    val gradient = Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.secondaryContainer,
-        ),
-    )
     Card(
         modifier = modifier,
-        shape = ShapeLargeIncreased,
+        shape = com.rallytrax.app.ui.theme.ShapeSignature,
         colors = CardDefaults.cardColors(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
     ) {
         Column(
-            modifier = Modifier
-                .background(brush = gradient, shape = ShapeLargeIncreased)
-                .padding(16.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary,
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
+            Spacer(modifier = Modifier.height(10.dp))
+            com.rallytrax.app.ui.components.MonoText(
                 text = value,
-                style = RallyTraxTypeEmphasized.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            Text(
+            Spacer(modifier = Modifier.height(2.dp))
+            com.rallytrax.app.ui.components.OverlineLabel(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

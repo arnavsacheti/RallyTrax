@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -296,16 +297,22 @@ fun RecordingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // === SPEED (always visible, above pager) ===
-            Text(
-                text = formatSpeed(data.currentSpeed, preferences.unitSystem),
-                style = RallyTraxTypeEmphasized.displayLarge,
-                color = Color.White,
-            )
-            Text(
-                text = speedUnit(preferences.unitSystem),
-                style = RallyTraxTypeEmphasized.labelLarge,
-                color = Color.White.copy(alpha = 0.7f),
-            )
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
+                com.rallytrax.app.ui.components.MonoText(
+                    text = formatSpeed(data.currentSpeed, preferences.unitSystem),
+                    fontSize = 92.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = speedUnit(preferences.unitSystem),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.65f),
+                    modifier = Modifier.padding(bottom = 18.dp),
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
