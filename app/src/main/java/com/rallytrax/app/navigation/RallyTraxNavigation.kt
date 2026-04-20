@@ -137,15 +137,27 @@ fun RallyTraxNavHost(
             )
         }
         composable<LibraryRoute> {
-            LibraryScreen(
-                onTrackClick = { trackId ->
-                    navController.navigate(TrackDetailRoute(trackId))
-                },
+            com.rallytrax.app.ui.library.LibraryListDetailPane(
                 onReplayTrack = { trackId ->
                     navController.navigate(ReplayHudRoute(trackId))
                 },
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
+                },
+                onNavigateToEditTrack = { trackId ->
+                    navController.navigate(EditTrackRoute(trackId))
+                },
+                onNavigateToSegmentsList = {
+                    navController.navigate(SegmentsListRoute)
+                },
+                onNavigateToSegmentDetail = { segmentId ->
+                    navController.navigate(SegmentDetailRoute(segmentId))
+                },
+                onNavigateToVehicleDetail = { vehicleId ->
+                    navController.navigate(VehicleDetailRoute(vehicleId))
+                },
+                onNavigateToTrip = { tripId ->
+                    navController.navigate(TripDetailRoute(tripId))
                 },
                 isSignedIn = isSignedIn,
                 userPhotoUrl = userPhotoUrl,
