@@ -397,12 +397,10 @@ private fun BigStat(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(
+            com.rallytrax.app.ui.components.MonoText(
                 text = value,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.SemiBold,
                 fontSize = 22.sp,
-                letterSpacing = (-0.5).sp,
+                fontWeight = FontWeight.SemiBold,
                 color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             )
             if (unit != null) {
@@ -416,10 +414,8 @@ private fun BigStat(
             }
         }
         Spacer(Modifier.height(2.dp))
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            letterSpacing = 0.8.sp,
+        com.rallytrax.app.ui.components.OverlineLabel(
+            text = label,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
