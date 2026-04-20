@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.ui.components.EmptyStateView
@@ -273,6 +274,18 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            if (!uiState.isMultiSelectMode) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    com.rallytrax.app.ui.components.OverlineLabel(text = "Your routes")
+                    Text(
+                        text = "Library",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.8).sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
             // Search bar
             TextField(
                 value = uiState.searchQuery,

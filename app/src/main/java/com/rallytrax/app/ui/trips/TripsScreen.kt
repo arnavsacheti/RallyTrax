@@ -52,6 +52,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.util.formatDate
@@ -153,6 +154,15 @@ fun TripsScreen(
                     .padding(innerPadding),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                item(key = "totals") {
+                    TripsTotalsStrip(
+                        tripCount = visibleTrips.size,
+                        stintCount = visibleTrips.sumOf { it.trackCount },
+                        totalDistanceMeters = visibleTrips.sumOf { it.totalDistanceMeters },
+                        totalDurationMs = visibleTrips.sumOf { it.totalDurationMs },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
                 items(
                     items = visibleTrips,
                     key = { it.trip.id },
@@ -277,6 +287,48 @@ private fun TripListItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TripsTotalsStrip(
+    tripCount: Int,
+    stintCount: Int,
+    totalDistanceMeters: Double,
+    totalDurationMs: Long,
+    modifier: Modifier = Modifier,
+) {
+    com.rallytrax.app.ui.components.HeroGradientCard(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = 16.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            TripsTotalCell(label = "Trips", value = tripCount.toString())
+            TripsTotalCell(label = "Stints", value = stintCount.toString())
+            TripsTotalCell(label = "Distance", value = formatDistance(totalDistanceMeters))
+            if (totalDurationMs > 0) {
+                TripsTotalCell(label = "Time", value = formatElapsedTime(totalDurationMs))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TripsTotalCell(label: String, value: String) {
+    Column {
+        com.rallytrax.app.ui.components.MonoText(
+            text = value,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        com.rallytrax.app.ui.components.OverlineLabel(
+            text = label,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+        )
     }
 }
 

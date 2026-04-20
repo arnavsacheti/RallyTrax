@@ -227,34 +227,21 @@ private fun SharePreviewCard(
     unitSystem: UnitSystem,
     caption: String,
 ) {
-    val gradient = Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.tertiaryContainer,
-        ),
-    )
-    val onContainer = MaterialTheme.colorScheme.onSurface
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(gradient, RoundedCornerShape(24.dp))
-            .padding(16.dp),
+    com.rallytrax.app.ui.components.HeroGradientCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = 16.dp,
     ) {
-        Text(
-            text = "STINT",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = muted,
-            letterSpacing = 0.8.sp,
+      androidx.compose.foundation.layout.Column {
+        com.rallytrax.app.ui.components.OverlineLabel(
+            text = "Stint",
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = track.name,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            color = onContainer,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         Spacer(Modifier.height(12.dp))
         Row(
@@ -283,9 +270,10 @@ private fun SharePreviewCard(
             Text(
                 text = "\u201C${caption}\u201D",
                 style = MaterialTheme.typography.bodySmall,
-                color = onContainer.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
             )
         }
+      }
     }
 }
 
