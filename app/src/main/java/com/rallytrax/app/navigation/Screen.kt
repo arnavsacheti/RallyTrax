@@ -49,6 +49,7 @@ data class TopLevelRoute(
 @Serializable data object CommonRoutesRoute
 @Serializable data class CommonRouteDetailRoute(val routeId: String)
 @Serializable data object AnalyticsRoute
+@Serializable data object YearInReviewRoute
 
 val topLevelRoutes = listOf(
     TopLevelRoute(

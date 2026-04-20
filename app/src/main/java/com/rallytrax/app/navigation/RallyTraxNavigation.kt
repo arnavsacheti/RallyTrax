@@ -187,6 +187,9 @@ fun RallyTraxNavHost(
                 onNavigateToAnalytics = {
                     navController.navigate(AnalyticsRoute)
                 },
+                onNavigateToYearInReview = {
+                    navController.navigate(YearInReviewRoute)
+                },
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
@@ -204,6 +207,11 @@ fun RallyTraxNavHost(
         }
         composable<AnalyticsRoute> {
             com.rallytrax.app.ui.profile.AnalyticsScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<YearInReviewRoute> {
+            com.rallytrax.app.ui.yearinreview.YearInReviewScreen(
                 onBack = { navController.popBackStack() },
             )
         }
