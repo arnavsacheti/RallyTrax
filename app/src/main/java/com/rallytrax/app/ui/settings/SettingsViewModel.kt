@@ -172,6 +172,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
     }
 
+    fun setOledDark(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setOledDark(enabled) }
+    }
+
     fun showDeleteConfirmation() {
         _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
     }

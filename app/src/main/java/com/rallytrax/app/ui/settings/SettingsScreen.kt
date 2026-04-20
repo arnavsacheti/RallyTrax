@@ -322,6 +322,35 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                if (preferences.themeMode != ThemeMode.LIGHT) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "OLED Dark",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "True-black backgrounds for AMOLED displays",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = preferences.oledDark,
+                            onCheckedChange = { settingsViewModel.setOledDark(it) },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Toggle OLED dark theme"
+                            },
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

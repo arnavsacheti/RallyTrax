@@ -51,6 +51,44 @@ private val LightColorScheme = lightColorScheme(
     scrim = ScrimColor,
 )
 
+private val OledDarkColorScheme = darkColorScheme(
+    primary = PrimaryDark,
+    onPrimary = OnPrimaryDark,
+    primaryContainer = PrimaryContainerDark,
+    onPrimaryContainer = OnPrimaryContainerDark,
+    secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
+    error = ErrorDark,
+    onError = OnErrorDark,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark,
+    background = OledBackground,
+    onBackground = OnBackgroundDark,
+    surface = OledSurface,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    surfaceContainerLowest = OledSurfaceContainerLowest,
+    surfaceContainerLow = OledSurfaceContainerLow,
+    surfaceContainer = OledSurfaceContainer,
+    surfaceContainerHigh = OledSurfaceContainerHigh,
+    surfaceContainerHighest = OledSurfaceContainerHighest,
+    surfaceDim = OledSurfaceDim,
+    surfaceBright = OledSurfaceBright,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    inverseSurface = InverseSurfaceDark,
+    inverseOnSurface = InverseOnSurfaceDark,
+    inversePrimary = InversePrimaryDark,
+    scrim = ScrimColor,
+)
+
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
     onPrimary = OnPrimaryDark,
@@ -94,6 +132,7 @@ fun RallyTraxTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = true,
     ruggedMode: Boolean = false,
+    oledDark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (themeMode) {
@@ -102,7 +141,11 @@ fun RallyTraxTheme(
         ThemeMode.DARK -> true
     }
 
+    // OLED takes precedence over dynamic color when enabled: a true-black surface
+    // is only achievable by using our static palette (dynamic color picks tonal
+    // grays derived from the wallpaper).
     val colorScheme = when {
+        darkTheme && oledDark -> OledDarkColorScheme
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

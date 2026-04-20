@@ -57,6 +57,7 @@ data class UserPreferencesData(
     val halfStepSeverityEnabled: Boolean = false, // opt-in +/- severity (16 graduations)
     val onboardingCompleted: Boolean = false,
     val keepScreenOn: Boolean = false,
+    val oledDark: Boolean = false,
     // Activity lifecycle preferences
     val autoPauseEnabled: Boolean = true,
     val autoPauseDelaySeconds: Int = 30,
@@ -89,6 +90,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val HALF_STEP_SEVERITY_ENABLED = booleanPreferencesKey("half_step_severity_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val OLED_DARK = booleanPreferencesKey("oled_dark")
         // Activity lifecycle
         val AUTO_PAUSE_ENABLED = booleanPreferencesKey("auto_pause_enabled")
         val AUTO_PAUSE_DELAY_SECONDS = intPreferencesKey("auto_pause_delay_seconds")
@@ -136,6 +138,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             halfStepSeverityEnabled = prefs[Keys.HALF_STEP_SEVERITY_ENABLED] ?: false,
             onboardingCompleted = prefs[Keys.ONBOARDING_COMPLETED] ?: false,
             keepScreenOn = prefs[Keys.KEEP_SCREEN_ON] ?: false,
+            oledDark = prefs[Keys.OLED_DARK] ?: false,
             autoPauseEnabled = prefs[Keys.AUTO_PAUSE_ENABLED] ?: true,
             autoPauseDelaySeconds = prefs[Keys.AUTO_PAUSE_DELAY_SECONDS] ?: 30,
             weeklyDistanceGoalKm = prefs[Keys.WEEKLY_DISTANCE_GOAL_KM],
@@ -217,6 +220,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setKeepScreenOn(enabled: Boolean) {
         dataStore.edit { it[Keys.KEEP_SCREEN_ON] = enabled }
+    }
+
+    suspend fun setOledDark(enabled: Boolean) {
+        dataStore.edit { it[Keys.OLED_DARK] = enabled }
     }
 
     suspend fun setLastSyncTime(time: Long) {

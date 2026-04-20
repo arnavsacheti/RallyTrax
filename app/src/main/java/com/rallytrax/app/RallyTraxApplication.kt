@@ -16,6 +16,7 @@ import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderF
 import com.google.firebase.auth.FirebaseAuth
 import com.rallytrax.app.data.local.BackfillWorker
 import com.rallytrax.app.data.sync.SyncManager
+import com.rallytrax.app.notifications.NotificationChannels
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -35,6 +36,10 @@ class RallyTraxApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Register every notification channel up-front so first-use of any
+        // notification type hits an already-registered channel.
+        NotificationChannels.registerAll(this)
 
         // Initialize Firebase App Check for attestation
         FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
