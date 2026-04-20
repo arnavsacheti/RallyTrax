@@ -84,6 +84,8 @@ import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.GoalRing
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowWidthSizeClass
 import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
 import com.rallytrax.app.ui.theme.ShapeExtraLargeIncreased
@@ -151,6 +153,12 @@ fun HomeScreen(
     var showReplaySheet by remember { mutableStateOf(false) }
     var showFillUpSheet by remember { mutableStateOf(false) }
 
+    // On Medium+ screens the navigation rail/drawer already surfaces Record,
+    // so the Home FAB menu (which duplicates Record and clutters larger
+    // layouts) is only shown on Compact.
+    val isCompactWidth = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass ==
+        WindowWidthSizeClass.COMPACT
+
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     fun requestRecording() {
@@ -188,28 +196,30 @@ fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            RallyTraxFabMenu(
-                expanded = isFabMenuExpanded,
-                onToggle = { isFabMenuExpanded = !isFabMenuExpanded },
-                onRecord = {
-                    isFabMenuExpanded = false
-                    requestRecording()
-                },
-                onReplay = {
-                    isFabMenuExpanded = false
-                    showReplaySheet = true
-                },
-                onImportGpx = {
-                    isFabMenuExpanded = false
-                    gpxImportLauncher.launch(
-                        arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
-                    )
-                },
-                onLogFillUp = {
-                    isFabMenuExpanded = false
-                    showFillUpSheet = true
-                },
-            )
+            if (isCompactWidth) {
+                RallyTraxFabMenu(
+                    expanded = isFabMenuExpanded,
+                    onToggle = { isFabMenuExpanded = !isFabMenuExpanded },
+                    onRecord = {
+                        isFabMenuExpanded = false
+                        requestRecording()
+                    },
+                    onReplay = {
+                        isFabMenuExpanded = false
+                        showReplaySheet = true
+                    },
+                    onImportGpx = {
+                        isFabMenuExpanded = false
+                        gpxImportLauncher.launch(
+                            arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
+                        )
+                    },
+                    onLogFillUp = {
+                        isFabMenuExpanded = false
+                        showFillUpSheet = true
+                    },
+                )
+            }
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
