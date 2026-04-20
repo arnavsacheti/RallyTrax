@@ -99,6 +99,17 @@ val InversePrimaryDark = Color(0xFF1A73E8)     // tone 40
 
 val ScrimColor = Color(0xFF000000)             // tone 0
 
+// ── OLED dark palette (true-black backgrounds for AMOLED displays) ───────────
+val OledBackground = Color(0xFF000000)
+val OledSurface = Color(0xFF000000)
+val OledSurfaceContainerLowest = Color(0xFF000000)
+val OledSurfaceContainerLow = Color(0xFF0A0A0A)
+val OledSurfaceContainer = Color(0xFF121212)
+val OledSurfaceContainerHigh = Color(0xFF1A1A1A)
+val OledSurfaceContainerHighest = Color(0xFF242424)
+val OledSurfaceDim = Color(0xFF000000)
+val OledSurfaceBright = Color(0xFF2A2A2A)
+
 // ── Map layer tokens (constant across light/dark themes) ─────────────────────
 val LayerSpeedLow = Color(0xFF34A853)
 val LayerSpeedMid = Color(0xFFFBBC04)

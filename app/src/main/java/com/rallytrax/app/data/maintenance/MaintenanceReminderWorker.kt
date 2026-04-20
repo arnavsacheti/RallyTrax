@@ -1,6 +1,5 @@
 package com.rallytrax.app.data.maintenance
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.util.Log
@@ -12,6 +11,7 @@ import com.rallytrax.app.R
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.VehicleDao
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
+import com.rallytrax.app.notifications.NotificationChannels
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -32,8 +32,6 @@ class MaintenanceReminderWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            ensureNotificationChannel()
-
             val schedules = maintenanceDao.getAllActiveSchedules()
             val now = System.currentTimeMillis()
 
@@ -99,21 +97,9 @@ class MaintenanceReminderWorker @AssistedInject constructor(
         notificationManager.notify(serviceType.hashCode(), notification)
     }
 
-    private fun ensureNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Maintenance Reminders",
-            NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply {
-            description = "Reminders for upcoming and overdue vehicle maintenance"
-        }
-        val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
-    }
-
     companion object {
         private const val TAG = "MaintenanceReminderWorker"
-        const val CHANNEL_ID = "maintenance_reminders"
+        const val CHANNEL_ID = NotificationChannels.MAINTENANCE
         const val WORK_NAME = "maintenance_reminder_check"
     }
 }

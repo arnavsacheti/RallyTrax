@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
 
             var showProfileSheet by remember { mutableStateOf(false) }
 
-            RallyTraxTheme(themeMode = prefs.themeMode) {
+            RallyTraxTheme(themeMode = prefs.themeMode, oledDark = prefs.oledDark) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
