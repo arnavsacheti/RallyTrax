@@ -135,6 +135,10 @@ fun ProfileScreen(
                     onFriends = onNavigateToFriends,
                     onAchievements = onNavigateToAchievements,
                     onYearInReview = onNavigateToYearInReview,
+                    showYearInReview = yearInReviewVisible(
+                        today = LocalDate.now(),
+                        totalDrives = profile.totalDrives,
+                    ),
                 )
 
                 Text(
@@ -625,18 +629,21 @@ private fun SettingsList(
     onFriends: () -> Unit,
     onAchievements: () -> Unit,
     onYearInReview: () -> Unit,
+    showYearInReview: Boolean,
 ) {
-    val rows = listOf(
-        Row4(Icons.Filled.DirectionsCar, "Garage", "Manage your vehicles", onGarage),
-        Row4(Icons.Filled.Route, "Stints", "All recorded drives", onStints),
-        Row4(Icons.Filled.Map, "Trips", "Group drives into trips", onTrips),
-        Row4(Icons.Filled.TrendingUp, "Common routes", "Routes you drive often", onCommonRoutes),
-        Row4(Icons.Filled.BarChart, "Driving analytics", "Trends, weather, vehicle mix", onAnalytics),
-        Row4(Icons.Filled.EmojiEvents, "Achievements", "Track milestones", onAchievements),
-        Row4(Icons.Filled.People, "Friends", "Follow and connect", onFriends),
-        Row4(Icons.Filled.CalendarMonth, "Year in review", "Your year in drives", onYearInReview),
-        Row4(Icons.Filled.Settings, "Preferences", "Units, map style, voice", onPreferences),
-    )
+    val rows = buildList {
+        add(Row4(Icons.Filled.DirectionsCar, "Garage", "Manage your vehicles", onGarage))
+        add(Row4(Icons.Filled.Route, "Stints", "All recorded drives", onStints))
+        add(Row4(Icons.Filled.Map, "Trips", "Group drives into trips", onTrips))
+        add(Row4(Icons.Filled.TrendingUp, "Common routes", "Routes you drive often", onCommonRoutes))
+        add(Row4(Icons.Filled.BarChart, "Driving analytics", "Trends, weather, vehicle mix", onAnalytics))
+        add(Row4(Icons.Filled.EmojiEvents, "Achievements", "Track milestones", onAchievements))
+        add(Row4(Icons.Filled.People, "Friends", "Follow and connect", onFriends))
+        if (showYearInReview) {
+            add(Row4(Icons.Filled.CalendarMonth, "Year in review", "Your year in drives", onYearInReview))
+        }
+        add(Row4(Icons.Filled.Settings, "Preferences", "Units, map style, voice", onPreferences))
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -657,6 +664,16 @@ private fun SettingsList(
             }
         }
     }
+}
+
+/**
+ * Year-in-Review entry is only shown between Dec 15 and Jan 31 (inclusive),
+ * and only once the user has at least 10 drives — the review needs data to be
+ * meaningful and the entry should fade out during the rest of the year.
+ */
+internal fun yearInReviewVisible(today: LocalDate, totalDrives: Int): Boolean {
+    if (totalDrives < 10) return false
+    return (today.monthValue == 12 && today.dayOfMonth >= 15) || today.monthValue == 1
 }
 
 private data class Row4(
