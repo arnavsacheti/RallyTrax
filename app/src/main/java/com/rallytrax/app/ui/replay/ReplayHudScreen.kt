@@ -90,6 +90,9 @@ import com.rallytrax.app.ui.map.OsmPolylineData
 import com.rallytrax.app.ui.map.ColoredSegment
 import com.rallytrax.app.ui.map.PaceNoteIconRenderer
 import com.rallytrax.app.ui.map.buildColoredSegments
+import com.rallytrax.app.ui.util.FoldingPosture
+import com.rallytrax.app.ui.util.rememberFoldingPosture
+import androidx.compose.foundation.layout.fillMaxHeight
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
@@ -171,6 +174,12 @@ fun ReplayHudScreen(
         if (uiState.isActive) showExitDialog = true else onExit()
     }
 
+    // Foldable in book posture (vertical hinge, phone open like a book): keep
+    // the map on the left page so the right page is free for the overlays to
+    // sit over without crossing the hinge.
+    val posture by rememberFoldingPosture()
+    val isBookPosture = posture == FoldingPosture.Book
+
     MaterialTheme(colorScheme = darkColorScheme()) {
         Box(
             modifier = Modifier
@@ -190,8 +199,19 @@ fun ReplayHudScreen(
                     }
                 }
             } else {
-                // Full-screen map
-                ReplayMap(uiState, viewModel, preferences.mapProvider)
+                // Full-screen map, or the left page in book posture.
+                Box(
+                    modifier = if (isBookPosture) {
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth(0.5f)
+                            .fillMaxHeight()
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
+                ) {
+                    ReplayMap(uiState, viewModel, preferences.mapProvider)
+                }
 
                 // ── Thin progress bar at very top ──
                 LinearProgressIndicator(
