@@ -97,6 +97,7 @@ fun LibraryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val pendingDeletes by viewModel.pendingDeletes.collectAsStateWithLifecycle()
+    val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -476,6 +477,7 @@ fun LibraryScreen(
                                     onClick = { onTrackClick(track.id) },
                                     onLongClick = { viewModel.toggleMultiSelect(track.id) },
                                     attemptCount = uiState.attemptCounts[track.name] ?: 1,
+                                    thumbnailPoints = thumbnails[track.id],
                                 )
                             }
                         } else {
@@ -488,6 +490,7 @@ fun LibraryScreen(
                                 onLongClick = { viewModel.toggleMultiSelect(track.id) },
                                 modifier = Modifier.animateItem(),
                                 attemptCount = uiState.attemptCounts[track.name] ?: 1,
+                                thumbnailPoints = thumbnails[track.id],
                             )
                         }
                     }

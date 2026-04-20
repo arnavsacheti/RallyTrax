@@ -195,6 +195,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.appcheck.playintegrity)
+    implementation(libs.firebase.ai)
 
     // Google Sign-In (Credential Manager)
     implementation(libs.credentials)

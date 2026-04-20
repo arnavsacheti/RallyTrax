@@ -69,6 +69,16 @@ class RallyTraxApplication : Application(), Configuration.Provider {
             maintenanceReminderRequest,
         )
 
+        // Schedule periodic trip detection (every 6 hours)
+        val tripDetectionRequest = PeriodicWorkRequestBuilder<com.rallytrax.app.data.trips.TripDetectionWorker>(
+            6, TimeUnit.HOURS,
+        ).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            com.rallytrax.app.data.trips.TripDetectionWorker.UNIQUE_PERIODIC_WORK,
+            ExistingPeriodicWorkPolicy.KEEP,
+            tripDetectionRequest,
+        )
+
         // Schedule gas station cache refresh (monthly, requires network)
         val gasStationRequest = PeriodicWorkRequestBuilder<com.rallytrax.app.data.fuel.GasStationCacheWorker>(
             30, TimeUnit.DAYS,

@@ -25,11 +25,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rallytrax.app.data.local.dao.LatLonSpeedProjection
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.components.DifficultyChip
+import com.rallytrax.app.ui.components.ShimmerPlaceholder
 import com.rallytrax.app.ui.components.StatLabel
 import com.rallytrax.app.ui.components.SurfaceBreakdownBar
+import com.rallytrax.app.ui.components.TrackThumbnail
 import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
 import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.util.formatDate
@@ -50,6 +53,7 @@ fun EnhancedTrackListItem(
     modifier: Modifier = Modifier,
     unitSystem: UnitSystem = UnitSystem.METRIC,
     attemptCount: Int = 1,
+    thumbnailPoints: List<LatLonSpeedProjection>? = null,
 ) {
     val containerColor = if (isSelected) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -71,6 +75,23 @@ fun EnhancedTrackListItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            when {
+                thumbnailPoints == null -> ShimmerPlaceholder(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp),
+                    shape = MaterialTheme.shapes.medium,
+                )
+                thumbnailPoints.size >= 2 -> TrackThumbnail(
+                    track = track,
+                    points = thumbnailPoints,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (thumbnailPoints == null || thumbnailPoints.size >= 2) {
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

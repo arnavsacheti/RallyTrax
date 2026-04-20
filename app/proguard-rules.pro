@@ -97,6 +97,10 @@
 # Firebase App Check
 -keep class com.google.firebase.appcheck.** { *; }
 
+# Firebase AI Logic (Gemini)
+-keep class com.google.firebase.ai.** { *; }
+-dontwarn com.google.firebase.ai.**
+
 # Coil
 -keep class coil.** { *; }
 -dontwarn coil.**

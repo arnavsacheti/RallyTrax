@@ -407,6 +407,18 @@ class TrackingService : LifecycleService() {
             _recordingData.value = RecordingData.EMPTY
             _sensorHudData.value = SensorHudData.EMPTY
 
+            // Trigger trip detection after recording completes
+            try {
+                val tripDetectRequest = androidx.work.OneTimeWorkRequestBuilder<com.rallytrax.app.data.trips.TripDetectionWorker>().build()
+                androidx.work.WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                    com.rallytrax.app.data.trips.TripDetectionWorker.UNIQUE_ONE_SHOT_WORK,
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    tripDetectRequest,
+                )
+            } catch (_: Exception) {
+                // Non-critical — periodic detection will catch it
+            }
+
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }

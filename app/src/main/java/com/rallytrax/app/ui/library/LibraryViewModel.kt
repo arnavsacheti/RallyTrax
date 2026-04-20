@@ -9,6 +9,7 @@ import com.google.android.gms.location.LocationServices
 import com.rallytrax.app.data.classification.RouteClassifier
 import com.rallytrax.app.data.gpx.GpxParseException
 import com.rallytrax.app.data.local.GridCellComputer
+import com.rallytrax.app.data.local.dao.LatLonSpeedProjection
 import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -27,9 +28,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.math.atan2
@@ -138,12 +142,20 @@ class LibraryViewModel @Inject constructor(
     private val _pendingDeletes = MutableStateFlow<List<TrackEntity>>(emptyList())
     val pendingDeletes: StateFlow<List<TrackEntity>> = _pendingDeletes.asStateFlow()
 
+    private val _thumbnails = MutableStateFlow<Map<String, List<LatLonSpeedProjection>>>(emptyMap())
+    val thumbnails: StateFlow<Map<String, List<LatLonSpeedProjection>>> = _thumbnails.asStateFlow()
+
+    private val thumbnailFetchMutex = Mutex()
+    private val thumbnailsInFlight = mutableSetOf<String>()
+
     private val allTracks = _searchQuery.flatMapLatest { query ->
         if (query.isBlank()) {
             trackDao.getRoutes()
         } else {
             trackDao.searchRoutes(query)
         }
+    }.onEach { tracks ->
+        prefetchThumbnails(tracks.map { it.id })
     }
 
     private val categoryFilters = combine(
@@ -477,6 +489,43 @@ class LibraryViewModel @Inject constructor(
             }
         }
         _pendingDeletes.value = emptyList()
+    }
+
+    private fun prefetchThumbnails(trackIds: List<String>) {
+        if (trackIds.isEmpty()) return
+        viewModelScope.launch {
+            val toFetch = thumbnailFetchMutex.withLock {
+                val cached = _thumbnails.value.keys
+                trackIds.filter { it !in cached && it !in thumbnailsInFlight }
+                    .also { thumbnailsInFlight.addAll(it) }
+            }
+            if (toFetch.isEmpty()) return@launch
+            withContext(ioDispatcher) {
+                for (id in toFetch) {
+                    val raw = try {
+                        trackPointDao.getLatLonSpeedForTrack(id)
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                    val sampled = subsample(raw, targetPoints = 150)
+                    _thumbnails.value = _thumbnails.value + (id to sampled)
+                }
+            }
+            thumbnailFetchMutex.withLock { thumbnailsInFlight.removeAll(toFetch.toSet()) }
+        }
+    }
+
+    private fun subsample(
+        points: List<LatLonSpeedProjection>,
+        targetPoints: Int,
+    ): List<LatLonSpeedProjection> {
+        if (points.size <= targetPoints) return points
+        val stride = points.size / targetPoints
+        if (stride <= 1) return points
+        val sampled = ArrayList<LatLonSpeedProjection>(targetPoints + 1)
+        for (i in points.indices step stride) sampled.add(points[i])
+        if (sampled.lastOrNull() !== points.last()) sampled.add(points.last())
+        return sampled
     }
 
     private fun recomputeGridCells() {

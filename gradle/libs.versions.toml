@@ -86,6 +86,7 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
+firebase-ai = { group = "com.google.firebase", name = "firebase-ai" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

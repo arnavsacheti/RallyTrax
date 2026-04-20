@@ -27,10 +27,14 @@ import com.rallytrax.app.data.local.entity.MaintenanceRecordEntity
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
 import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.SegmentRunEntity
+import com.rallytrax.app.data.local.dao.CommonRouteDao
 import com.rallytrax.app.data.local.dao.TripDao
+import com.rallytrax.app.data.local.dao.TripSuggestionDao
 import com.rallytrax.app.data.local.dao.VehiclePartDao
 import com.rallytrax.app.data.local.dao.WeatherDao
+import com.rallytrax.app.data.local.entity.CommonRouteEntity
 import com.rallytrax.app.data.local.entity.TripEntity
+import com.rallytrax.app.data.local.entity.TripSuggestionEntity
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.local.entity.VehiclePartEntity
 import com.rallytrax.app.data.local.entity.WeatherEntity
@@ -53,8 +57,10 @@ import com.rallytrax.app.data.local.entity.WeatherEntity
         WeatherEntity::class,
         VehiclePartEntity::class,
         TripEntity::class,
+        TripSuggestionEntity::class,
+        CommonRouteEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -72,6 +78,8 @@ abstract class RallyTraxDatabase : RoomDatabase() {
     abstract fun weatherDao(): WeatherDao
     abstract fun vehiclePartDao(): VehiclePartDao
     abstract fun tripDao(): TripDao
+    abstract fun tripSuggestionDao(): TripSuggestionDao
+    abstract fun commonRouteDao(): CommonRouteDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -452,6 +460,55 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                 """)
                 db.execSQL("ALTER TABLE `tracks` ADD COLUMN `tripId` TEXT")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_tripId` ON `tracks` (`tripId`)")
+            }
+        }
+
+        val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Trip suggestions table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `trip_suggestions` (
+                        `id` TEXT NOT NULL,
+                        `stintIds` TEXT NOT NULL,
+                        `suggestedName` TEXT NOT NULL,
+                        `status` TEXT NOT NULL DEFAULT 'pending',
+                        `confidenceScore` REAL NOT NULL DEFAULT 0.0,
+                        `totalDistanceMeters` REAL NOT NULL DEFAULT 0.0,
+                        `totalDurationMs` INTEGER NOT NULL DEFAULT 0,
+                        `stintCount` INTEGER NOT NULL DEFAULT 0,
+                        `startTimestamp` INTEGER NOT NULL DEFAULT 0,
+                        `endTimestamp` INTEGER NOT NULL DEFAULT 0,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `aiGeneratedName` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                """)
+
+                // Common routes table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `common_routes` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `description` TEXT,
+                        `stintIds` TEXT NOT NULL,
+                        `representativeTrackId` TEXT NOT NULL,
+                        `driveCount` INTEGER NOT NULL DEFAULT 0,
+                        `startLat` REAL NOT NULL DEFAULT 0.0,
+                        `startLon` REAL NOT NULL DEFAULT 0.0,
+                        `endLat` REAL NOT NULL DEFAULT 0.0,
+                        `endLon` REAL NOT NULL DEFAULT 0.0,
+                        `avgDistanceMeters` REAL NOT NULL DEFAULT 0.0,
+                        `avgDurationMs` INTEGER NOT NULL DEFAULT 0,
+                        `bestDurationMs` INTEGER NOT NULL DEFAULT 0,
+                        `avgSpeedMps` REAL NOT NULL DEFAULT 0.0,
+                        `lastDrivenAt` INTEGER NOT NULL DEFAULT 0,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `aiDescription` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                """)
             }
         }
 

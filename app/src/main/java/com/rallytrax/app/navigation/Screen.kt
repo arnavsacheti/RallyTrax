@@ -46,6 +46,8 @@ data class TopLevelRoute(
 @Serializable data class SegmentDetailRoute(val segmentId: String)
 @Serializable data object TripsRoute
 @Serializable data class TripDetailRoute(val tripId: String)
+@Serializable data object CommonRoutesRoute
+@Serializable data class CommonRouteDetailRoute(val routeId: String)
 
 val topLevelRoutes = listOf(
     TopLevelRoute(

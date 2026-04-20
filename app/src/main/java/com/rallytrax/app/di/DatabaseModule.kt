@@ -14,7 +14,9 @@ import com.rallytrax.app.data.local.dao.PaceNoteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.dao.VehicleDao
+import com.rallytrax.app.data.local.dao.CommonRouteDao
 import com.rallytrax.app.data.local.dao.TripDao
+import com.rallytrax.app.data.local.dao.TripSuggestionDao
 import com.rallytrax.app.data.local.dao.VehiclePartDao
 import com.rallytrax.app.data.local.dao.WeatherDao
 import dagger.Module
@@ -57,6 +59,7 @@ object DatabaseModule {
                 RallyTraxDatabase.MIGRATION_18_19,
                 RallyTraxDatabase.MIGRATION_19_20,
                 RallyTraxDatabase.MIGRATION_20_21,
+                RallyTraxDatabase.MIGRATION_21_22,
             )
             .build()
     }
@@ -129,5 +132,15 @@ object DatabaseModule {
     @Provides
     fun provideTripDao(database: RallyTraxDatabase): TripDao {
         return database.tripDao()
+    }
+
+    @Provides
+    fun provideTripSuggestionDao(database: RallyTraxDatabase): TripSuggestionDao {
+        return database.tripSuggestionDao()
+    }
+
+    @Provides
+    fun provideCommonRouteDao(database: RallyTraxDatabase): CommonRouteDao {
+        return database.commonRouteDao()
     }
 }

@@ -61,6 +61,8 @@ import com.rallytrax.app.ui.theme.LayerElevation
 import com.rallytrax.app.ui.theme.LayerSpeedHigh
 import com.rallytrax.app.ui.theme.LayerSpeedLow
 import com.rallytrax.app.ui.theme.LayerSpeedMid
+import com.rallytrax.app.ui.theme.lerpColor
+import com.rallytrax.app.ui.theme.speedColor
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import org.osmdroid.util.BoundingBox
@@ -427,22 +429,3 @@ private fun TrackInfoSheet(
     }
 }
 
-// ── Utility ─────────────────────────────────────────────────────────────────
-
-private fun speedColor(fraction: Float): Color {
-    return if (fraction < 0.5f) {
-        lerpColor(LayerSpeedLow, LayerSpeedMid, fraction * 2f)
-    } else {
-        lerpColor(LayerSpeedMid, LayerSpeedHigh, (fraction - 0.5f) * 2f)
-    }
-}
-
-private fun lerpColor(start: Color, end: Color, fraction: Float): Color {
-    val f = fraction.coerceIn(0f, 1f)
-    return Color(
-        red = start.red + (end.red - start.red) * f,
-        green = start.green + (end.green - start.green) * f,
-        blue = start.blue + (end.blue - start.blue) * f,
-        alpha = start.alpha + (end.alpha - start.alpha) * f,
-    )
-}

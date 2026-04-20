@@ -68,13 +68,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.data.local.dao.LatLonSpeedProjection
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.components.ShimmerLoadingList
+import com.rallytrax.app.ui.components.ShimmerPlaceholder
+import com.rallytrax.app.ui.components.TrackThumbnail
 import com.rallytrax.app.ui.library.SortOption
 import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
 import com.rallytrax.app.ui.theme.ShapeFullRound
 import com.rallytrax.app.ui.theme.ShapeLargeIncreased
+import com.rallytrax.app.ui.trips.TripSuggestionCard
+import com.rallytrax.app.ui.trips.TripSuggestionViewModel
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -89,10 +94,13 @@ fun StintsScreen(
     onVehicleClick: (String) -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: StintsViewModel = hiltViewModel(),
+    suggestionViewModel: TripSuggestionViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val suggestionState by suggestionViewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val pendingDeletes by viewModel.pendingDeletes.collectAsStateWithLifecycle()
+    val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showSortMenu by remember { mutableStateOf(false) }
@@ -102,6 +110,12 @@ fun StintsScreen(
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        suggestionViewModel.snackbarMessage.collect { message ->
             snackbarHostState.showSnackbar(message)
         }
     }
@@ -271,6 +285,32 @@ fun StintsScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
+                    // Trip suggestion cards
+                    if (suggestionState.suggestions.isNotEmpty()) {
+                        item(key = "suggestion_header") {
+                            Text(
+                                text = "Trip Suggestions",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                        items(
+                            items = suggestionState.suggestions,
+                            key = { "suggestion_${it.id}" },
+                        ) { suggestion ->
+                            TripSuggestionCard(
+                                suggestion = suggestion,
+                                onAccept = { suggestionViewModel.acceptSuggestion(it) },
+                                onDismiss = { suggestionViewModel.dismissSuggestion(it) },
+                            )
+                        }
+                        item(key = "suggestion_divider") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+
                     items(
                         items = visibleTracks,
                         key = { it.id },
@@ -334,6 +374,7 @@ fun StintsScreen(
                                     vehicleName = track.vehicleId?.let { uiState.vehicleNames[it] },
                                     isSelected = track.id in uiState.selectedTrackIds,
                                     isMultiSelectMode = false,
+                                    thumbnailPoints = thumbnails[track.id],
                                     unitSystem = preferences.unitSystem,
                                     onClick = { onTrackClick(track.id) },
                                     onLongClick = { viewModel.toggleMultiSelect(track.id) },
@@ -346,6 +387,7 @@ fun StintsScreen(
                                 vehicleName = track.vehicleId?.let { uiState.vehicleNames[it] },
                                 isSelected = track.id in uiState.selectedTrackIds,
                                 isMultiSelectMode = true,
+                                thumbnailPoints = thumbnails[track.id],
                                 unitSystem = preferences.unitSystem,
                                 onClick = { viewModel.toggleMultiSelect(track.id) },
                                 onLongClick = { viewModel.toggleMultiSelect(track.id) },
@@ -369,6 +411,7 @@ private fun StintListItem(
     vehicleName: String?,
     isSelected: Boolean,
     isMultiSelectMode: Boolean,
+    thumbnailPoints: List<LatLonSpeedProjection>?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onVehicleClick: () -> Unit,
@@ -397,6 +440,23 @@ private fun StintListItem(
         Column(
             modifier = Modifier.padding(16.dp),
         ) {
+            when {
+                thumbnailPoints == null -> ShimmerPlaceholder(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp),
+                    shape = MaterialTheme.shapes.medium,
+                )
+                thumbnailPoints.size >= 2 -> TrackThumbnail(
+                    track = track,
+                    points = thumbnailPoints,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (thumbnailPoints == null || thumbnailPoints.size >= 2) {
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
