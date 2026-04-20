@@ -2535,11 +2535,25 @@ private fun PaceNotesList(
     onPaceNoteClick: (Int) -> Unit = {},
     selectedPaceNoteIndex: Int? = null,
 ) {
+    var listExpanded by remember { mutableStateOf(false) }
+    val totalDistance = remember(paceNotes) {
+        paceNotes.maxOfOrNull { it.distanceFromStart } ?: 0.0
+    }
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            if (paceNotes.isNotEmpty() && totalDistance > 0) {
+                com.rallytrax.app.ui.pacenotes.PaceNoteTimelineCard(
+                    notes = paceNotes,
+                    totalDistanceMeters = totalDistance,
+                    selectedIndex = selectedPaceNoteIndex,
+                    onSelectNote = onPaceNoteClick,
+                    onExpandList = { listExpanded = !listExpanded },
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             Text(
                 "Pace Notes (${paceNotes.size})",
                 style = MaterialTheme.typography.titleMedium,
@@ -2589,21 +2603,30 @@ private fun PaceNotesList(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            paceNotes.take(20).forEachIndexed { index, note ->
-                PaceNoteItem(
-                    note = note,
-                    unitSystem = unitSystem,
-                    isSelected = index == selectedPaceNoteIndex,
-                    onClick = { onPaceNoteClick(index) },
-                )
+            androidx.compose.animation.AnimatedVisibility(visible = listExpanded) {
+                Column {
+                    paceNotes.take(20).forEachIndexed { index, note ->
+                        PaceNoteItem(
+                            note = note,
+                            unitSystem = unitSystem,
+                            isSelected = index == selectedPaceNoteIndex,
+                            onClick = { onPaceNoteClick(index) },
+                        )
+                    }
+                    if (paceNotes.size > 20) {
+                        Text(
+                            "+ ${paceNotes.size - 20} more",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 54.dp, top = 4.dp),
+                        )
+                    }
+                }
             }
-            if (paceNotes.size > 20) {
-                Text(
-                    "+ ${paceNotes.size - 20} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 54.dp, top = 4.dp),
-                )
+            if (!listExpanded && paceNotes.isNotEmpty()) {
+                androidx.compose.material3.TextButton(onClick = { listExpanded = true }) {
+                    Text("Show all ${paceNotes.size} notes")
+                }
             }
         }
     }
