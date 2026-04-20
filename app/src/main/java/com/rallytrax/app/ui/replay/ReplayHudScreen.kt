@@ -308,11 +308,11 @@ fun ReplayHudScreen(
                             Modifier.fillMaxWidth().padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            PaceNoteIconRenderer.PaceNoteIcon(
+                            com.rallytrax.app.ui.pacenotes.PaceNoteGlyphWithLabel(
                                 noteType = note.noteType,
                                 severity = note.severity,
-                                modifier = note.modifier,
-                                sizeDp = 40.dp,
+                                sizeDp = 44.dp,
+                                color = Color.White,
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(

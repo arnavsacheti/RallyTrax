@@ -9,7 +9,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +40,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -60,7 +60,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -137,7 +138,9 @@ import com.rallytrax.app.ui.theme.LayerElevation
 import com.rallytrax.app.ui.theme.LayerSpeedHigh
 import com.rallytrax.app.ui.theme.LayerSpeedLow
 import com.rallytrax.app.ui.theme.LayerSpeedMid
+import com.rallytrax.app.ui.theme.lerpColor
 import com.rallytrax.app.ui.theme.rallyTraxColors
+import com.rallytrax.app.ui.theme.speedColor
 import com.rallytrax.app.util.formatDateTime
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -350,32 +353,34 @@ fun TrackDetailScreen(
                             }
                         }
 
-                        // Fullscreen toggle button
-                        IconButton(
-                            onClick = { isMapFullscreen = true },
+                        // Top-right overlay controls: fullscreen + layers
+                        Column(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .background(
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.End,
+                        ) {
+                            IconButton(
+                                onClick = { isMapFullscreen = true },
+                                modifier = Modifier.background(
                                     MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                                     RoundedCornerShape(8.dp),
                                 ),
-                        ) {
-                            Icon(
-                                Icons.Filled.Fullscreen,
-                                contentDescription = "Fullscreen map",
-                                tint = MaterialTheme.colorScheme.onSurface,
+                            ) {
+                                Icon(
+                                    Icons.Filled.Fullscreen,
+                                    contentDescription = "Fullscreen map",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                            LayersButton(
+                                activeLayers = uiState.activeLayers,
+                                onToggle = viewModel::toggleLayer,
+                                isRoute = uiState.track?.trackCategory == "route",
                             )
                         }
                     }
-
-                    // Layer toggle chips
-                    LayerToolbar(
-                        activeLayers = uiState.activeLayers,
-                        onToggle = viewModel::toggleLayer,
-                        isRoute = uiState.track?.trackCategory == "route",
-                    )
-
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -959,34 +964,28 @@ private fun FullscreenMapDialog(
                 selectedPaceNotePoints = selectedPaceNotePoints,
             )
 
-            // Exit fullscreen button
-            IconButton(
-                onClick = onDismiss,
+            // Top-right overlay controls: exit fullscreen + layers
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.background(
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                         RoundedCornerShape(8.dp),
                     ),
-            ) {
-                Icon(
-                    Icons.Filled.FullscreenExit,
-                    contentDescription = "Exit fullscreen",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
-            // Layer toolbar at bottom
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
-                    ),
-            ) {
-                LayerToolbar(
+                ) {
+                    Icon(
+                        Icons.Filled.FullscreenExit,
+                        contentDescription = "Exit fullscreen",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                LayersButton(
                     activeLayers = activeLayers,
                     onToggle = onToggleLayer,
                     isRoute = isRoute,
@@ -996,37 +995,67 @@ private fun FullscreenMapDialog(
     }
 }
 
-// ── Layer Toolbar ───────────────────────────────────────────────────────────
+// ── Layer Selector ──────────────────────────────────────────────────────────
 
 @Composable
-private fun LayerToolbar(activeLayers: Set<MapLayer>, onToggle: (MapLayer) -> Unit, isRoute: Boolean = false) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LayerChip("Route", MapLayer.ROUTE, activeLayers, onToggle, enabled = false)
-        if (!isRoute) {
-            LayerChip("Speed", MapLayer.SPEED, activeLayers, onToggle)
-            LayerChip("Accel", MapLayer.ACCEL, activeLayers, onToggle)
+private fun LayersButton(
+    activeLayers: Set<MapLayer>,
+    onToggle: (MapLayer) -> Unit,
+    isRoute: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.background(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                RoundedCornerShape(8.dp),
+            ),
+        ) {
+            Icon(
+                Icons.Filled.Layers,
+                contentDescription = "Map layers",
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
         }
-        LayerChip("Elevation", MapLayer.ELEVATION, activeLayers, onToggle)
-        LayerChip("Curve", MapLayer.CURVATURE, activeLayers, onToggle)
-        LayerChip("Surface", MapLayer.SURFACE, activeLayers, onToggle)
-        LayerChip("Grip", MapLayer.GRIP, activeLayers, onToggle)
-        LayerChip("Callouts", MapLayer.CALLOUTS, activeLayers, onToggle)
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            if (!isRoute) {
+                LayerMenuItem("Speed", MapLayer.SPEED, activeLayers, onToggle)
+                LayerMenuItem("Accel", MapLayer.ACCEL, activeLayers, onToggle)
+            }
+            LayerMenuItem("Elevation", MapLayer.ELEVATION, activeLayers, onToggle)
+            LayerMenuItem("Curvature", MapLayer.CURVATURE, activeLayers, onToggle)
+            LayerMenuItem("Surface", MapLayer.SURFACE, activeLayers, onToggle)
+            LayerMenuItem("Grip", MapLayer.GRIP, activeLayers, onToggle)
+            LayerMenuItem("Pace notes", MapLayer.CALLOUTS, activeLayers, onToggle)
+        }
     }
 }
 
 @Composable
-private fun LayerChip(label: String, layer: MapLayer, active: Set<MapLayer>, onToggle: (MapLayer) -> Unit, enabled: Boolean = true) {
-    FilterChip(
-        selected = layer in active,
+private fun LayerMenuItem(
+    label: String,
+    layer: MapLayer,
+    active: Set<MapLayer>,
+    onToggle: (MapLayer) -> Unit,
+) {
+    val isActive = layer in active
+    DropdownMenuItem(
+        text = { Text(label) },
         onClick = { onToggle(layer) },
-        label = { Text(label) },
-        enabled = enabled,
+        trailingIcon = {
+            if (isActive) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = "Active",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
     )
 }
 
@@ -1457,6 +1486,7 @@ private fun ElevationProfileCard(elevationProfile: List<ElevationPoint>, paceNot
                 Text("0 km", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatDistance(elevationProfile.last().distanceFromStart, unitSystem), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            GradeGradientLegend(modifier = Modifier.padding(top = 10.dp))
             // Hero stats below chart
             HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -1508,18 +1538,62 @@ private fun ElevationChart(data: List<ElevationPoint>, unitSystem: UnitSystem, m
             }
         }
 
-        val fillPath = Path().apply {
-            moveTo(xFor(data.first().distanceFromStart), size.height)
-            for (point in data) lineTo(xFor(point.distanceFromStart), yFor(point.elevation))
-            lineTo(xFor(data.last().distanceFromStart), size.height)
-            close()
+        // Per-segment grade-gradient fill: flat = green, steep = red, matching the
+        // speed chart and list thumbnails' visual language.
+        for (i in 0 until data.size - 1) {
+            val a = data[i]
+            val b = data[i + 1]
+            val dDist = (b.distanceFromStart - a.distanceFromStart).coerceAtLeast(1.0)
+            val grade = (b.elevation - a.elevation) / dDist
+            val segColor = speedColor(gradeToFraction(grade)).copy(alpha = 0.35f)
+            val xA = xFor(a.distanceFromStart)
+            val xB = xFor(b.distanceFromStart)
+            val yA = yFor(a.elevation)
+            val yB = yFor(b.elevation)
+            val segPath = Path().apply {
+                moveTo(xA, yA)
+                lineTo(xB, yB)
+                lineTo(xB, size.height)
+                lineTo(xA, size.height)
+                close()
+            }
+            drawPath(segPath, color = segColor)
         }
-        drawPath(fillPath, color = LayerElevation.copy(alpha = 0.2f))
         val linePath = Path().apply {
             moveTo(xFor(data.first().distanceFromStart), yFor(data.first().elevation))
             for (point in data) lineTo(xFor(point.distanceFromStart), yFor(point.elevation))
         }
         drawPath(linePath, color = LayerElevation, style = Stroke(width = 3f))
+    }
+}
+
+@Composable
+private fun GradeGradientLegend(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GradeLegendItem("Flat", LayerSpeedLow)
+        GradeLegendItem("Moderate", LayerSpeedMid)
+        GradeLegendItem("Steep", LayerSpeedHigh)
+    }
+}
+
+@Composable
+private fun GradeLegendItem(label: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .background(color.copy(alpha = 0.9f), RoundedCornerShape(3.dp)),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1547,26 +1621,15 @@ private fun PaceNoteItem(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PaceNoteIconRenderer.PaceNoteIcon(
+            com.rallytrax.app.ui.pacenotes.PaceNoteGlyphWithLabel(
                 noteType = note.noteType,
                 severity = note.severity,
-                modifier = note.modifier,
-                sizeDp = 36.dp,
+                sizeDp = 40.dp,
             )
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(note.callText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(formatDistance(note.distanceFromStart, unitSystem), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (note.severity in 1..6) {
-                Card(
-                    shape = RoundedCornerShape(6.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                ) {
-                    Text("${note.severity}", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer)
-                }
             }
         }
         AnimatedVisibility(
@@ -2547,28 +2610,18 @@ private fun visibleCards(activeLayers: Set<MapLayer>): Set<CardType> {
 
 // ── Utility Functions ───────────────────────────────────────────────────────
 
-private fun speedColor(fraction: Float): Color {
-    return if (fraction < 0.5f) {
-        lerpColor(LayerSpeedLow, LayerSpeedMid, fraction * 2f)
-    } else {
-        lerpColor(LayerSpeedMid, LayerSpeedHigh, (fraction - 0.5f) * 2f)
-    }
-}
-
-private fun lerpColor(start: Color, end: Color, fraction: Float): Color {
-    val f = fraction.coerceIn(0f, 1f)
-    return Color(
-        red = start.red + (end.red - start.red) * f,
-        green = start.green + (end.green - start.green) * f,
-        blue = start.blue + (end.blue - start.blue) * f,
-        alpha = start.alpha + (end.alpha - start.alpha) * f,
-    )
-}
-
 /** Maps absolute curvature (deg/m) to a 0–1 fraction for color interpolation.
  *  Aligns with CurvatureDistribution thresholds: 10 deg/m = hairpin = full pink. */
 private fun curvatureToFraction(curvatureDegPerM: Double): Float {
     return (curvatureDegPerM / 10.0).coerceIn(0.0, 1.0).toFloat()
+}
+
+/** Maps absolute grade (rise/run) to a 0–1 fraction for color interpolation.
+ *  ≥10% grade saturates to red; below 0.5% is treated as flat. */
+private fun gradeToFraction(grade: Double): Float {
+    val absGrade = abs(grade)
+    if (absGrade < 0.005) return 0f
+    return (absGrade / 0.10).coerceIn(0.0, 1.0).toFloat()
 }
 
 private fun formatCurvature(trackPoints: List<TrackPointEntity>): String {
@@ -2639,11 +2692,10 @@ private fun CornerRow(corner: CornerAnalysis, unitSystem: UnitSystem) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PaceNoteIconRenderer.PaceNoteIcon(
+            com.rallytrax.app.ui.pacenotes.PaceNoteGlyphWithLabel(
                 noteType = note.noteType,
                 severity = note.severity,
-                modifier = note.modifier,
-                sizeDp = 28.dp,
+                sizeDp = 32.dp,
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
