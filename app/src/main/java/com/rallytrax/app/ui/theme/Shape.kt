@@ -18,6 +18,10 @@ val ShapeExtraLargeIncreased = RoundedCornerShape(32.dp)
 val ShapeExtraExtraLarge = RoundedCornerShape(48.dp)
 val ShapeFullRound = RoundedCornerShape(50)
 
+// ── RallyTrax-signature shapes (prototype design system) ─────────────────────
+val ShapeSignature = RoundedCornerShape(20.dp)   // metric tiles, stop button, transport buttons, peek glyph plate
+val ShapeHeroCard = RoundedCornerShape(24.dp)    // Home hero, Trips totals, share preview
+
 // ── Rugged Mode: Larger corner radii for easier visual parsing ───────────────
 val RuggedShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),

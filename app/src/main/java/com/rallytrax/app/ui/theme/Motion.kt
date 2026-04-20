@@ -17,4 +17,9 @@ object RallyTraxMotion {
     // Full-screen: page transitions, full-screen modals
     fun <T> slowSpatial(): SpringSpec<T> = spring(dampingRatio = 0.9f, stiffness = 300f)
     fun <T> slowEffects(): SpringSpec<T> = spring(dampingRatio = 1.0f, stiffness = 800f)
+
+    // Signature expressive easing — matches prototype's cubic-bezier(0.2, 0.9, 0.2, 1.05).
+    // Slight overshoot for staggered-enter animations (FAB menu mini-fabs, peek sheets, chips).
+    fun <T> expressive(): SpringSpec<T> = spring(dampingRatio = 0.62f, stiffness = 500f)
+    fun <T> expressiveSnappy(): SpringSpec<T> = spring(dampingRatio = 0.7f, stiffness = 900f)
 }

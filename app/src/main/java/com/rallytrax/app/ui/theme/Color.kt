@@ -141,6 +141,15 @@ val WarningRed = Color(0xFFEF5350)
 
 // ── M3 Expressive: Custom semantic colors via CompositionLocal ─────────────
 
+// ── Achievement tier colors (prototype: tokens.jsx) ──────────────────────────
+val TierGold = Color(0xFFE3B34A)
+val TierSilver = Color(0xFFB6BEC8)
+val TierBronze = Color(0xFFC1814A)
+
+// ── Glass-chip overlays for map hero tints (prototype) ───────────────────────
+val GlassChipLight = Color(0xD0FFFFFF)
+val GlassChipDark = Color(0xC00A0A0C)
+
 @Immutable
 data class RallyTraxColors(
     val fuelWarning: Color = WarningAmber,
@@ -153,6 +162,15 @@ data class RallyTraxColors(
     val surfaceTarmac: Color = SurfacePaved,
     val surfaceDirt: Color = SurfaceDirt,
     val recordingActive: Color = Color(0xFFFF1744),
+    val tierGold: Color = TierGold,
+    val tierSilver: Color = TierSilver,
+    val tierBronze: Color = TierBronze,
+    val glassChip: Color = GlassChipLight,
+    val onGlassChip: Color = Color(0xFF1A1C20),
+    // Continuous severity ramp anchors (sev 1 → sev 6)
+    val sevLow: Color = DifficultyGreen,
+    val sevMid: Color = DifficultyAmber,
+    val sevHigh: Color = DifficultyRed,
 )
 
 val LightRallyTraxColors = RallyTraxColors()
@@ -168,6 +186,11 @@ val DarkRallyTraxColors = RallyTraxColors(
     surfaceTarmac = Color(0xFF9E9E9E),
     surfaceDirt = Color(0xFFA1887F),
     recordingActive = Color(0xFFFF5252),
+    glassChip = GlassChipDark,
+    onGlassChip = Color(0xFFE2E2E9),
+    sevLow = Color(0xFF69F0AE),
+    sevMid = Color(0xFFFFCA28),
+    sevHigh = Color(0xFFFF8A80),
 )
 
 val LocalRallyTraxColors = staticCompositionLocalOf { RallyTraxColors() }

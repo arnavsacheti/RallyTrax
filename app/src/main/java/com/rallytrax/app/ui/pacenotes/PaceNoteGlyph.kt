@@ -2,7 +2,9 @@ package com.rallytrax.app.ui.pacenotes
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -28,6 +30,7 @@ import com.rallytrax.app.data.local.entity.NoteType
 import com.rallytrax.app.ui.theme.DifficultyAmber
 import com.rallytrax.app.ui.theme.DifficultyGreen
 import com.rallytrax.app.ui.theme.DifficultyRed
+import com.rallytrax.app.ui.theme.LocalRallyTraxColors
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -65,15 +68,16 @@ private fun isDip(t: NoteType) =
  */
 @Composable
 fun sevTone(noteType: NoteType, severity: Int): Color {
+    val rt = LocalRallyTraxColors.current
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     return when {
-        isCrest(noteType) || isDip(noteType) -> DifficultyAmber
+        isCrest(noteType) || isDip(noteType) -> rt.sevMid
         noteType == NoteType.STRAIGHT -> onSurfaceVariant
         !isTurn(noteType) -> onSurfaceVariant
         else -> {
             val u = (effectiveSeverity(noteType, severity) - 1) / 5f
-            if (u <= 0.5f) lerp(DifficultyGreen, DifficultyAmber, u * 2f)
-            else lerp(DifficultyAmber, DifficultyRed, (u - 0.5f) * 2f)
+            if (u <= 0.5f) lerp(rt.sevLow, rt.sevMid, u * 2f)
+            else lerp(rt.sevMid, rt.sevHigh, (u - 0.5f) * 2f)
         }
     }
 }
@@ -283,4 +287,34 @@ private fun DrawScope.drawDip(s: Float, color: Color, stroke: Stroke) {
         quadraticTo(s * 0.68f, 2f * 0.78f * s - 1.21f * s, s * 0.85f, s * 0.4f)
     }
     drawPath(path, color, style = stroke)
+}
+
+// ─── Preview ────────────────────────────────────────────────────────────────
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 420, heightDp = 540)
+@Composable
+private fun PaceNoteGlyphGridPreview() {
+    com.rallytrax.app.ui.theme.RallyTraxTheme {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            listOf(
+                listOf(NoteType.LEFT to 1, NoteType.LEFT to 2, NoteType.LEFT to 3,
+                    NoteType.LEFT to 4, NoteType.LEFT to 5, NoteType.HAIRPIN_LEFT to 6),
+                listOf(NoteType.RIGHT to 1, NoteType.RIGHT to 2, NoteType.RIGHT to 3,
+                    NoteType.RIGHT to 4, NoteType.RIGHT to 5, NoteType.HAIRPIN_RIGHT to 6),
+            ).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { (t, s) ->
+                        PaceNoteGlyphWithLabel(noteType = t, severity = s, sizeDp = 56.dp)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(NoteType.STRAIGHT, NoteType.CREST, NoteType.DIP, NoteType.BIG_CREST, NoteType.BIG_DIP)
+                    .forEach { PaceNoteGlyph(noteType = it, severity = 3, sizeDp = 56.dp) }
+            }
+        }
+    }
 }
