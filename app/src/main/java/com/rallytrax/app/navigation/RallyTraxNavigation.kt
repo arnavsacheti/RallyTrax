@@ -109,6 +109,9 @@ fun RallyTraxNavHost(
                 onVehicleClick = { vehicleId ->
                     navController.navigate(VehicleDetailRoute(vehicleId))
                 },
+                onNavigateToGarage = {
+                    navController.navigate(GarageRoute)
+                },
                 onViewAllAchievements = {
                     navController.navigate(AchievementsRoute)
                 },

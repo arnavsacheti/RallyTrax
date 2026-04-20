@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -109,6 +110,7 @@ fun HomeScreen(
     onSignIn: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onVehicleClick: (String) -> Unit = {},
+    onNavigateToGarage: () -> Unit = {},
     onViewAllAchievements: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     suggestionViewModel: TripSuggestionViewModel = hiltViewModel(),
@@ -226,26 +228,25 @@ fun HomeScreen(
                     }
                 }
 
-                // Vehicle filter chip
-                item(key = "vehicle_filter") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        androidx.compose.material3.FilterChip(
-                            selected = feedState.showActiveVehicleOnly,
-                            onClick = { viewModel.toggleVehicleFilter() },
-                            label = {
-                                Text(
-                                    text = if (feedState.showActiveVehicleOnly) {
-                                        feedState.activeVehicleName ?: "Active Vehicle"
-                                    } else {
-                                        "All Vehicles"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            },
+                // Vehicle hero banner (active vehicle) — or a prompt if none.
+                val activeVehicle = feedState.activeVehicle
+                if (activeVehicle != null) {
+                    item(key = "vehicle_hero") {
+                        val tracksForVehicle = remember(feedState.feedItems, activeVehicle.id) {
+                            feedState.feedItems
+                                .map { it.track }
+                                .filter { it.vehicleId == activeVehicle.id }
+                        }
+                        com.rallytrax.app.ui.garage.VehicleHeroCard(
+                            vehicle = activeVehicle,
+                            tracks = tracksForVehicle,
+                            unitSystem = preferences.unitSystem,
+                            onClick = { onVehicleClick(activeVehicle.id) },
                         )
+                    }
+                } else {
+                    item(key = "vehicle_prompt") {
+                        NoPrimaryVehicleCard(onClick = onNavigateToGarage)
                     }
                 }
 
@@ -255,6 +256,20 @@ fun HomeScreen(
                         summary = feedState.weeklySummary,
                         unitSystem = preferences.unitSystem,
                         weeklyGoalProgress = feedState.weeklyGoalProgress,
+                    )
+                }
+
+                // Quick actions row
+                item(key = "quick_actions") {
+                    QuickActionsRow(
+                        onRecord = { requestRecording() },
+                        onReplay = { showReplaySheet = true },
+                        onImportGpx = {
+                            gpxImportLauncher.launch(
+                                arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
+                            )
+                        },
+                        onFillUp = { showFillUpSheet = true },
                     )
                 }
 
@@ -433,6 +448,147 @@ fun HomeScreen(
                 }
             },
         )
+    }
+}
+
+// ── No-primary-vehicle prompt ─────────────────────────────────────────────────
+
+@Composable
+private fun NoPrimaryVehicleCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        MaterialTheme.colorScheme.secondaryContainer,
+                        androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.DirectionsCar,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "No primary vehicle",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Pick one in the Garage to see it here",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+// ── Quick Actions ────────────────────────────────────────────────────────────
+
+@Composable
+private fun QuickActionsRow(
+    onRecord: () -> Unit,
+    onReplay: () -> Unit,
+    onImportGpx: () -> Unit,
+    onFillUp: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        QuickActionTile(
+            icon = Icons.Filled.FiberManualRecord,
+            label = "Record",
+            primary = true,
+            onClick = onRecord,
+            modifier = Modifier.weight(1f),
+        )
+        QuickActionTile(
+            icon = Icons.Filled.PlayArrow,
+            label = "Replay",
+            onClick = onReplay,
+            modifier = Modifier.weight(1f),
+        )
+        QuickActionTile(
+            icon = Icons.Filled.FileOpen,
+            label = "Import",
+            onClick = onImportGpx,
+            modifier = Modifier.weight(1f),
+        )
+        QuickActionTile(
+            icon = Icons.Filled.LocalGasStation,
+            label = "Fuel",
+            onClick = onFillUp,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun QuickActionTile(
+    icon: ImageVector,
+    label: String,
+    primary: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val container = if (primary) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceContainer
+    val content = if (primary) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurface
+    val innerBg = if (primary) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f)
+        else MaterialTheme.colorScheme.surfaceContainerHigh
+    Card(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
+        onClick = onClick,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(innerBg, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(20.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (primary) content else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
