@@ -57,6 +57,7 @@ class ReplayNavigationScreen(
     init {
         // Register map surface callback so the host delivers surface events
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(mapRenderer)
+        session.registerRenderer(mapRenderer)
 
         // Start navigation session (required before returning NavigationTemplate)
         navigationManager.setNavigationManagerCallback(object : NavigationManagerCallback {
@@ -77,6 +78,7 @@ class ReplayNavigationScreen(
                 endNavigationIfActive()
                 navigationManager.clearNavigationManagerCallback()
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                session.unregisterRenderer(mapRenderer)
                 replayManager.destroy()
                 scope.cancel()
                 mapRenderer.destroy()
