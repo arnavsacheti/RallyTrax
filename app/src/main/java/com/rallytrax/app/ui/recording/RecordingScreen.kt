@@ -93,6 +93,9 @@ import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
 import com.rallytrax.app.ui.theme.ShapeFullRound
 import com.rallytrax.app.ui.theme.rallyTraxColors
+import com.rallytrax.app.ui.util.FoldingPosture
+import com.rallytrax.app.ui.util.rememberFoldingPosture
+import androidx.compose.foundation.layout.fillMaxHeight
 
 @Composable
 fun RecordingScreen(
@@ -150,6 +153,12 @@ fun RecordingScreen(
     val isPaused = status == RecordingStatus.PAUSED
     val isWaitingForGps = isRecording && data.pointCount == 0 && data.currentLatLng == null
 
+    // Foldable in table-top posture: phone in car cradle, horizontal hinge.
+    // Map occupies the top half, stats overlay expands to fill the bottom half,
+    // keeping every interactive element clear of the hinge.
+    val posture by rememberFoldingPosture()
+    val isTableTop = posture == FoldingPosture.TableTop
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Map
         if (MapProvider.useGoogleMaps(preferences.mapProvider)) {
@@ -168,7 +177,14 @@ fun RecordingScreen(
                 }
             }
             GoogleMap(
-                modifier = Modifier.fillMaxSize(),
+                modifier = if (isTableTop) {
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.5f)
+                } else {
+                    Modifier.fillMaxSize()
+                },
                 cameraPositionState = cameraPositionState,
                 properties = MapProperties(isMyLocationEnabled = true),
                 uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, compassEnabled = true),
@@ -188,7 +204,14 @@ fun RecordingScreen(
             }
             val followPos = data.currentLatLng?.let { GeoPoint(it.latitude, it.longitude) }
             OsmMapView(
-                modifier = Modifier.fillMaxSize(),
+                modifier = if (isTableTop) {
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.5f)
+                } else {
+                    Modifier.fillMaxSize()
+                },
                 centerLat = 37.7749, centerLng = -122.4194, zoom = 15.0,
                 polylines = osmPolylines, followPosition = followPos,
             )
@@ -270,13 +293,21 @@ fun RecordingScreen(
             }
         }
 
-        // GPS lock loading indicator
+        // GPS lock loading indicator — stay clear of the hinge in table-top mode
         if (isWaitingForGps) {
             Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(24.dp))
-                    .padding(24.dp),
+                modifier = if (isTableTop) {
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 140.dp)
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(24.dp))
+                        .padding(24.dp)
+                } else {
+                    Modifier
+                        .align(Alignment.Center)
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(24.dp))
+                        .padding(24.dp)
+                },
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -292,9 +323,11 @@ fun RecordingScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .then(if (isTableTop) Modifier.fillMaxHeight(0.5f) else Modifier)
                 .background(Color.Black.copy(alpha = 0.85f))
                 .padding(top = 16.dp, bottom = 32.dp, start = 16.dp, end = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = if (isTableTop) Arrangement.Center else Arrangement.Top,
         ) {
             // === SPEED (always visible, above pager) ===
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {

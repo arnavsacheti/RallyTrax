@@ -128,6 +128,11 @@ open class CarMapRenderer(
         }
     }
 
+    /** Force a full redraw — used when the host configuration changes (day/night). */
+    fun refresh() {
+        render()
+    }
+
     protected open fun render() {
         val s = surface ?: return
         if (surfaceWidth <= 0 || surfaceHeight <= 0) return

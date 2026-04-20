@@ -52,6 +52,8 @@ class RecordingScreen(
     init {
         // Register map surface callback so the host delivers surface events
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(mapRenderer)
+        // Let the session refresh this renderer when the host flips day/night
+        session.registerRenderer(mapRenderer)
 
         // Start navigation session (required before returning NavigationTemplate)
         navigationManager.setNavigationManagerCallback(object : NavigationManagerCallback {
@@ -71,6 +73,7 @@ class RecordingScreen(
                 endNavigationIfActive()
                 navigationManager.clearNavigationManagerCallback()
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                session.unregisterRenderer(mapRenderer)
                 scope.cancel()
                 mapRenderer.destroy()
             }

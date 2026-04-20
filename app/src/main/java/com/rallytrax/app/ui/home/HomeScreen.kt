@@ -29,8 +29,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
@@ -84,6 +86,8 @@ import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.GoalRing
 import com.rallytrax.app.ui.fuel.FillUpSheet
 import com.rallytrax.app.ui.components.RallyTraxTopAppBar
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowWidthSizeClass
 import com.rallytrax.app.ui.theme.RallyTraxMotion
 import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
 import com.rallytrax.app.ui.theme.ShapeExtraLargeIncreased
@@ -151,6 +155,12 @@ fun HomeScreen(
     var showReplaySheet by remember { mutableStateOf(false) }
     var showFillUpSheet by remember { mutableStateOf(false) }
 
+    // On Medium+ screens the navigation rail/drawer already surfaces Record,
+    // so the Home FAB menu (which duplicates Record and clutters larger
+    // layouts) is only shown on Compact.
+    val isCompactWidth = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass ==
+        WindowWidthSizeClass.COMPACT
+
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     fun requestRecording() {
@@ -188,41 +198,45 @@ fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            RallyTraxFabMenu(
-                expanded = isFabMenuExpanded,
-                onToggle = { isFabMenuExpanded = !isFabMenuExpanded },
-                onRecord = {
-                    isFabMenuExpanded = false
-                    requestRecording()
-                },
-                onReplay = {
-                    isFabMenuExpanded = false
-                    showReplaySheet = true
-                },
-                onImportGpx = {
-                    isFabMenuExpanded = false
-                    gpxImportLauncher.launch(
-                        arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
-                    )
-                },
-                onLogFillUp = {
-                    isFabMenuExpanded = false
-                    showFillUpSheet = true
-                },
-            )
+            if (isCompactWidth) {
+                RallyTraxFabMenu(
+                    expanded = isFabMenuExpanded,
+                    onToggle = { isFabMenuExpanded = !isFabMenuExpanded },
+                    onRecord = {
+                        isFabMenuExpanded = false
+                        requestRecording()
+                    },
+                    onReplay = {
+                        isFabMenuExpanded = false
+                        showReplaySheet = true
+                    },
+                    onImportGpx = {
+                        isFabMenuExpanded = false
+                        gpxImportLauncher.launch(
+                            arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")
+                        )
+                    },
+                    onLogFillUp = {
+                        isFabMenuExpanded = false
+                        showFillUpSheet = true
+                    },
+                )
+            }
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 360.dp),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // Sign-in card
                 if (!isSignedIn) {
-                    item(key = "sign_in") {
+                    item(key = "sign_in", span = { GridItemSpan(maxLineSpan) }) {
                         Spacer(modifier = Modifier.height(4.dp))
                         GoogleSignInCard(authState = authState, onClick = onSignIn)
                     }
@@ -231,7 +245,7 @@ fun HomeScreen(
                 // Vehicle hero banner (active vehicle) — or a prompt if none.
                 val activeVehicle = feedState.activeVehicle
                 if (activeVehicle != null) {
-                    item(key = "vehicle_hero") {
+                    item(key = "vehicle_hero", span = { GridItemSpan(maxLineSpan) }) {
                         val tracksForVehicle = remember(feedState.feedItems, activeVehicle.id) {
                             feedState.feedItems
                                 .map { it.track }
@@ -245,13 +259,13 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    item(key = "vehicle_prompt") {
+                    item(key = "vehicle_prompt", span = { GridItemSpan(maxLineSpan) }) {
                         NoPrimaryVehicleCard(onClick = onNavigateToGarage)
                     }
                 }
 
                 // Weekly summary strip
-                item(key = "weekly_summary") {
+                item(key = "weekly_summary", span = { GridItemSpan(maxLineSpan) }) {
                     WeeklySummaryStrip(
                         summary = feedState.weeklySummary,
                         unitSystem = preferences.unitSystem,
@@ -260,7 +274,7 @@ fun HomeScreen(
                 }
 
                 // Quick actions row
-                item(key = "quick_actions") {
+                item(key = "quick_actions", span = { GridItemSpan(maxLineSpan) }) {
                     QuickActionsRow(
                         onRecord = { requestRecording() },
                         onReplay = { showReplaySheet = true },
@@ -273,7 +287,7 @@ fun HomeScreen(
                     )
                 }
 
-                // Milestone celebration cards
+                // Milestone celebration cards — wrap into multiple columns on wider screens
                 items(
                     items = feedState.recentAchievements,
                     key = { "milestone_${it.id}" },
@@ -286,7 +300,7 @@ fun HomeScreen(
 
                 // Maintenance warning
                 if (feedState.maintenanceDueItems.isNotEmpty()) {
-                    item(key = "maintenance") {
+                    item(key = "maintenance", span = { GridItemSpan(maxLineSpan) }) {
                         MaintenanceWarningCard(
                             items = feedState.maintenanceDueItems,
                             onItemClick = onVehicleClick,
@@ -296,12 +310,12 @@ fun HomeScreen(
 
                 // Motivational card for new users
                 if (feedState.totalStintCount < 3) {
-                    item(key = "motivational") {
+                    item(key = "motivational", span = { GridItemSpan(maxLineSpan) }) {
                         MotivationalCard(onRecord = { requestRecording() })
                     }
                 }
 
-                // Trip suggestion cards (show max 2 on home screen)
+                // Trip suggestion cards (show max 2 on home screen) — wrap side-by-side
                 if (suggestionState.suggestions.isNotEmpty()) {
                     items(
                         items = suggestionState.suggestions.take(2),
@@ -318,7 +332,7 @@ fun HomeScreen(
 
                 // Activity feed header
                 if (feedState.feedItems.isNotEmpty() || feedState.totalStintCount >= 3) {
-                    item(key = "feed_header") {
+                    item(key = "feed_header", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "Recent Drives",
                             style = RallyTraxTypeEmphasized.titleMedium,
@@ -327,9 +341,9 @@ fun HomeScreen(
                     }
                 }
 
-                // Activity feed
+                // Activity feed empty-state placeholder
                 if (feedState.feedItems.isEmpty() && feedState.totalStintCount >= 3) {
-                    item(key = "empty_feed") {
+                    item(key = "empty_feed", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "No drives match the current filter",
                             style = MaterialTheme.typography.bodyMedium,
@@ -342,6 +356,7 @@ fun HomeScreen(
                     }
                 }
 
+                // Activity feed cards — multi-column on Medium+ widths
                 items(
                     items = feedState.feedItems,
                     key = { it.track.id },
@@ -357,7 +372,7 @@ fun HomeScreen(
 
                 // Friends activity feed
                 if (friendActivities.isNotEmpty()) {
-                    item(key = "friends_header") {
+                    item(key = "friends_header", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "Friends",
                             style = RallyTraxTypeEmphasized.titleMedium,
@@ -377,7 +392,7 @@ fun HomeScreen(
                 }
 
                 // Bottom spacer for FAB
-                item(key = "fab_spacer") {
+                item(key = "fab_spacer", span = { GridItemSpan(maxLineSpan) }) {
                     Spacer(modifier = Modifier.height(72.dp))
                 }
             }

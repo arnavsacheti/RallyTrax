@@ -2,12 +2,12 @@ package com.rallytrax.app.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Route
@@ -52,22 +52,28 @@ data class TopLevelRoute(
 
 val topLevelRoutes = listOf(
     TopLevelRoute(
-        label = "Home",
+        label = "Dashboard",
         selectedIcon = Icons.Filled.Home,
         unselectedIcon = Icons.Outlined.Home,
         route = HomeRoute,
     ),
     TopLevelRoute(
-        label = "Explore",
-        selectedIcon = Icons.Filled.Explore,
-        unselectedIcon = Icons.Outlined.Explore,
-        route = ExploreRoute(),
+        label = "Record",
+        selectedIcon = Icons.Filled.FiberManualRecord,
+        unselectedIcon = Icons.Outlined.FiberManualRecord,
+        route = RecordingRoute,
     ),
     TopLevelRoute(
         label = "Routes",
         selectedIcon = Icons.Filled.Route,
         unselectedIcon = Icons.Outlined.Route,
         route = LibraryRoute,
+    ),
+    TopLevelRoute(
+        label = "Garage",
+        selectedIcon = Icons.Filled.DirectionsCar,
+        unselectedIcon = Icons.Outlined.DirectionsCar,
+        route = GarageRoute,
     ),
     TopLevelRoute(
         label = "Profile",
