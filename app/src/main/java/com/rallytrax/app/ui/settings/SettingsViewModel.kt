@@ -176,6 +176,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setOledDark(enabled) }
     }
 
+    fun setRecordingFieldsPreset(presetName: String) {
+        viewModelScope.launch { preferencesRepository.setRecordingFieldsPreset(presetName) }
+    }
+
     fun showDeleteConfirmation() {
         _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
     }

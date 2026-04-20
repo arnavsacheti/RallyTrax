@@ -61,6 +61,7 @@ data class UserPreferencesData(
     // Activity lifecycle preferences
     val autoPauseEnabled: Boolean = true,
     val autoPauseDelaySeconds: Int = 30,
+    val recordingFieldsPreset: String = "Balanced",
     val weeklyDistanceGoalKm: Double? = null,
     // Sync-related
     val lastSyncTime: Long = 0L,
@@ -94,6 +95,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         // Activity lifecycle
         val AUTO_PAUSE_ENABLED = booleanPreferencesKey("auto_pause_enabled")
         val AUTO_PAUSE_DELAY_SECONDS = intPreferencesKey("auto_pause_delay_seconds")
+        val RECORDING_FIELDS_PRESET = stringPreferencesKey("recording_fields_preset")
         val WEEKLY_DISTANCE_GOAL_KM = doublePreferencesKey("weekly_distance_goal_km")
         // Sync
         val LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
@@ -141,6 +143,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             oledDark = prefs[Keys.OLED_DARK] ?: false,
             autoPauseEnabled = prefs[Keys.AUTO_PAUSE_ENABLED] ?: true,
             autoPauseDelaySeconds = prefs[Keys.AUTO_PAUSE_DELAY_SECONDS] ?: 30,
+            recordingFieldsPreset = prefs[Keys.RECORDING_FIELDS_PRESET] ?: "Balanced",
             weeklyDistanceGoalKm = prefs[Keys.WEEKLY_DISTANCE_GOAL_KM],
             lastSyncTime = prefs[Keys.LAST_SYNC_TIME] ?: 0L,
             backupTracksEnabled = prefs[Keys.BACKUP_TRACKS_ENABLED] ?: false,
@@ -327,6 +330,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setAutoPauseDelaySeconds(seconds: Int) {
         dataStore.edit { it[Keys.AUTO_PAUSE_DELAY_SECONDS] = seconds }
+    }
+
+    suspend fun setRecordingFieldsPreset(presetName: String) {
+        dataStore.edit { it[Keys.RECORDING_FIELDS_PRESET] = presetName }
     }
 
     suspend fun setWeeklyDistanceGoalKm(goalKm: Double?) {

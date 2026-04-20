@@ -465,6 +465,39 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Recording data fields
+            SettingsSectionCard(title = "Recording", icon = { Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.size(20.dp)) }) {
+                Text(
+                    text = "Data field layout",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val presets = com.rallytrax.app.ui.recording.RecordingFieldPreset.entries
+                    presets.forEachIndexed { index, preset ->
+                        SegmentedButton(
+                            selected = preferences.recordingFieldsPreset == preset.name,
+                            onClick = { settingsViewModel.setRecordingFieldsPreset(preset.name) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = presets.size,
+                            ),
+                        ) {
+                            Text(preset.label)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Which metrics appear in the swipeable pager during recording",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // Map Provider
             SettingsSectionCard(title = "Map Provider", icon = { Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(20.dp)) }) {
                 Text(

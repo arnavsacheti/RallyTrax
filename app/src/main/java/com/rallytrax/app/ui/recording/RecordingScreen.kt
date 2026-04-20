@@ -72,9 +72,6 @@ import com.rallytrax.app.ui.map.MapProvider
 import com.rallytrax.app.ui.map.OsmMapView
 import com.rallytrax.app.ui.map.OsmPolylineData
 import org.osmdroid.util.GeoPoint
-import com.rallytrax.app.util.formatDistance
-import com.rallytrax.app.util.formatElapsedTime
-import com.rallytrax.app.util.formatElevation
 import com.rallytrax.app.util.formatSpeed
 import com.rallytrax.app.util.speedUnit
 import android.Manifest
@@ -349,53 +346,47 @@ fun RecordingScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Page indicator dots
-            val pagerState = rememberPagerState(pageCount = { 3 })
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                repeat(3) { page ->
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(
-                                if (page == pagerState.currentPage) Color.White else Color.White.copy(alpha = 0.3f),
-                                CircleShape,
-                            ),
-                    )
-                    if (page < 2) Spacer(modifier = Modifier.width(6.dp))
-                }
+            // Pager pages driven by the active field preset (Settings → Data fields).
+            val fieldPreset = remember(preferences.recordingFieldsPreset) {
+                RecordingFieldPreset.fromName(preferences.recordingFieldsPreset)
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
+            val pageCount = fieldPreset.pages.size
+            val pagerState = rememberPagerState(pageCount = { pageCount })
+            if (pageCount > 1) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    repeat(pageCount) { page ->
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(
+                                    if (page == pagerState.currentPage) Color.White else Color.White.copy(alpha = 0.3f),
+                                    CircleShape,
+                                ),
+                        )
+                        if (page < pageCount - 1) Spacer(modifier = Modifier.width(6.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             // Swipeable metric pages
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth().height(60.dp),
             ) { page ->
+                val fields = fieldPreset.pages.getOrNull(page) ?: return@HorizontalPager
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    when (page) {
-                        0 -> {
-                            MetricColumn(formatElapsedTime(data.elapsedTimeMs), "Time")
-                            MetricColumn(formatDistance(data.distanceMeters, preferences.unitSystem), "Distance")
-                        }
-                        1 -> {
-                            MetricColumn("${formatSpeed(data.avgSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}", "Avg Speed")
-                            MetricColumn("${formatSpeed(data.maxSpeedMps, preferences.unitSystem)} ${speedUnit(preferences.unitSystem)}", "Max Speed")
-                            MetricColumn(formatElevation(data.elevationGainM, preferences.unitSystem), "Elev Gain")
-                            MetricColumn(data.currentElevation?.let { formatElevation(it, preferences.unitSystem) } ?: "—", "Elevation")
-                        }
-                        2 -> {
-                            MetricColumn(data.gpsAccuracy?.let { "${it.toInt()}m" } ?: "—", "GPS Acc")
-                            MetricColumn("${data.pointCount}", "Points")
-                            MetricColumn(sensorData.lateralG?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "—", "Lat G")
-                            MetricColumn(sensorData.longitudinalG?.let { String.format(java.util.Locale.US, "%.2f", kotlin.math.abs(it)) } ?: "—", "Brk G")
-                        }
+                    fields.forEach { field ->
+                        MetricColumn(
+                            value = field.format(data, sensorData, preferences),
+                            label = field.label,
+                        )
                     }
                 }
             }
