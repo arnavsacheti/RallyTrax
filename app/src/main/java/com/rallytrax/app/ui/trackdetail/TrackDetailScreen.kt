@@ -172,10 +172,39 @@ fun TrackDetailScreen(
     var isMapFullscreen by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showTripPicker by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
             snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    uiState.track?.let { track ->
+        if (showShareSheet) {
+            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+            com.rallytrax.app.ui.share.ShareSheet(
+                track = track,
+                unitSystem = preferences.unitSystem,
+                onAction = { action, caption ->
+                    when (action) {
+                        com.rallytrax.app.ui.share.ShareAction.SystemShare -> viewModel.shareActivity(context)
+                        com.rallytrax.app.ui.share.ShareAction.ExportGpx -> viewModel.exportGpx(context)
+                        com.rallytrax.app.ui.share.ShareAction.CopySummary -> {
+                            val distKm = track.distanceMeters / 1000.0
+                            val summary = buildString {
+                                if (caption.isNotBlank()) appendLine(caption)
+                                append("${track.name} · ")
+                                append("%.1f km".format(distKm))
+                                append(" · ")
+                                append(formatElapsedTime(track.durationMs))
+                            }
+                            clipboard.setText(androidx.compose.ui.text.AnnotatedString(summary))
+                        }
+                    }
+                },
+                onDismiss = { showShareSheet = false },
+            )
         }
     }
 
@@ -229,18 +258,10 @@ fun TrackDetailScreen(
                                 leadingIcon = { Icon(Icons.Filled.Edit, null) },
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Share Activity") },
+                                text = { Text("Share…") },
                                 onClick = {
                                     showOverflowMenu = false
-                                    viewModel.shareActivity(context)
-                                },
-                                leadingIcon = { Icon(Icons.Filled.Share, null) },
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Export GPX") },
-                                onClick = {
-                                    showOverflowMenu = false
-                                    viewModel.exportGpx(context)
+                                    showShareSheet = true
                                 },
                                 leadingIcon = { Icon(Icons.Filled.Share, null) },
                             )

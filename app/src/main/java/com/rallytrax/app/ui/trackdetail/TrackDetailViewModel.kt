@@ -842,7 +842,7 @@ class TrackDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val fileName = "${track.name.replace(Regex("[^a-zA-Z0-9_ -]"), "_")}.gpx"
+                val fileName = "${shareBaseName(track)}.gpx"
                 val paceNotes = withContext(ioDispatcher) { paceNoteDao.getNotesForTrackOnce(trackId) }
 
                 val contentValues = ContentValues().apply {
@@ -878,6 +878,22 @@ class TrackDetailViewModel @Inject constructor(
                 _snackbarMessage.tryEmit("Export failed: ${e.message}")
             }
         }
+    }
+
+    // Builds a descriptive, file-system-safe base name for share/export files:
+    // RallyTrax_<sanitized-track-name>_<YYYY-MM-DD>. Falls back to "stint" when
+    // the track name sanitizes to blank.
+    private fun shareBaseName(track: TrackEntity): String {
+        val sanitized = track.name
+            .replace(Regex("[^a-zA-Z0-9_ -]"), "_")
+            .replace(Regex("\\s+"), "_")
+            .trim('_')
+            .ifBlank { "stint" }
+        val date = java.time.Instant.ofEpochMilli(track.recordedAt)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDate()
+            .toString()
+        return "RallyTrax_${sanitized}_$date"
     }
 
     private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
@@ -1025,7 +1041,8 @@ class TrackDetailViewModel @Inject constructor(
                 val bitmap = withContext(defaultDispatcher) {
                     generateShareBitmap(track, unitSystem)
                 }
-                val file = File(context.cacheDir, "share_activity.png")
+                val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
+                val file = File(shareDir, "${shareBaseName(track)}.png")
                 withContext(ioDispatcher) {
                     file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 }
