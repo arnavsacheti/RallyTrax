@@ -16,6 +16,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +74,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,6 +91,8 @@ import com.rallytrax.app.ui.theme.ShapeLargeIncreased
 import com.rallytrax.app.ui.theme.rallyTraxColors
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.data.local.entity.MaintenanceScheduleEntity
+import com.rallytrax.app.ui.trips.TripSuggestionCard
+import com.rallytrax.app.ui.trips.TripSuggestionViewModel
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatElapsedTime
 
@@ -107,10 +111,12 @@ fun HomeScreen(
     onVehicleClick: (String) -> Unit = {},
     onViewAllAchievements: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
+    suggestionViewModel: TripSuggestionViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val feedState by viewModel.feedState.collectAsStateWithLifecycle()
     val friendActivities by viewModel.friendActivities.collectAsStateWithLifecycle()
+    val suggestionState by suggestionViewModel.uiState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val duplicateState by viewModel.duplicateImportState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -280,6 +286,21 @@ fun HomeScreen(
                     }
                 }
 
+                // Trip suggestion cards (show max 2 on home screen)
+                if (suggestionState.suggestions.isNotEmpty()) {
+                    items(
+                        items = suggestionState.suggestions.take(2),
+                        key = { "home_suggestion_${it.id}" },
+                    ) { suggestion ->
+                        TripSuggestionCard(
+                            suggestion = suggestion,
+                            onAccept = { suggestionViewModel.acceptSuggestion(it) },
+                            onDismiss = { suggestionViewModel.dismissSuggestion(it) },
+                            modifier = Modifier.padding(horizontal = 0.dp),
+                        )
+                    }
+                }
+
                 // Activity feed header
                 if (feedState.feedItems.isNotEmpty() || feedState.totalStintCount >= 3) {
                     item(key = "feed_header") {
@@ -423,58 +444,85 @@ private fun WeeklySummaryStrip(
     unitSystem: com.rallytrax.app.data.preferences.UnitSystem,
     weeklyGoalProgress: Float? = null,
 ) {
+    val isMetric = unitSystem == com.rallytrax.app.data.preferences.UnitSystem.METRIC
+    val heroValue: Int
+    val heroUnit: String
+    if (isMetric) {
+        heroValue = kotlin.math.round(summary.totalDistanceMeters / 1000.0).toInt()
+        heroUnit = "km"
+    } else {
+        heroValue = kotlin.math.round(summary.totalDistanceMeters / 1609.344).toInt()
+        heroUnit = "mi"
+    }
+    val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
     val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
         colors = listOf(
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.tertiaryContainer,
         ),
     )
+
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent,
-        ),
         shape = ShapeExtraLargeIncreased,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(brush = gradient, shape = ShapeExtraLargeIncreased)
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(20.dp),
         ) {
-            if (weeklyGoalProgress != null) {
-                GoalRing(
-                    progress = weeklyGoalProgress,
-                    label = "Goal",
-                    size = 64.dp,
-                    strokeWidth = 6.dp,
-                )
-            } else {
-                SummaryMetric(
-                    label = "This Week",
-                    value = formatDistance(summary.totalDistanceMeters, unitSystem),
-                    modifier = Modifier.weight(1f),
-                )
+            Text(
+                text = "THIS WEEK",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = onContainer.copy(alpha = 0.75f),
+                letterSpacing = 0.8.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = heroValue.toString(),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 64.sp,
+                            lineHeight = 62.sp,
+                            letterSpacing = (-3).sp,
+                            color = onContainer,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = heroUnit,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = onContainer.copy(alpha = 0.7f),
+                            letterSpacing = (-0.5).sp,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "${summary.driveCount} drives · ${formatElapsedTime(summary.totalDurationMs)} behind the wheel",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onContainer.copy(alpha = 0.8f),
+                    )
+                }
+                if (weeklyGoalProgress != null) {
+                    Spacer(Modifier.width(12.dp))
+                    GoalRing(
+                        progress = weeklyGoalProgress,
+                        label = "goal",
+                        size = 82.dp,
+                        strokeWidth = 9.dp,
+                    )
+                }
             }
-            VerticalDivider(
-                modifier = Modifier.height(44.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
-            )
-            SummaryMetric(
-                label = "Drives",
-                value = summary.driveCount.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            VerticalDivider(
-                modifier = Modifier.height(44.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
-            )
-            SummaryMetric(
-                label = "Time",
-                value = formatElapsedTime(summary.totalDurationMs),
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 }
@@ -759,61 +807,72 @@ private fun RallyTraxFabMenu(
 ) {
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 45f else 0f,
-        animationSpec = RallyTraxMotion.fastSpatial(),
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.7f, stiffness = 420f,
+        ),
         label = "fab_rotation",
+    )
+    // Press state drives the squircle "blob" morph when not expanded.
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    // Corner radius morphs between: pressed→10dp (pinched), expanded→50% (circle), else 20dp (squircle).
+    val cornerDp by animateFloatAsState(
+        targetValue = when {
+            expanded -> 28f
+            pressed -> 10f
+            else -> 20f
+        },
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.55f, stiffness = 260f,
+        ),
+        label = "fab_corner",
+    )
+
+    val items = listOf(
+        Triple(Icons.Filled.FiberManualRecord, "Record", onRecord),
+        Triple(Icons.Filled.PlayArrow, "Replay", onReplay),
+        Triple(Icons.Filled.FileOpen, "Import GPX", onImportGpx),
+        Triple(Icons.Filled.LocalGasStation, "Log fill-up", onLogFillUp),
     )
 
     Column(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AnimatedVisibility(
-            visible = expanded,
-            enter = fadeIn(RallyTraxMotion.fastEffects()) +
-                slideInVertically(RallyTraxMotion.fastSpatial()) { it / 2 } +
-                scaleIn(RallyTraxMotion.fastSpatial(), initialScale = 0.8f),
-            exit = fadeOut(RallyTraxMotion.fastEffects()) +
-                slideOutVertically(RallyTraxMotion.fastSpatial()) { it / 2 } +
-                scaleOut(RallyTraxMotion.fastSpatial(), targetScale = 0.8f),
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                FabMenuItem(
-                    icon = Icons.Filled.LocalGasStation,
-                    label = "Log fill-up",
-                    onClick = onLogFillUp,
-                )
-                FabMenuItem(
-                    icon = Icons.Filled.FileOpen,
-                    label = "Import GPX",
-                    onClick = onImportGpx,
-                )
-                FabMenuItem(
-                    icon = Icons.Filled.PlayArrow,
-                    label = "Replay",
-                    onClick = onReplay,
-                )
-                FabMenuItem(
-                    icon = Icons.Filled.FiberManualRecord,
-                    label = "Record",
-                    onClick = onRecord,
-                )
-            }
+        // Staggered per-item entrance: index 0 fires last (bottom of stack) so
+        // it appears closest to the FAB first. Reversing visually stacks bottom-up.
+        items.forEachIndexed { index, (icon, label, handler) ->
+            val delayMs = (items.size - 1 - index) * 50
+            FabMenuItem(
+                icon = icon,
+                label = label,
+                visible = expanded,
+                delayMs = delayMs,
+                onClick = handler,
+            )
         }
 
         FloatingActionButton(
             onClick = onToggle,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(cornerDp.dp),
+            containerColor = if (expanded) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.primaryContainer
+            },
+            contentColor = if (expanded) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            },
+            interactionSource = interactionSource,
             elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
-                defaultElevation = 6.dp,
-                pressedElevation = 6.dp,
+                defaultElevation = 8.dp,
+                pressedElevation = 4.dp,
             ),
         ) {
             Icon(
-                imageVector = if (expanded) Icons.Filled.Close else Icons.Filled.Add,
+                imageVector = Icons.Filled.Add,
                 contentDescription = if (expanded) "Close menu" else "Open menu",
                 modifier = Modifier.rotate(rotation),
             )
@@ -825,32 +884,55 @@ private fun RallyTraxFabMenu(
 private fun FabMenuItem(
     icon: ImageVector,
     label: String,
+    visible: Boolean,
+    delayMs: Int,
     onClick: () -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 220, delayMillis = delayMs,
             ),
+        ) + slideInVertically(
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 0.55f, stiffness = 320f,
+            ),
+            initialOffsetY = { it / 2 },
+        ) + scaleIn(
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 0.55f, stiffness = 320f,
+            ),
+            initialScale = 0.7f,
+        ),
+        exit = fadeOut(RallyTraxMotion.fastEffects()) +
+            scaleOut(RallyTraxMotion.fastEffects(), targetScale = 0.7f),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = label,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.labelLarge,
-            )
-        }
-        SmallFloatingActionButton(
-            onClick = onClick,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-            )
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+            ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            SmallFloatingActionButton(
+                onClick = onClick,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Icon(imageVector = icon, contentDescription = label)
+            }
         }
     }
 }
