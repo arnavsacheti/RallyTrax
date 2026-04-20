@@ -8,10 +8,28 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
@@ -127,49 +145,56 @@ class MainActivity : ComponentActivity() {
                         !dest.hasRoute(com.rallytrax.app.navigation.GarageRoute::class)
                 } ?: true
 
+                // Permission flow for the nav-bar Record button. Mirrors the
+                // check Home's FAB does so either entry point starts recording.
+                var hasLocationPermission by remember {
+                    mutableStateOf(
+                        androidx.core.content.ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    )
+                }
+                val recordPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+                ) { perms ->
+                    hasLocationPermission = perms[android.Manifest.permission.ACCESS_FINE_LOCATION] == true
+                    if (hasLocationPermission) navController.navigate(RecordingRoute)
+                }
+                fun requestRecording() {
+                    if (hasLocationPermission) {
+                        navController.navigate(RecordingRoute)
+                    } else {
+                        val perms = mutableListOf(
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                        )
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        recordPermissionLauncher.launch(perms.toTypedArray())
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     bottomBar = {
                         if (showBottomBar) {
-                            NavigationBar {
-                                topLevelRoutes.forEach { topLevelRoute ->
-                                    val selected = currentDestination?.hierarchy?.any {
-                                        it.hasRoute(topLevelRoute.route::class)
-                                    } == true
-
-                                    NavigationBarItem(
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selected) {
-                                                    topLevelRoute.selectedIcon
-                                                } else {
-                                                    topLevelRoute.unselectedIcon
-                                                },
-                                                contentDescription = topLevelRoute.label,
-                                            )
-                                        },
-                                        label = { Text(topLevelRoute.label) },
-                                        selected = selected,
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                                            selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        ),
-                                        onClick = {
-                                            navController.navigate(topLevelRoute.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        },
-                                    )
-                                }
-                            }
+                            RallyTraxBottomBar(
+                                routes = topLevelRoutes,
+                                currentDestination = currentDestination,
+                                onNavigate = { route ->
+                                    navController.navigate(route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                onRecord = ::requestRecording,
+                            )
                         }
                     },
                 ) { innerPadding ->
@@ -498,5 +523,116 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             snackbarHostState.showSnackbar("Import failed: ${e.message}")
         }
+    }
+}
+
+// ── Bottom bar with center quick-record button ────────────────────────────────
+
+@androidx.compose.runtime.Composable
+private fun RallyTraxBottomBar(
+    routes: List<com.rallytrax.app.navigation.TopLevelRoute>,
+    currentDestination: androidx.navigation.NavDestination?,
+    onNavigate: (Any) -> Unit,
+    onRecord: () -> Unit,
+) {
+    val mid = routes.size / 2
+    val left = routes.take(mid)
+    val right = routes.drop(mid)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .navigationBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            left.forEach { r ->
+                BottomNavSlot(
+                    route = r,
+                    currentDestination = currentDestination,
+                    onClick = { onNavigate(r.route) },
+                )
+            }
+            CenterRecordSlot(onClick = onRecord)
+            right.forEach { r ->
+                BottomNavSlot(
+                    route = r,
+                    currentDestination = currentDestination,
+                    onClick = { onNavigate(r.route) },
+                )
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun RowScope.BottomNavSlot(
+    route: com.rallytrax.app.navigation.TopLevelRoute,
+    currentDestination: androidx.navigation.NavDestination?,
+    onClick: () -> Unit,
+) {
+    val selected = currentDestination?.hierarchy?.any { it.hasRoute(route.route::class) } == true
+    val pillBg = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    val iconTint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val labelColor = if (selected) MaterialTheme.colorScheme.onSurface
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(onClick = onClick)
+            .padding(top = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 64.dp, height = 32.dp)
+                .background(pillBg, RoundedCornerShape(999.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
+                contentDescription = route.label,
+                tint = iconTint,
+            )
+        }
+        Text(text = route.label, style = MaterialTheme.typography.labelMedium, color = labelColor)
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun RowScope.CenterRecordSlot(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(onClick = onClick)
+            .padding(top = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 56.dp, height = 32.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(999.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.FiberManualRecord,
+                contentDescription = "Record",
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+        Text(
+            text = "Record",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }

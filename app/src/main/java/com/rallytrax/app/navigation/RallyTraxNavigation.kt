@@ -172,6 +172,9 @@ fun RallyTraxNavHost(
                 onNavigateToFriends = {
                     navController.navigate(FriendsRoute)
                 },
+                onNavigateToAnalytics = {
+                    navController.navigate(AnalyticsRoute)
+                },
                 onNavigateToSettings = {
                     navController.navigate(SettingsRoute)
                 },
@@ -184,6 +187,11 @@ fun RallyTraxNavHost(
         }
         composable<AchievementsRoute> {
             AchievementsScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<AnalyticsRoute> {
+            com.rallytrax.app.ui.profile.AnalyticsScreen(
                 onBack = { navController.popBackStack() },
             )
         }

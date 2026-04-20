@@ -1,7 +1,7 @@
 package com.rallytrax.app.ui.profile
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,15 +18,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,44 +35,33 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.rallytrax.app.data.auth.AuthState
 import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.ui.auth.GoogleSignInCard
-import com.rallytrax.app.ui.components.RallyTraxTopAppBar
-import com.rallytrax.app.ui.components.Sparkline
-import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
-import com.rallytrax.app.ui.theme.ShapeLargeIncreased
-import com.rallytrax.app.ui.theme.rallyTraxColors
-import com.rallytrax.app.util.formatDistance
-import com.rallytrax.app.util.formatSpeed
-import com.rallytrax.app.util.speedUnit
-import java.util.Locale
+import java.time.DayOfWeek
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +72,7 @@ fun ProfileScreen(
     onNavigateToCommonRoutes: () -> Unit = {},
     onNavigateToAchievements: () -> Unit = {},
     onNavigateToFriends: () -> Unit = {},
+    onNavigateToAnalytics: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     authState: AuthState = AuthState.SignedOut,
     isSignedIn: Boolean = false,
@@ -92,565 +83,271 @@ fun ProfileScreen(
 ) {
     val profile by viewModel.profileState.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
     val authUser = (authState as? AuthState.SignedIn)?.user
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            RallyTraxTopAppBar(
-                title = "Profile",
-                onSettingsClick = onNavigateToSettings,
-                scrollBehavior = scrollBehavior,
-                isSignedIn = isSignedIn,
-                userPhotoUrl = userPhotoUrl,
-                onProfileClick = onProfileClick,
-            )
-        },
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Sign in card or user header
             if (!isSignedIn) {
-                GoogleSignInCard(authState = authState, onClick = onSignIn)
-            } else if (authUser != null) {
-                UserHeader(
-                    displayName = authUser.displayName,
-                    email = authUser.email,
-                    photoUrl = authUser.photoUrl,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Hero Stats — Lifetime
-            Text(
-                text = "Lifetime Stats",
-                style = RallyTraxTypeEmphasized.titleMedium,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Route,
-                    value = "${profile.totalDrives}",
-                    label = "Total Drives",
-                )
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.LocalFireDepartment,
-                    value = "${profile.stintCount}",
-                    label = "Stints",
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Straighten,
-                    value = formatDistance(profile.totalDistanceMeters, preferences.unitSystem),
-                    label = "Total Distance",
-                )
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Speed,
-                    value = formatDistance(profile.avgDriveLengthMeters, preferences.unitSystem),
-                    label = "Avg Drive",
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.DirectionsCar,
-                    value = "${profile.vehicleCount}",
-                    label = "Cars",
-                )
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Timer,
-                    value = formatDistance(profile.longestDriveMeters, preferences.unitSystem),
-                    label = "Longest Drive",
-                )
-            }
-
-            // Streak card (Strava-style)
-            if (profile.currentStreak > 0) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocalFireDepartment,
-                            contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "${profile.currentStreak} day streak!",
-                                style = RallyTraxTypeEmphasized.titleMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
-                            Text(
-                                text = "Keep it going — drive again today",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                            )
-                        }
-                    }
+                Column(modifier = Modifier.padding(16.dp)) {
+                    GoogleSignInCard(authState = authState, onClick = onSignIn)
                 }
+            } else {
+                ProfileHeaderBanner(
+                    displayName = authUser?.displayName ?: "Driver",
+                    handle = authUser?.email,
+                    photoUrl = authUser?.photoUrl ?: userPhotoUrl,
+                    unlockedAchievements = profile.achievementSummary.unlockedCount,
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Achievements Summary
-            if (profile.achievementSummary.totalCount > 0) {
-                AchievementsSummaryCard(summary = profile.achievementSummary)
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Yearly Stats
-            Text(
-                text = "This Year",
-                style = RallyTraxTypeEmphasized.titleMedium,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Route,
-                    value = "${profile.yearlyDrives}",
-                    label = "Drives",
-                )
-                HeroStatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Straighten,
-                    value = formatDistance(profile.yearlyDistanceMeters, preferences.unitSystem),
-                    label = "Distance",
-                )
-            }
+                Spacer(Modifier.height(4.dp))
 
-            // Driving Trends Card
-            DrivingTrendsCard(profile = profile)
+                LifetimeStatsCard(profile = profile, unitSystem = preferences.unitSystem)
 
-            if (profile.vehicleComparison.size >= 2) {
-                Spacer(modifier = Modifier.height(16.dp))
-                VehicleComparisonCard(
-                    vehicleStats = profile.vehicleComparison,
+                SevenDayActivityCard(
+                    dailyDistances = profile.dailyDistances,
                     unitSystem = preferences.unitSystem,
                 )
-            }
 
-            // Corner Speed Profile radar chart
-            if (profile.driverProfile.size >= 3) {
-                Spacer(modifier = Modifier.height(16.dp))
-                DriverRadarCard(driverProfile = profile.driverProfile)
-            }
+                AchievementsOverviewCard(
+                    summary = profile.achievementSummary,
+                    onSeeAll = onNavigateToAchievements,
+                )
 
-            // Weather Impact Card
-            if (profile.weatherBuckets.size >= 2) {
-                Spacer(modifier = Modifier.height(16.dp))
-                WeatherImpactCard(
-                    buckets = profile.weatherBuckets,
-                    unitSystem = preferences.unitSystem,
+                SettingsList(
+                    onPreferences = onNavigateToSettings,
+                    onAnalytics = onNavigateToAnalytics,
+                    onGarage = onNavigateToGarage,
+                    onStints = onNavigateToStints,
+                    onTrips = onNavigateToTrips,
+                    onCommonRoutes = onNavigateToCommonRoutes,
+                    onFriends = onNavigateToFriends,
+                    onAchievements = onNavigateToAchievements,
+                )
+
+                Text(
+                    text = "RallyTrax · ${com.rallytrax.app.BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // My Garage button
-            Card(
-                onClick = onNavigateToGarage,
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DirectionsCar,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "My Garage",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            text = "${profile.vehicleCount} vehicle${if (profile.vehicleCount != 1) "s" else ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = "Go to Garage",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // My Stints button
-            Card(
-                onClick = onNavigateToStints,
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Route,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "My Stints",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            text = "${profile.stintCount} stint${if (profile.stintCount != 1) "s" else ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = "Go to Stints",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // My Trips button
-            Card(
-                onClick = onNavigateToTrips,
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DirectionsCar,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "My Trips",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            text = "Group drives into trips",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = "Go to Trips",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Common Routes button
-            Card(
-                onClick = onNavigateToCommonRoutes,
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Route,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Common Routes",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            text = "Routes you drive frequently",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = "Go to Common Routes",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Achievements button
-            Card(
-                onClick = onNavigateToAchievements,
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.EmojiEvents,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Achievements",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            text = "Track your milestones",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = "Go to Achievements",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(
-                onClick = onNavigateToFriends,
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.People,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Friends",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            text = "Follow and connect with friends",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = "Go to Friends",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
+// ── Header banner ────────────────────────────────────────────────────────────
+
 @Composable
-private fun UserHeader(
-    displayName: String?,
-    email: String?,
+private fun ProfileHeaderBanner(
+    displayName: String,
+    handle: String?,
     photoUrl: String?,
+    unlockedAchievements: Int,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+    // Rally tier scales with unlocked achievements: every 3 unlocked = +1 tier, capped at 5.
+    val rallyTier = (unlockedAchievements / 3 + 1).coerceIn(1, 5)
+
+    val bannerGradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f),
+        ),
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bannerGradient)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
     ) {
-        if (photoUrl != null) {
-            AsyncImage(
-                model = photoUrl,
-                contentDescription = "Profile photo",
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop,
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-        }
-        Column {
-            Text(
-                text = displayName ?: "Driver",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (email != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ConicAvatar(displayName = displayName, photoUrl = photoUrl, size = 76.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = email,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = displayName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!handle.isNullOrBlank()) {
+                    Text(
+                        text = handle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                RallyTierPill(tier = rallyTier)
             }
         }
     }
 }
 
 @Composable
-private fun DrivingTrendsCard(profile: ProfileState) {
-    val hasTrends = profile.smoothnessTrend.size >= 2 ||
-        profile.brakingTrend.size >= 2 ||
-        profile.corneringGTrend.size >= 2
-
-    if (!hasTrends) return
-
-    Spacer(modifier = Modifier.height(16.dp))
-
-    Text(
-        text = "Driving Trends",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
+private fun ConicAvatar(displayName: String, photoUrl: String?, size: androidx.compose.ui.unit.Dp) {
+    // Derive a deterministic hue from the name so every user gets a unique ring.
+    val hue = ((displayName.hashCode() and 0x7fffffff) % 360).toFloat()
+    val ringBrush = Brush.sweepGradient(
+        colors = listOf(
+            Color.hsl(hue, 0.70f, 0.60f),
+            Color.hsl((hue + 60f) % 360f, 0.70f, 0.55f),
+            Color.hsl(hue, 0.70f, 0.60f),
+        ),
     )
-    Spacer(modifier = Modifier.height(8.dp))
+    Box(
+        modifier = Modifier
+            .size(size)
+            .background(ringBrush, CircleShape)
+            .padding(3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (photoUrl != null) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                )
+            } else {
+                val initials = displayName
+                    .split(' ')
+                    .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                    .take(2)
+                    .joinToString("")
+                Text(
+                    text = initials.ifBlank { "·" },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RallyTierPill(tier: Int) {
+    Row(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.EmojiEvents,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(
+            text = "Rally tier $tier",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimary,
+        )
+    }
+}
+
+// ── Lifetime stats card with toggle ─────────────────────────────────────────
+
+private enum class StatsRange { AllTime, Year }
+
+@Composable
+private fun LifetimeStatsCard(profile: ProfileState, unitSystem: UnitSystem) {
+    var range by remember { mutableStateOf(StatsRange.AllTime) }
+    val drives = if (range == StatsRange.AllTime) profile.totalDrives else profile.yearlyDrives
+    val distanceMeters = if (range == StatsRange.AllTime) profile.totalDistanceMeters else profile.yearlyDistanceMeters
+
+    val distanceValue: String
+    val distanceUnit: String
+    if (unitSystem == UnitSystem.METRIC) {
+        val km = distanceMeters / 1000.0
+        if (km >= 1000) {
+            distanceValue = "%.1f".format(km / 1000.0); distanceUnit = "k km"
+        } else {
+            distanceValue = "%.0f".format(km); distanceUnit = "km"
+        }
+    } else {
+        val mi = distanceMeters / 1609.344
+        if (mi >= 1000) {
+            distanceValue = "%.1f".format(mi / 1000.0); distanceUnit = "k mi"
+        } else {
+            distanceValue = "%.0f".format(mi); distanceUnit = "mi"
+        }
+    }
+
+    val hoursDriven = "%.0f".format(profile.avgDriveLengthMeters / 1.0)
+        .let { _ ->
+            // Use longestDriveMeters / average isn't right; use avg speed heuristic? ProfileState
+            // has no total-duration field, so we derive a proxy: driveCount × typical-hour placeholder.
+            // Fall back to "—" if we can't compute; otherwise show total drives × 0.5h estimate.
+            "—"
+        }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
+        shape = RoundedCornerShape(20.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (profile.smoothnessTrend.size >= 2) {
-                TrendRow(
-                    label = "Smoothness",
-                    latestValue = profile.latestSmoothness?.toString() ?: "--",
-                    trendData = profile.smoothnessTrend,
+        Column(modifier = Modifier.padding(vertical = 14.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Lifetime stats",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                RangeToggle(
+                    range = range,
+                    onChange = { range = it },
                 )
             }
-            if (profile.brakingTrend.size >= 2) {
-                TrendRow(
-                    label = "Braking",
-                    latestValue = profile.latestBraking?.toString() ?: "--",
-                    trendData = profile.brakingTrend,
-                )
-            }
-            if (profile.corneringGTrend.size >= 2) {
-                TrendRow(
-                    label = "Cornering G",
-                    latestValue = profile.latestCorneringG?.let {
-                        String.format("%.2f", it)
-                    } ?: "--",
-                    trendData = profile.corneringGTrend,
+            Spacer(Modifier.height(14.dp))
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                BigStat(Modifier.weight(1f), drives.toString(), null, "Stints")
+                BigStat(Modifier.weight(1f), distanceValue, distanceUnit, "Distance", accent = true)
+                BigStat(Modifier.weight(1f), profile.vehicleCount.toString(), null, "Cars")
+                BigStat(
+                    Modifier.weight(1f),
+                    profile.achievementSummary.unlockedCount.toString(),
+                    "/${profile.achievementSummary.totalCount}",
+                    "Unlocked",
                 )
             }
         }
@@ -658,135 +355,224 @@ private fun DrivingTrendsCard(profile: ProfileState) {
 }
 
 @Composable
-private fun TrendRow(
-    label: String,
-    latestValue: String,
-    trendData: List<Float>,
-) {
-    val improving = trendData.last() > trendData.first()
-    val declining = trendData.last() < trendData.first()
-    val trendColor = when {
-        improving -> MaterialTheme.rallyTraxColors.speedSafe
-        declining -> MaterialTheme.rallyTraxColors.speedDanger
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val trendArrow = when {
-        improving -> " \u2191"
-        declining -> " \u2193"
-        else -> ""
-    }
-
+private fun RangeToggle(range: StatsRange, onChange: (StatsRange) -> Unit) {
+    val selectedBg = MaterialTheme.colorScheme.primary
+    val selectedFg = MaterialTheme.colorScheme.onPrimary
+    val unselectedFg = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(999.dp))
+            .padding(2.dp),
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = "$latestValue$trendArrow",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = trendColor,
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Sparkline(
-            data = trendData,
-            color = trendColor,
-            modifier = Modifier
-                .width(60.dp)
-                .height(24.dp),
-        )
-    }
-}
-
-@Composable
-private fun HeroStatCard(
-    icon: ImageVector,
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier,
-        shape = ShapeLargeIncreased,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                style = RallyTraxTypeEmphasized.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
+        listOf(StatsRange.AllTime to "All time", StatsRange.Year to "2026").forEach { (r, label) ->
+            val selected = r == range
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) selectedFg else unselectedFg,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable { onChange(r) }
+                    .background(
+                        if (selected) selectedBg else Color.Transparent,
+                        RoundedCornerShape(999.dp),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
     }
 }
 
 @Composable
-private fun AchievementsSummaryCard(
-    summary: AchievementSummary,
+private fun BigStat(
     modifier: Modifier = Modifier,
+    value: String,
+    unit: String?,
+    label: String,
+    accent: Boolean = false,
 ) {
-    val overallProgress = if (summary.totalCount > 0) {
+    Column(
+        modifier = modifier.padding(horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = value,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 22.sp,
+                letterSpacing = (-0.5).sp,
+                color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+            if (unit != null) {
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 3.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 0.8.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// ── 7-day activity bars ─────────────────────────────────────────────────────
+
+@Composable
+private fun SevenDayActivityCard(
+    dailyDistances: Map<LocalDate, Double>,
+    unitSystem: UnitSystem,
+) {
+    val today = remember { LocalDate.now() }
+    val last7 = remember(dailyDistances, today) {
+        (6 downTo 0).map { daysAgo ->
+            val date = today.minusDays(daysAgo.toLong())
+            date to (dailyDistances[date] ?: 0.0)
+        }
+    }
+    val totalMeters = last7.sumOf { it.second }
+    val maxMeters = last7.maxOf { it.second }.coerceAtLeast(1.0)
+    val totalLabel = formatCompactDistance(totalMeters, unitSystem)
+    val avgPerDay = formatCompactDistance(totalMeters / 7.0, unitSystem)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Activity · last 7 days",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "$totalLabel · avg $avgPerDay/day",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                last7.forEachIndexed { idx, (date, meters) ->
+                    val fraction = (meters / maxMeters).toFloat().coerceIn(0f, 1f)
+                    val barHeight = (6f + fraction * 80f).dp
+                    val isToday = idx == last7.lastIndex
+                    val barColor = if (isToday) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.secondaryContainer
+                    val labelColor = if (isToday) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(barHeight)
+                                .background(barColor, RoundedCornerShape(6.dp)),
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = date.dayOfWeek.dayInitial(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = labelColor,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun DayOfWeek.dayInitial(): String = when (this) {
+    DayOfWeek.MONDAY -> "M"
+    DayOfWeek.TUESDAY -> "T"
+    DayOfWeek.WEDNESDAY -> "W"
+    DayOfWeek.THURSDAY -> "T"
+    DayOfWeek.FRIDAY -> "F"
+    DayOfWeek.SATURDAY -> "S"
+    DayOfWeek.SUNDAY -> "S"
+}
+
+private fun formatCompactDistance(meters: Double, unitSystem: UnitSystem): String {
+    return if (unitSystem == UnitSystem.METRIC) {
+        val km = meters / 1000.0
+        if (km >= 100) "%.0f km".format(km) else "%.1f km".format(km)
+    } else {
+        val mi = meters / 1609.344
+        if (mi >= 100) "%.0f mi".format(mi) else "%.1f mi".format(mi)
+    }
+}
+
+// ── Achievements overview card ──────────────────────────────────────────────
+
+@Composable
+private fun AchievementsOverviewCard(
+    summary: AchievementSummary,
+    onSeeAll: () -> Unit,
+) {
+    val progress = if (summary.totalCount > 0) {
         summary.unlockedCount.toFloat() / summary.totalCount.toFloat()
     } else 0f
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
+        shape = RoundedCornerShape(20.dp),
+        onClick = onSeeAll,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.EmojiEvents,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(20.dp),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = "Achievements",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = "${summary.unlockedCount} / ${summary.totalCount}",
                     style = MaterialTheme.typography.labelLarge,
+                    fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
+            Spacer(Modifier.height(10.dp))
             LinearProgressIndicator(
-                progress = { overallProgress },
+                progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -794,26 +580,19 @@ private fun AchievementsSummaryCard(
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
-
-            if (summary.nextAchievement != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val nextProgress = (summary.nextAchievement.progress * 100).toInt()
+            summary.nextAchievement?.let { next ->
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Next: ${summary.nextAchievement.title}",
+                    text = "Next: ${next.title}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     LinearProgressIndicator(
-                        progress = { summary.nextAchievement.progress.toFloat() },
+                        progress = { next.progress.toFloat() },
                         modifier = Modifier
                             .weight(1f)
                             .height(6.dp)
@@ -821,10 +600,11 @@ private fun AchievementsSummaryCard(
                         color = MaterialTheme.colorScheme.tertiary,
                         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "$nextProgress%",
+                        text = "${(next.progress * 100).toInt()}%",
                         style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -833,359 +613,100 @@ private fun AchievementsSummaryCard(
     }
 }
 
+// ── Settings list ───────────────────────────────────────────────────────────
+
 @Composable
-private fun VehicleComparisonCard(
-    vehicleStats: List<VehicleStats>,
-    unitSystem: UnitSystem,
-    modifier: Modifier = Modifier,
+private fun SettingsList(
+    onPreferences: () -> Unit,
+    onAnalytics: () -> Unit,
+    onGarage: () -> Unit,
+    onStints: () -> Unit,
+    onTrips: () -> Unit,
+    onCommonRoutes: () -> Unit,
+    onFriends: () -> Unit,
+    onAchievements: () -> Unit,
 ) {
-    val maxDistance = vehicleStats.maxOfOrNull { it.totalDistanceMeters } ?: 1.0
+    val rows = listOf(
+        Row4(Icons.Filled.DirectionsCar, "Garage", "Manage your vehicles", onGarage),
+        Row4(Icons.Filled.Route, "Stints", "All recorded drives", onStints),
+        Row4(Icons.Filled.Map, "Trips", "Group drives into trips", onTrips),
+        Row4(Icons.Filled.TrendingUp, "Common routes", "Routes you drive often", onCommonRoutes),
+        Row4(Icons.Filled.BarChart, "Driving analytics", "Trends, weather, vehicle mix", onAnalytics),
+        Row4(Icons.Filled.EmojiEvents, "Achievements", "Track milestones", onAchievements),
+        Row4(Icons.Filled.People, "Friends", "Follow and connect", onFriends),
+        Row4(Icons.Filled.Settings, "Preferences", "Units, map style, voice", onPreferences),
+    )
 
     Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Vehicle Comparison",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            vehicleStats.forEach { stats ->
-                val fraction = if (maxDistance > 0) {
-                    (stats.totalDistanceMeters / maxDistance).toFloat().coerceIn(0f, 1f)
-                } else 0f
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stats.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${stats.driveCount}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = formatDistance(stats.totalDistanceMeters, unitSystem),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DriverRadarCard(
-    driverProfile: Map<Int, Double>,
-    modifier: Modifier = Modifier,
-) {
-    val sortedEntries = remember(driverProfile) {
-        driverProfile.entries.sortedBy { it.key }
-    }
-    val axisCount = sortedEntries.size
-    val maxSpeed = remember(sortedEntries) {
-        sortedEntries.maxOf { it.value }.coerceAtLeast(1.0)
-    }
-    val strongest = remember(sortedEntries) { sortedEntries.maxByOrNull { it.value } }
-    val weakest = remember(sortedEntries) { sortedEntries.minByOrNull { it.value } }
-
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val fillColor = primaryColor.copy(alpha = 0.3f)
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val labelTextSizePx = with(LocalDensity.current) { 10.dp.toPx() }
-
-    val labelPaint = remember(labelColor, labelTextSizePx) {
-        android.graphics.Paint().apply {
-            color = labelColor.toArgb()
-            textSize = labelTextSizePx
-            isAntiAlias = true
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-    }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Corner Speed Profile",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Your average speed through turns of different radii",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-            ) {
-                val centerX = size.width / 2f
-                val centerY = size.height / 2f
-                val chartRadius = minOf(centerX, centerY) - labelTextSizePx * 2.5f
-
-                val angleStep = (2.0 * Math.PI / axisCount).toFloat()
-                // Start from top (negative Y) per radar chart convention
-                val startAngle = (-Math.PI / 2.0).toFloat()
-
-                for (fraction in listOf(0.25f, 0.5f, 0.75f, 1.0f)) {
-                    drawCircle(
-                        color = gridColor.copy(alpha = 0.2f),
-                        radius = chartRadius * fraction,
-                        center = Offset(centerX, centerY),
-                        style = Stroke(width = 1f),
-                    )
-                }
-
-                for (i in 0 until axisCount) {
-                    val angle = startAngle + i * angleStep
-                    val endX = centerX + chartRadius * kotlin.math.cos(angle)
-                    val endY = centerY + chartRadius * kotlin.math.sin(angle)
-                    drawLine(
-                        color = gridColor.copy(alpha = 0.2f),
-                        start = Offset(centerX, centerY),
-                        end = Offset(endX, endY),
-                        strokeWidth = 1f,
-                    )
-                }
-
-                val path = Path()
-                for (i in sortedEntries.indices) {
-                    val angle = startAngle + i * angleStep
-                    val normalizedSpeed = (sortedEntries[i].value / maxSpeed).toFloat()
-                    val dist = chartRadius * normalizedSpeed
-                    val px = centerX + dist * kotlin.math.cos(angle)
-                    val py = centerY + dist * kotlin.math.sin(angle)
-                    if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
-                }
-                path.close()
-
-                drawPath(path = path, color = fillColor)
-                drawPath(path = path, color = primaryColor, style = Stroke(width = 2f))
-
-                drawIntoCanvas { canvas ->
-                    for (i in sortedEntries.indices) {
-                        val angle = startAngle + i * angleStep
-                        val labelDist = chartRadius + labelTextSizePx * 1.5f
-                        val lx = centerX + labelDist * kotlin.math.cos(angle)
-                        val ly = centerY + labelDist * kotlin.math.sin(angle) + labelTextSizePx / 3f
-                        canvas.nativeCanvas.drawText(
-                            "${sortedEntries[i].key}m",
-                            lx,
-                            ly,
-                            labelPaint,
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                if (strongest != null) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Strongest",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "${strongest.key}m radius",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                if (weakest != null) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Weakest",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "${weakest.key}m radius",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Weather Impact Card ───────────────────────────────────────────────────────
-
-private val BASELINE_CONDITION_GROUPS = setOf("Clear", "Clouds")
-private val IMPACT_CONDITION_GROUPS = setOf("Rain", "Drizzle", "Thunderstorm", "Snow")
-
-@Composable
-private fun WeatherImpactCard(
-    buckets: List<WeatherBucket>,
-    unitSystem: UnitSystem,
-    modifier: Modifier = Modifier,
-) {
-    val clearBucket = buckets.find { it.label in BASELINE_CONDITION_GROUPS }
-    val impactBuckets = buckets.filter { it.label in IMPACT_CONDITION_GROUPS }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Weather Impact",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            buckets.forEach { bucket ->
-                WeatherBucketRow(bucket = bucket, unitSystem = unitSystem)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            if (clearBucket != null && impactBuckets.isNotEmpty()) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                Spacer(modifier = Modifier.height(4.dp))
-
-                impactBuckets.forEach { impactBucket ->
-                    if (clearBucket.avgSpeedMps > 0) {
-                        ComparisonRow(
-                            label = "${impactBucket.label} vs ${clearBucket.label}:",
-                            diffPercent = percentChange(impactBucket.avgSpeedMps, clearBucket.avgSpeedMps),
-                            positiveLabel = "faster",
-                            negativeLabel = "slower",
-                        )
-                    }
-                    val clearSmooth = clearBucket.avgSmoothness
-                    val impactSmooth = impactBucket.avgSmoothness
-                    if (clearSmooth != null && impactSmooth != null && clearSmooth > 0) {
-                        ComparisonRow(
-                            label = "${impactBucket.label} smoothness:",
-                            diffPercent = percentChange(impactSmooth, clearSmooth),
-                            positiveLabel = "smoother",
-                            negativeLabel = "rougher",
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-            }
-        }
-    }
-}
-
-private fun percentChange(value: Double, baseline: Double): Double =
-    ((value - baseline) / baseline) * 100
-
-@Composable
-private fun ComparisonRow(
-    label: String,
-    diffPercent: Double,
-    positiveLabel: String,
-    negativeLabel: String,
-) {
-    val text = if (diffPercent < 0) {
-        String.format(Locale.US, "%.0f%% %s", -diffPercent, negativeLabel)
-    } else {
-        String.format(Locale.US, "+%.0f%% %s", diffPercent, positiveLabel)
-    }
-    val color = if (diffPercent < 0) {
-        MaterialTheme.rallyTraxColors.speedDanger
-    } else {
-        MaterialTheme.rallyTraxColors.speedSafe
-    }
-
-    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        shape = RoundedCornerShape(20.dp),
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-        )
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            rows.forEachIndexed { idx, row ->
+                if (idx > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 62.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    )
+                }
+                SettingsRow(row)
+            }
+        }
     }
 }
 
+private data class Row4(
+    val icon: ImageVector,
+    val label: String,
+    val hint: String,
+    val onClick: () -> Unit,
+)
+
 @Composable
-private fun WeatherBucketRow(
-    bucket: WeatherBucket,
-    unitSystem: UnitSystem,
-) {
+private fun SettingsRow(row: Row4) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = row.onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    RoundedCornerShape(10.dp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = row.icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = bucket.label,
+                text = row.label,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = "${bucket.driveCount} drive${if (bucket.driveCount != 1) "s" else ""}",
-                style = MaterialTheme.typography.bodySmall,
+                text = row.hint,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = "${formatSpeed(bucket.avgSpeedMps, unitSystem)} ${speedUnit(unitSystem)}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (bucket.avgSmoothness != null) {
-                Text(
-                    text = String.format(Locale.US, "%.0f smoothness", bucket.avgSmoothness),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
