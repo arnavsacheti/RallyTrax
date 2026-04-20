@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -73,6 +74,7 @@ fun ProfileScreen(
     onNavigateToAchievements: () -> Unit = {},
     onNavigateToFriends: () -> Unit = {},
     onNavigateToAnalytics: () -> Unit = {},
+    onNavigateToYearInReview: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     authState: AuthState = AuthState.SignedOut,
     isSignedIn: Boolean = false,
@@ -132,6 +134,7 @@ fun ProfileScreen(
                     onCommonRoutes = onNavigateToCommonRoutes,
                     onFriends = onNavigateToFriends,
                     onAchievements = onNavigateToAchievements,
+                    onYearInReview = onNavigateToYearInReview,
                 )
 
                 Text(
@@ -621,6 +624,7 @@ private fun SettingsList(
     onCommonRoutes: () -> Unit,
     onFriends: () -> Unit,
     onAchievements: () -> Unit,
+    onYearInReview: () -> Unit,
 ) {
     val rows = listOf(
         Row4(Icons.Filled.DirectionsCar, "Garage", "Manage your vehicles", onGarage),
@@ -630,6 +634,7 @@ private fun SettingsList(
         Row4(Icons.Filled.BarChart, "Driving analytics", "Trends, weather, vehicle mix", onAnalytics),
         Row4(Icons.Filled.EmojiEvents, "Achievements", "Track milestones", onAchievements),
         Row4(Icons.Filled.People, "Friends", "Follow and connect", onFriends),
+        Row4(Icons.Filled.CalendarMonth, "Year in review", "Your year in drives", onYearInReview),
         Row4(Icons.Filled.Settings, "Preferences", "Units, map style, voice", onPreferences),
     )
 
