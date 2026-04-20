@@ -387,7 +387,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f))
                         .clickable { isFabMenuExpanded = false },
                 )
             }
@@ -628,12 +628,9 @@ private fun WeeklySummaryStrip(
                 .background(brush = gradient, shape = ShapeExtraLargeIncreased)
                 .padding(20.dp),
         ) {
-            Text(
-                text = "THIS WEEK",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
+            com.rallytrax.app.ui.components.OverlineLabel(
+                text = "This week",
                 color = onContainer.copy(alpha = 0.75f),
-                letterSpacing = 0.8.sp,
             )
             Spacer(Modifier.height(10.dp))
             Row(
@@ -663,8 +660,21 @@ private fun WeeklySummaryStrip(
                         )
                     }
                     Spacer(Modifier.height(6.dp))
+                    val subhead = if (weeklyGoalProgress != null) {
+                        val pct = (weeklyGoalProgress.coerceIn(0f, 1f) * 100).toInt()
+                        val dow = java.time.LocalDate.now().dayOfWeek.value  // Mon=1..Sun=7
+                        val daysLeft = (7 - dow).coerceAtLeast(0)
+                        val daysLabel = when (daysLeft) {
+                            0 -> "last day of the week"
+                            1 -> "1 day left"
+                            else -> "$daysLeft days left"
+                        }
+                        "$pct% of weekly goal · $daysLabel"
+                    } else {
+                        "${summary.driveCount} drives · ${formatElapsedTime(summary.totalDurationMs)} behind the wheel"
+                    }
                     Text(
-                        text = "${summary.driveCount} drives · ${formatElapsedTime(summary.totalDurationMs)} behind the wheel",
+                        text = subhead,
                         style = MaterialTheme.typography.bodyMedium,
                         color = onContainer.copy(alpha = 0.8f),
                     )
