@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -219,7 +220,9 @@ class MainActivity : ComponentActivity() {
                         RallyTraxNavHost(
                             navController = navController,
                             startDestination = startDestination,
-                            modifier = Modifier.padding(innerPadding),
+                            modifier = Modifier
+                                .padding(innerPadding)
+                                .consumeWindowInsets(innerPadding),
                             authState = authState,
                             isSignedIn = isSignedIn,
                             userPhotoUrl = userPhotoUrl,
