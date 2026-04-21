@@ -20,6 +20,9 @@ data class TripSummary(
     val trackCount: Int = 0,
     val totalDistanceMeters: Double = 0.0,
     val totalDurationMs: Long = 0L,
+    val dayCount: Int = 0,
+    val firstRecordedAt: Long? = null,
+    val lastRecordedAt: Long? = null,
 )
 
 data class TripsUiState(
@@ -44,6 +47,9 @@ class TripsViewModel @Inject constructor(
                     trackCount = tripRepository.getTrackCountForTripOnce(trip.id),
                     totalDistanceMeters = tripRepository.getTotalDistanceForTripOnce(trip.id),
                     totalDurationMs = tripRepository.getTotalDurationForTripOnce(trip.id),
+                    dayCount = tripRepository.getDayCountForTripOnce(trip.id),
+                    firstRecordedAt = tripRepository.getFirstRecordedAtForTripOnce(trip.id),
+                    lastRecordedAt = tripRepository.getLastRecordedAtForTripOnce(trip.id),
                 )
             }
             TripsUiState(trips = summaries, isLoading = false)

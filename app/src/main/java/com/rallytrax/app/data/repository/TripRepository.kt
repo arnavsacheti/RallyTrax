@@ -29,6 +29,9 @@ class TripRepository @Inject constructor(
     suspend fun getTrackCountForTripOnce(tripId: String): Int = tripDao.getTrackCountForTripOnce(tripId)
     suspend fun getTotalDistanceForTripOnce(tripId: String): Double = tripDao.getTotalDistanceForTripOnce(tripId)
     suspend fun getTotalDurationForTripOnce(tripId: String): Long = tripDao.getTotalDurationForTripOnce(tripId)
+    suspend fun getFirstRecordedAtForTripOnce(tripId: String): Long? = tripDao.getFirstRecordedAtForTripOnce(tripId)
+    suspend fun getLastRecordedAtForTripOnce(tripId: String): Long? = tripDao.getLastRecordedAtForTripOnce(tripId)
+    suspend fun getDayCountForTripOnce(tripId: String): Int = tripDao.getDayCountForTripOnce(tripId)
 
     suspend fun createTrip(name: String, description: String? = null): String {
         val now = System.currentTimeMillis()

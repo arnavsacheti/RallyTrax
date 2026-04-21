@@ -39,6 +39,18 @@ interface TripDao {
     @Query("SELECT COALESCE(SUM(durationMs), 0) FROM tracks WHERE tripId = :tripId")
     suspend fun getTotalDurationForTripOnce(tripId: String): Long
 
+    @Query("SELECT MIN(recordedAt) FROM tracks WHERE tripId = :tripId")
+    suspend fun getFirstRecordedAtForTripOnce(tripId: String): Long?
+
+    @Query("SELECT MAX(recordedAt) FROM tracks WHERE tripId = :tripId")
+    suspend fun getLastRecordedAtForTripOnce(tripId: String): Long?
+
+    @Query(
+        "SELECT COUNT(DISTINCT DATE(recordedAt / 1000, 'unixepoch', 'localtime')) " +
+            "FROM tracks WHERE tripId = :tripId",
+    )
+    suspend fun getDayCountForTripOnce(tripId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrip(trip: TripEntity)
 

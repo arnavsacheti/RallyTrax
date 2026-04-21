@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,6 +106,7 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var showTagFilter by remember { mutableStateOf(false) }
     var showAdvancedFilters by remember { mutableStateOf(false) }
+    var libraryScope by remember { mutableStateOf("all") }
 
     // Location permission for Near Me filter
     var hasLocationPermission by remember {
@@ -286,6 +288,19 @@ fun LibraryScreen(
                     )
                 }
             }
+
+            // Segmented scope tabs: All · N | Routes · N
+            if (!uiState.isMultiSelectMode) {
+                val routesCount = remember(uiState.tracks) { uiState.tracks.count { it.trackCategory == "route" } }
+                val allCount = uiState.tracks.size
+                LibraryScopeTabs(
+                    scope = libraryScope,
+                    onScopeChange = { libraryScope = it },
+                    allCount = allCount,
+                    routesCount = routesCount,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             // Search bar
             TextField(
                 value = uiState.searchQuery,
@@ -376,9 +391,10 @@ fun LibraryScreen(
             if (uiState.isLoading) {
                 ShimmerLoadingList(modifier = Modifier.fillMaxSize())
             } else {
-                val visibleTracks = remember(uiState.tracks, pendingDeletes) {
+                val visibleTracks = remember(uiState.tracks, pendingDeletes, libraryScope) {
                     val pendingIds = pendingDeletes.map { it.id }.toSet()
-                    if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
+                    val base = if (pendingIds.isNotEmpty()) uiState.tracks.filter { it.id !in pendingIds } else uiState.tracks
+                    if (libraryScope == "routes") base.filter { it.trackCategory == "route" } else base
                 }
 
                 if (visibleTracks.isEmpty()) {
@@ -533,6 +549,65 @@ fun LibraryScreen(
                 viewModel.updateElevationRange(null)
                 viewModel.updateDurationRange(null)
             },
+        )
+    }
+}
+
+@Composable
+private fun LibraryScopeTabs(
+    scope: String,
+    onScopeChange: (String) -> Unit,
+    allCount: Int,
+    routesCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val cs = MaterialTheme.colorScheme
+    androidx.compose.foundation.layout.Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(ShapeFullRound)
+            .background(cs.surfaceContainer)
+            .padding(4.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+    ) {
+        LibraryScopeTab(
+            label = "All · $allCount",
+            selected = scope == "all",
+            onClick = { onScopeChange("all") },
+            modifier = Modifier.weight(1f),
+        )
+        LibraryScopeTab(
+            label = "Routes · $routesCount",
+            selected = scope == "routes",
+            onClick = { onScopeChange("routes") },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun LibraryScopeTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val cs = MaterialTheme.colorScheme
+    val bg = if (selected) cs.primary else Color.Transparent
+    val fg = if (selected) cs.onPrimary else cs.onSurface
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .clip(ShapeFullRound)
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = fg,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }

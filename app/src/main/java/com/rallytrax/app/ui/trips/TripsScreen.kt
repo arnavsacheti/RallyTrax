@@ -11,12 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
@@ -55,6 +61,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.ui.components.MonoText
+import com.rallytrax.app.ui.components.OverlineLabel
+import com.rallytrax.app.ui.theme.RallyTraxTypeEmphasized
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -221,74 +230,158 @@ private fun TripListItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val dateRange = tripDateRange(summary)
+    val isDark = !MaterialTheme.colorScheme.background.isLight()
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        // Hero: stitched trip map + gradient scrim + title + pills
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainer),
+        ) {
+            StitchedTripMap(
+                tripId = summary.trip.id,
+                stintCount = summary.trackCount.coerceAtLeast(1),
+                dayCount = summary.dayCount.coerceAtLeast(1),
+                isDark = isDark,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color(0xB00C0E12)),
+                            startY = 60f,
+                        ),
+                    ),
+            )
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                dateRange?.let {
+                    TripPill(
+                        text = it,
+                        leadingIcon = Icons.Filled.CalendarMonth,
+                        bg = Color(0xD8FFFFFF),
+                        fg = Color(0xFF1B1D22),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
             ) {
                 Text(
                     text = summary.trip.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = RallyTraxTypeEmphasized.titleLarge,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = formatDate(summary.trip.createdAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            summary.trip.description?.let { desc ->
-                if (desc.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                summary.trip.description?.takeIf { it.isNotBlank() }?.let { desc ->
                     Text(
                         text = desc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xCFFFFFFF),
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                TripStatChip(
-                    label = "Stints",
-                    value = "${summary.trackCount}",
-                )
-                TripStatChip(
-                    label = "Distance",
-                    value = formatDistance(summary.totalDistanceMeters),
-                )
-                if (summary.totalDurationMs > 0) {
-                    TripStatChip(
-                        label = "Duration",
-                        value = formatElapsedTime(summary.totalDurationMs),
-                    )
-                }
+        // Body: metric row with dividers
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TripMetric(value = formatDistance(summary.totalDistanceMeters), label = "Distance")
+            TripMetricDivider()
+            TripMetric(
+                value = if (summary.totalDurationMs > 0) formatElapsedTime(summary.totalDurationMs) else "—",
+                label = "Time",
+            )
+            TripMetricDivider()
+            TripMetric(value = summary.trackCount.toString(), label = "Stints")
+            if (summary.dayCount > 1) {
+                TripMetricDivider()
+                TripMetric(value = summary.dayCount.toString(), label = "Days")
             }
         }
     }
 }
+
+@Composable
+private fun TripMetric(value: String, label: String) {
+    Column {
+        MonoText(
+            text = value,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        OverlineLabel(text = label)
+    }
+}
+
+@Composable
+private fun TripMetricDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(36.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+@Composable
+private fun TripPill(
+    text: String,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    bg: Color,
+    fg: Color,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(bg)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        leadingIcon?.let {
+            Icon(imageVector = it, contentDescription = null, tint = fg, modifier = Modifier.size(12.dp))
+        }
+        Text(text = text, color = fg, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private fun tripDateRange(summary: TripSummary): String? {
+    val first = summary.firstRecordedAt ?: return null
+    val last = summary.lastRecordedAt ?: return formatDate(first)
+    return if (last - first < 24L * 3600 * 1000) formatDate(first)
+    else "${formatDate(first)} – ${formatDate(last)}"
+}
+
+private fun Color.isLight(): Boolean =
+    (0.299f * red + 0.587f * green + 0.114f * blue) > 0.5f
 
 @Composable
 private fun TripsTotalsStrip(
@@ -328,22 +421,6 @@ private fun TripsTotalCell(label: String, value: String) {
         com.rallytrax.app.ui.components.OverlineLabel(
             text = label,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-        )
-    }
-}
-
-@Composable
-private fun TripStatChip(label: String, value: String) {
-    Column {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
