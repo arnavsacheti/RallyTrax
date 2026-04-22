@@ -46,6 +46,7 @@ fun SegmentsListScreen(
     viewModel: SegmentsListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -96,6 +97,7 @@ fun SegmentsListScreen(
                 items(uiState.segments, key = { it.segment.id }) { item ->
                     SegmentCard(
                         item = item,
+                        unitSystem = preferences.unitSystem,
                         onClick = { onSegmentClick(item.segment.id) },
                         onToggleFavorite = { viewModel.toggleFavorite(item.segment.id) },
                     )
@@ -108,6 +110,7 @@ fun SegmentsListScreen(
 @Composable
 private fun SegmentCard(
     item: SegmentListItem,
+    unitSystem: UnitSystem,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
@@ -135,7 +138,7 @@ private fun SegmentCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = buildString {
-                        append(formatDistance(item.segment.distanceMeters, UnitSystem.METRIC))
+                        append(formatDistance(item.segment.distanceMeters, unitSystem))
                         append(" \u2022 ")
                         append("${item.stats.runCount} run${if (item.stats.runCount != 1) "s" else ""}")
                     },

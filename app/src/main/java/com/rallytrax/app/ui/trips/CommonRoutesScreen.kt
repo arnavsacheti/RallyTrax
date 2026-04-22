@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.CommonRouteEntity
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.util.formatDate
@@ -54,6 +55,7 @@ fun CommonRoutesScreen(
     viewModel: CommonRoutesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
@@ -111,6 +113,7 @@ fun CommonRoutesScreen(
                 ) { route ->
                     CommonRouteCard(
                         route = route,
+                        unitSystem = preferences.unitSystem,
                         onClick = { onRouteClick(route.id) },
                     )
                 }
@@ -122,6 +125,7 @@ fun CommonRoutesScreen(
 @Composable
 fun CommonRouteCard(
     route: CommonRouteEntity,
+    unitSystem: UnitSystem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -197,7 +201,7 @@ fun CommonRouteCard(
                 RouteStatItem(
                     icon = Icons.Filled.Route,
                     label = "Avg Distance",
-                    value = formatDistance(route.avgDistanceMeters),
+                    value = formatDistance(route.avgDistanceMeters, unitSystem),
                 )
                 if (route.bestDurationMs > 0) {
                     RouteStatItem(

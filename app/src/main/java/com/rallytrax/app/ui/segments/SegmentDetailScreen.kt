@@ -49,6 +49,7 @@ fun SegmentDetailScreen(
     viewModel: SegmentDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -99,7 +100,7 @@ fun SegmentDetailScreen(
             ) {
                 // Stats card
                 item {
-                    StatsCard(uiState)
+                    StatsCard(uiState, preferences.unitSystem)
                 }
 
                 // Run history header
@@ -119,6 +120,7 @@ fun SegmentDetailScreen(
                     RunHistoryRow(
                         item = item,
                         bestTimeMs = uiState.bestTimeMs,
+                        unitSystem = preferences.unitSystem,
                         onClick = { onTrackClick(item.run.trackId) },
                     )
                 }
@@ -132,7 +134,7 @@ fun SegmentDetailScreen(
 }
 
 @Composable
-private fun StatsCard(uiState: SegmentDetailUiState) {
+private fun StatsCard(uiState: SegmentDetailUiState, unitSystem: UnitSystem) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -143,7 +145,7 @@ private fun StatsCard(uiState: SegmentDetailUiState) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = formatDistance(uiState.segment?.distanceMeters ?: 0.0, UnitSystem.METRIC),
+                text = formatDistance(uiState.segment?.distanceMeters ?: 0.0, unitSystem),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -202,6 +204,7 @@ private fun StatsCard(uiState: SegmentDetailUiState) {
 private fun RunHistoryRow(
     item: RunHistoryItem,
     bestTimeMs: Long?,
+    unitSystem: UnitSystem,
     onClick: () -> Unit,
 ) {
     Column(
@@ -237,7 +240,7 @@ private fun RunHistoryRow(
                     color = if (isBest) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Avg ${formatSpeed(item.run.avgSpeedMps, UnitSystem.METRIC)}",
+                    text = "Avg ${formatSpeed(item.run.avgSpeedMps, unitSystem)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

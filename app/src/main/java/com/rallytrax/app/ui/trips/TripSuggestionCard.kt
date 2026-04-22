@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rallytrax.app.data.local.entity.TripSuggestionEntity
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
 
@@ -50,6 +51,7 @@ fun TripSuggestionCard(
     onAccept: (String) -> Unit,
     onDismiss: (String) -> Unit,
     modifier: Modifier = Modifier,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
 ) {
     var visible by remember { mutableStateOf(true) }
 
@@ -127,7 +129,7 @@ fun TripSuggestionCard(
                     )
                     SuggestionStat(
                         icon = Icons.Filled.GroupWork,
-                        value = formatDistance(suggestion.totalDistanceMeters),
+                        value = formatDistance(suggestion.totalDistanceMeters, unitSystem),
                     )
                     if (suggestion.totalDurationMs > 0) {
                         Text(

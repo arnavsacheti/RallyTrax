@@ -3,6 +3,8 @@ package com.rallytrax.app.ui.trips
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.entity.TripEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.TripRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,10 +33,14 @@ data class TripsUiState(
 @HiltViewModel
 class TripsViewModel @Inject constructor(
     private val tripRepository: TripRepository,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _pendingDelete = MutableStateFlow<TripEntity?>(null)
     val pendingDelete: StateFlow<TripEntity?> = _pendingDelete.asStateFlow()
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     val uiState: StateFlow<TripsUiState> = tripRepository.getAllTrips()
         .mapLatest { trips ->

@@ -326,6 +326,7 @@ fun HomeScreen(
                             onAccept = { suggestionViewModel.acceptSuggestion(it) },
                             onDismiss = { suggestionViewModel.dismissSuggestion(it) },
                             modifier = Modifier.padding(horizontal = 0.dp),
+                            unitSystem = preferences.unitSystem,
                         )
                     }
                 }

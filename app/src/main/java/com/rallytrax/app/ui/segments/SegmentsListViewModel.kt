@@ -3,12 +3,16 @@ package com.rallytrax.app.ui.segments
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.entity.SegmentEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.SegmentRepository
 import com.rallytrax.app.data.repository.SegmentStats
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,10 +29,14 @@ data class SegmentsListUiState(
 @HiltViewModel
 class SegmentsListViewModel @Inject constructor(
     private val segmentRepository: SegmentRepository,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SegmentsListUiState())
     val uiState: StateFlow<SegmentsListUiState> = _uiState.asStateFlow()
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     init {
         loadSegments()

@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TripEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.TripRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,12 +30,16 @@ data class TripDetailUiState(
 class TripDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val tripRepository: TripRepository,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val tripId: String = savedStateHandle["tripId"] ?: ""
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     val uiState: StateFlow<TripDetailUiState> = combine(
         tripRepository.getTripById(tripId),

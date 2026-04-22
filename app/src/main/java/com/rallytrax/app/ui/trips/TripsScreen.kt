@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -68,6 +69,7 @@ fun TripsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingDelete by viewModel.pendingDelete.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -160,6 +162,7 @@ fun TripsScreen(
                         stintCount = visibleTrips.sumOf { it.trackCount },
                         totalDistanceMeters = visibleTrips.sumOf { it.totalDistanceMeters },
                         totalDurationMs = visibleTrips.sumOf { it.totalDurationMs },
+                        unitSystem = preferences.unitSystem,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
@@ -206,6 +209,7 @@ fun TripsScreen(
                     ) {
                         TripListItem(
                             summary = summary,
+                            unitSystem = preferences.unitSystem,
                             onClick = { onTripClick(summary.trip.id) },
                         )
                     }
@@ -218,6 +222,7 @@ fun TripsScreen(
 @Composable
 private fun TripListItem(
     summary: TripSummary,
+    unitSystem: UnitSystem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -277,7 +282,7 @@ private fun TripListItem(
                 )
                 TripStatChip(
                     label = "Distance",
-                    value = formatDistance(summary.totalDistanceMeters),
+                    value = formatDistance(summary.totalDistanceMeters, unitSystem),
                 )
                 if (summary.totalDurationMs > 0) {
                     TripStatChip(
@@ -296,6 +301,7 @@ private fun TripsTotalsStrip(
     stintCount: Int,
     totalDistanceMeters: Double,
     totalDurationMs: Long,
+    unitSystem: UnitSystem,
     modifier: Modifier = Modifier,
 ) {
     com.rallytrax.app.ui.components.HeroGradientCard(
@@ -308,7 +314,7 @@ private fun TripsTotalsStrip(
         ) {
             TripsTotalCell(label = "Trips", value = tripCount.toString())
             TripsTotalCell(label = "Stints", value = stintCount.toString())
-            TripsTotalCell(label = "Distance", value = formatDistance(totalDistanceMeters))
+            TripsTotalCell(label = "Distance", value = formatDistance(totalDistanceMeters, unitSystem))
             if (totalDurationMs > 0) {
                 TripsTotalCell(label = "Time", value = formatElapsedTime(totalDurationMs))
             }

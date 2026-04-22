@@ -3,6 +3,8 @@ package com.rallytrax.app.ui.trips
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.entity.CommonRouteEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.CommonRouteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +22,7 @@ data class CommonRoutesUiState(
 @HiltViewModel
 class CommonRoutesViewModel @Inject constructor(
     private val commonRouteRepository: CommonRouteRepository,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<CommonRoutesUiState> = commonRouteRepository
@@ -31,6 +34,9 @@ class CommonRoutesViewModel @Inject constructor(
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CommonRoutesUiState())
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     fun refreshDetection() {
         viewModelScope.launch {

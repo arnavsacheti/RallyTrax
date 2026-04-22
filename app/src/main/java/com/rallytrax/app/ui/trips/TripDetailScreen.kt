@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rallytrax.app.data.local.entity.TrackEntity
+import com.rallytrax.app.data.preferences.UnitSystem
 import com.rallytrax.app.util.formatDate
 import com.rallytrax.app.util.formatDistance
 import com.rallytrax.app.util.formatElapsedTime
@@ -56,6 +57,7 @@ fun TripDetailScreen(
     viewModel: TripDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showEditDialog by remember { mutableStateOf(false) }
 
@@ -138,7 +140,7 @@ fun TripDetailScreen(
                         )
                         StatColumn(
                             label = "Distance",
-                            value = formatDistance(uiState.totalDistanceMeters),
+                            value = formatDistance(uiState.totalDistanceMeters, preferences.unitSystem),
                         )
                         StatColumn(
                             label = "Duration",
@@ -181,6 +183,7 @@ fun TripDetailScreen(
             ) { track ->
                 TripTrackItem(
                     track = track,
+                    unitSystem = preferences.unitSystem,
                     onClick = { onTrackClick(track.id) },
                     onRemove = { viewModel.removeTrackFromTrip(track.id) },
                 )
@@ -208,6 +211,7 @@ private fun StatColumn(label: String, value: String) {
 @Composable
 private fun TripTrackItem(
     track: TrackEntity,
+    unitSystem: UnitSystem,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
@@ -237,7 +241,7 @@ private fun TripTrackItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = formatDistance(track.distanceMeters),
+                        text = formatDistance(track.distanceMeters, unitSystem),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

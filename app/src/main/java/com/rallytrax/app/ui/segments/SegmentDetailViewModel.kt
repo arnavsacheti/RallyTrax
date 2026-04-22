@@ -7,14 +7,18 @@ import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
 import com.rallytrax.app.data.local.entity.SegmentEntity
 import com.rallytrax.app.data.local.entity.SegmentRunEntity
+import com.rallytrax.app.data.preferences.UserPreferencesData
+import com.rallytrax.app.data.preferences.UserPreferencesRepository
 import com.rallytrax.app.data.repository.SegmentRepository
 import com.rallytrax.app.recording.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -40,12 +44,16 @@ class SegmentDetailViewModel @Inject constructor(
     private val segmentRepository: SegmentRepository,
     private val trackDao: TrackDao,
     private val trackPointDao: TrackPointDao,
+    preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val segmentId: String = checkNotNull(savedStateHandle["segmentId"])
 
     private val _uiState = MutableStateFlow(SegmentDetailUiState())
     val uiState: StateFlow<SegmentDetailUiState> = _uiState.asStateFlow()
+
+    val preferences: StateFlow<UserPreferencesData> = preferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferencesData())
 
     private val _snackbarMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarMessage = _snackbarMessage.asSharedFlow()

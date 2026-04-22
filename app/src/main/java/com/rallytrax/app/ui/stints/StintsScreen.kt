@@ -304,6 +304,7 @@ fun StintsScreen(
                                 suggestion = suggestion,
                                 onAccept = { suggestionViewModel.acceptSuggestion(it) },
                                 onDismiss = { suggestionViewModel.dismissSuggestion(it) },
+                                unitSystem = preferences.unitSystem,
                             )
                         }
                         item(key = "suggestion_divider") {
