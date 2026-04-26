@@ -67,8 +67,6 @@ import com.rallytrax.app.update.UpdateViewModel
 import com.rallytrax.app.util.GoogleMapsUrlParser
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -92,18 +90,25 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Read onboarding state synchronously to determine start destination
-        val initialPrefs = runBlocking { preferencesRepository.preferences.first() }
-        val startDestination: Any = if (initialPrefs.onboardingCompleted) {
-            com.rallytrax.app.navigation.HomeRoute
-        } else {
-            OnboardingRoute
-        }
-
         setContent {
+            // Hold the splash until the first prefs emission lands so we can
+            // pick the correct start destination (Home vs Onboarding) without
+            // blocking the main thread on DataStore.
             val prefs by preferencesRepository.preferences.collectAsStateWithLifecycle(
-                initialValue = initialPrefs,
+                initialValue = null,
             )
+            val resolvedPrefs = prefs ?: run {
+                // Keep splash visible. Returning early avoids touching the rest
+                // of the UI graph until we can render with real preferences.
+                return@setContent
+            }
+            val startDestination: Any = remember(resolvedPrefs.onboardingCompleted) {
+                if (resolvedPrefs.onboardingCompleted) {
+                    com.rallytrax.app.navigation.HomeRoute
+                } else {
+                    OnboardingRoute
+                }
+            }
 
             val authState by authViewModel.authState.collectAsStateWithLifecycle()
             val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
@@ -115,7 +120,7 @@ class MainActivity : ComponentActivity() {
 
             var showProfileSheet by remember { mutableStateOf(false) }
 
-            RallyTraxTheme(themeMode = prefs.themeMode, oledDark = prefs.oledDark) {
+            RallyTraxTheme(themeMode = resolvedPrefs.themeMode, oledDark = resolvedPrefs.oledDark) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
@@ -236,7 +241,7 @@ class MainActivity : ComponentActivity() {
 
                 // Mark onboarding as completed when navigating away from it
                 LaunchedEffect(currentDestination) {
-                    if (currentDestination?.hasRoute(OnboardingRoute::class) == false && !initialPrefs.onboardingCompleted) {
+                    if (currentDestination?.hasRoute(OnboardingRoute::class) == false && !resolvedPrefs.onboardingCompleted) {
                         preferencesRepository.setOnboardingCompleted(true)
                     }
                 }

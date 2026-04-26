@@ -24,6 +24,7 @@ import com.rallytrax.app.util.formatElapsedTime
 import com.rallytrax.app.data.preferences.GpsAccuracy
 import com.rallytrax.app.data.preferences.GpsIntervalConfig
 import com.rallytrax.app.data.preferences.UnitSystem
+import com.rallytrax.app.data.preferences.UserPreferencesData
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,7 +40,6 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import kotlin.math.max
 
@@ -79,6 +79,16 @@ class TrackingService : LifecycleService() {
     private var maxLon: Double = -Double.MAX_VALUE
     private var isNewSegment: Boolean = true
     private var cachedUnitSystem: UnitSystem = UnitSystem.METRIC
+
+    /**
+     * Latest snapshot of user preferences. Updated reactively from
+     * [preferencesRepository.preferences] in [onCreate]; reads on the main
+     * thread / GPS callback path use this directly instead of blocking on
+     * DataStore. Defaults are sane for the brief window before the first
+     * emission lands. @Volatile so the GPS callback thread sees fresh writes.
+     */
+    @Volatile
+    private var cachedPrefs: UserPreferencesData = UserPreferencesData()
 
     // Kalman filter for smooth, high-rate position tracking
     private val kalmanFilter = GpsKalmanFilter()
@@ -172,6 +182,12 @@ class TrackingService : LifecycleService() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         notificationManager = TrackingNotificationManager(this)
+        // Subscribe to user preferences so subsequent reads (notification
+        // formatting, GPS accuracy tier, auto-pause thresholds) can hit a
+        // cached snapshot instead of blocking the main thread on DataStore.
+        lifecycleScope.launch {
+            preferencesRepository.preferences.collect { cachedPrefs = it }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -200,9 +216,7 @@ class TrackingService : LifecycleService() {
         lastLocation = null
         previousElevation = null
         isNewSegment = true
-        cachedUnitSystem = kotlinx.coroutines.runBlocking {
-            preferencesRepository.preferences.first()
-        }.unitSystem
+        cachedUnitSystem = cachedPrefs.unitSystem
         peakLateralG = 0.0
         peakBrakingG = 0.0
         alertCount = 0
@@ -290,10 +304,7 @@ class TrackingService : LifecycleService() {
     }
 
     private fun buildLocationRequest(): LocationRequest {
-        val prefs = kotlinx.coroutines.runBlocking {
-            preferencesRepository.preferences.first()
-        }
-        return when (prefs.gpsAccuracy) {
+        return when (cachedPrefs.gpsAccuracy) {
             GpsAccuracy.HIGH -> LocationRequest.Builder(
                 Priority.PRIORITY_HIGH_ACCURACY,
                 GpsIntervalConfig.HIGH_INTERVAL_MS,
@@ -579,10 +590,8 @@ class TrackingService : LifecycleService() {
     }
 
     private fun checkAutoPause(speed: Double, now: Long) {
-        // Read auto-pause preference (cached at start, check periodically)
-        val prefs = kotlinx.coroutines.runBlocking {
-            preferencesRepository.preferences.first()
-        }
+        // Read auto-pause preference from the cached snapshot (no blocking).
+        val prefs = cachedPrefs
         if (!prefs.autoPauseEnabled) {
             stationaryStartMs = null
             return
