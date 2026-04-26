@@ -153,7 +153,7 @@
             android:foregroundServiceType="location"
             android:exported="false" />
 
-        <!-- Android Auto Car App Service -->
+        <!-- Android Auto + Automotive OS Car App Service -->
         <service
             android:name=".car.RallyTraxCarAppService"
             android:exported="true"

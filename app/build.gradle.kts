@@ -133,6 +133,22 @@ android {
         }
     }
 
+    // phone: ships for phones + Android Auto projection (app + app-projected)
+    // automotive: ships for Android Automotive OS (app + app-automotive)
+    // The two Car App Library host artifacts can't coexist in one APK — flavors
+    // split them. Default for local dev + CI stays `phone`.
+    flavorDimensions += "target"
+    productFlavors {
+        create("phone") {
+            dimension = "target"
+            isDefault = true
+        }
+        create("automotive") {
+            dimension = "target"
+            versionNameSuffix = "-aaos"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -247,7 +263,8 @@ dependencies {
 
     // Android Auto (Car App Library)
     implementation(libs.car.app)
-    implementation(libs.car.app.projected)
+    "phoneImplementation"(libs.car.app.projected)
+    "automotiveImplementation"(libs.car.app.automotive)
 
     // Location
     implementation(libs.play.services.location)

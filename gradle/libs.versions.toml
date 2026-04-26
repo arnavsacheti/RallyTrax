@@ -81,6 +81,7 @@ camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", vers
 camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 car-app-projected = { group = "androidx.car.app", name = "app-projected", version.ref = "carApp" }
+car-app-automotive = { group = "androidx.car.app", name = "app-automotive", version.ref = "carApp" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
