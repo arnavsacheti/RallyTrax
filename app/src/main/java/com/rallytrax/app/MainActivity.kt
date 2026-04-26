@@ -274,8 +274,14 @@ class MainActivity : ComponentActivity() {
                                 FilledTonalButton(
                                     onClick = {
                                         updateViewModel.dismissUpdate()
-                                        val intent = Intent(Intent.ACTION_VIEW, release.htmlUrl.toUri())
-                                        startActivity(intent)
+                                        // Custom Tabs hands off to the user's
+                                        // default browser without going through
+                                        // implicit ACTION_VIEW resolution, so a
+                                        // hostile app declaring an https filter
+                                        // can't intercept the release URL.
+                                        androidx.browser.customtabs.CustomTabsIntent.Builder()
+                                            .build()
+                                            .launchUrl(this@MainActivity, release.htmlUrl.toUri())
                                     },
                                 ) {
                                     Icon(Icons.Filled.Download, contentDescription = null)
