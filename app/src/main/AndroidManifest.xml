@@ -87,13 +87,22 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.google-earth.kml+xml" />
             </intent-filter>
+            <!-- Some file managers serve GPX/KML as application/octet-stream.
+                 Constrain by filename extension so we only match files that
+                 are at least nominally GPX or KML rather than every binary
+                 stream from any content provider. -->
             <intent-filter
                 android:label="Import to RallyTrax"
                 tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" />
+                <data android:host="*" />
                 <data android:mimeType="application/octet-stream" />
+                <data android:pathPattern=".*\\.gpx" />
+                <data android:pathPattern=".*\\.kml" />
+                <data android:pathPattern=".*\\.GPX" />
+                <data android:pathPattern=".*\\.KML" />
             </intent-filter>
 
             <!-- Share single file (Strava, file managers, fitness apps) -->
@@ -117,13 +126,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.google-earth.kml+xml" />
             </intent-filter>
-            <intent-filter android:label="Import to RallyTrax">
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/octet-stream" />
-            </intent-filter>
-
             <!-- Share text (Google Maps URLs, location links) -->
+            <!-- The previous application/octet-stream SEND filter was removed:
+                 specific MIME types (gpx+xml, vnd.google-earth.kml+xml,
+                 application/xml, text/xml) cover all real-world sharers we
+                 know of and the broad octet-stream filter let any binary
+                 share target the import flow. -->
             <intent-filter android:label="Open in RallyTrax">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
