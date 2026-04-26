@@ -296,11 +296,22 @@ object PaceNoteGenerator {
                 } else {
                     points[i].elevation ?: points[i - 1].elevation
                 }
-                // Distance-proportional original index (D006): distribute indices across sparse GPS gaps
+                // Distance-proportional original index (D006): distribute
+                // indices across sparse GPS gaps. Use round-half-up nearest-
+                // neighbour rather than truncation: with .toInt() two
+                // interpolated points at fractions 0.3 and 0.7 in the same
+                // [prevIdx, prevIdx+1] gap both collapsed onto prevIdx,
+                // breaking segment-boundary fidelity. Math.round picks the
+                // closer source index. Note: this is still a lossy mapping
+                // when more than ~(nextIdx-prevIdx) interpolated points
+                // share a gap; the persisted PaceNoteEntity stores integer
+                // indices only, so a fully faithful reconstruction would
+                // require a schema migration to add an interpolation
+                // fraction. See issue #117 for that follow-up.
                 val prevIdx = points[i - 1].index
                 val nextIdx = points[i].index
                 val origIdx = if (nextIdx > prevIdx) {
-                    prevIdx + ((nextIdx - prevIdx).toDouble() * frac).toInt()
+                    prevIdx + Math.round((nextIdx - prevIdx).toDouble() * frac).toInt()
                 } else {
                     prevIdx  // same index or shouldn't happen — keep safe
                 }
