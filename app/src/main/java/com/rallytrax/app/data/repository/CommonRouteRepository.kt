@@ -1,6 +1,8 @@
 package com.rallytrax.app.data.repository
 
 import android.util.Log
+import androidx.room.withTransaction
+import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.CommonRouteDao
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TrackPointDao
@@ -21,6 +23,7 @@ class CommonRouteRepository @Inject constructor(
     private val trackPointDao: TrackPointDao,
     private val commonRouteDao: CommonRouteDao,
     private val commonRouteDetector: CommonRouteDetector,
+    private val database: RallyTraxDatabase,
 ) {
     companion object {
         private const val TAG = "CommonRouteRepo"
@@ -76,9 +79,9 @@ class CommonRouteRepository @Inject constructor(
                 sampledPoints = sampledPoints,
             )
 
-            // Replace all stored common routes with fresh detection
-            commonRouteDao.deleteAll()
-
+            // Replace all stored common routes with fresh detection. Wrap in
+            // a transaction so a crash between deleteAll and insertCommonRoutes
+            // doesn't leave the user with an empty common-routes table.
             val entities = clusters.map { cluster ->
                 CommonRouteEntity(
                     id = cluster.id,
@@ -98,8 +101,11 @@ class CommonRouteRepository @Inject constructor(
                 )
             }
 
-            if (entities.isNotEmpty()) {
-                commonRouteDao.insertCommonRoutes(entities)
+            database.withTransaction {
+                commonRouteDao.deleteAll()
+                if (entities.isNotEmpty()) {
+                    commonRouteDao.insertCommonRoutes(entities)
+                }
             }
 
             val elapsed = System.currentTimeMillis() - startMs
