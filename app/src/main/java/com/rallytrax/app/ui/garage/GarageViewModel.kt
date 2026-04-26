@@ -55,10 +55,16 @@ class GarageViewModel @Inject constructor(
     val uiState: StateFlow<GarageUiState> = vehicleRepository.getAllVehicles()
         .map { vehicles ->
             val withStats = vehicles.map { vehicle ->
-                val trackCount = vehicleRepository.getTrackCountForVehicle(vehicle.id)
-                val totalDistance = vehicleRepository.getTotalDistanceForVehicle(vehicle.id)
-                val warnings = computeWarnings(vehicle, trackCount)
-                VehicleWithStats(vehicle, trackCount, totalDistance, warnings)
+                // Single SQL round-trip per vehicle for both stats — was two
+                // separate suspend queries on each upstream emission.
+                val stats = vehicleRepository.getStatsForVehicle(vehicle.id)
+                val warnings = computeWarnings(vehicle, stats.trackCount)
+                VehicleWithStats(
+                    vehicle = vehicle,
+                    trackCount = stats.trackCount,
+                    totalDistanceM = stats.totalDistanceMeters,
+                    warnings = warnings,
+                )
             }
             val (loaners, owned) = withStats.partition {
                 Ownership.fromStorage(it.vehicle.ownership) != Ownership.OWNED

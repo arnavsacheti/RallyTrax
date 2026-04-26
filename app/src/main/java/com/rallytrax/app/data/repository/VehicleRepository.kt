@@ -74,6 +74,10 @@ class VehicleRepository @Inject constructor(
     suspend fun getTrackCountForVehicle(vehicleId: String): Int =
         trackDao.getTrackCountForVehicle(vehicleId)
 
+    /** Combined trackCount + totalDistance in a single SQL round-trip. */
+    suspend fun getStatsForVehicle(vehicleId: String): com.rallytrax.app.data.local.dao.VehicleStatsProjection =
+        trackDao.getStatsForVehicle(vehicleId)
+
     suspend fun assignVehicleToTrack(trackId: String, vehicleId: String) {
         val track = trackDao.getTrackById(trackId) ?: return
         trackDao.updateTrack(track.copy(vehicleId = vehicleId))
