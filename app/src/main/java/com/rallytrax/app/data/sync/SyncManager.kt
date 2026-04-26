@@ -310,7 +310,8 @@ class SyncManager @Inject constructor(
                 }
 
                 // Download and parse (outside the DB transaction by design)
-                val bytes = firestoreSyncHelper.downloadGpxFile(trackId) ?: run {
+                val bytes = firestoreSyncHelper.downloadGpxFile(trackId)
+                if (bytes == null) {
                     failedCount++
                     Log.w(TAG, "Download returned null for track $trackId")
                     continue
