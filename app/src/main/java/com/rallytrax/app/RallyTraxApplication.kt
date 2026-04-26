@@ -35,6 +35,12 @@ class RallyTraxApplication : Application(), Configuration.Provider {
             .build()
 
     override fun onCreate() {
+        // super.onCreate() is the generated Hilt entry point — it finishes
+        // graph init and populates @Inject fields (workerFactory, syncManager).
+        // Anything that needs an injected field MUST run after this line, and
+        // anything WorkManager-related MUST run after workManagerConfiguration
+        // can be queried (i.e. after super), since WorkManager.getInstance(...)
+        // calls back into the Configuration.Provider on first use.
         super.onCreate()
 
         // Register every notification channel up-front so first-use of any
@@ -51,9 +57,17 @@ class RallyTraxApplication : Application(), Configuration.Provider {
             userAgentValue = packageName
         }
 
+        // All work-enqueueing is grouped into one method so the order
+        // (super → init steps → enqueue) is obvious at a glance.
+        scheduleStartupWork()
+    }
+
+    private fun scheduleStartupWork() {
+        val workManager = WorkManager.getInstance(this)
+
         // Backfill accel/curvature data for existing tracks (runs once)
         val backfillRequest = OneTimeWorkRequestBuilder<BackfillWorker>().build()
-        WorkManager.getInstance(this).enqueueUniqueWork(
+        workManager.enqueueUniqueWork(
             "backfill_accel_curvature",
             ExistingWorkPolicy.KEEP,
             backfillRequest,
@@ -68,7 +82,7 @@ class RallyTraxApplication : Application(), Configuration.Provider {
         val maintenanceReminderRequest = PeriodicWorkRequestBuilder<com.rallytrax.app.data.maintenance.MaintenanceReminderWorker>(
             1, TimeUnit.DAYS,
         ).build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             com.rallytrax.app.data.maintenance.MaintenanceReminderWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             maintenanceReminderRequest,
@@ -78,7 +92,7 @@ class RallyTraxApplication : Application(), Configuration.Provider {
         val tripDetectionRequest = PeriodicWorkRequestBuilder<com.rallytrax.app.data.trips.TripDetectionWorker>(
             6, TimeUnit.HOURS,
         ).build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             com.rallytrax.app.data.trips.TripDetectionWorker.UNIQUE_PERIODIC_WORK,
             ExistingPeriodicWorkPolicy.KEEP,
             tripDetectionRequest,
@@ -94,7 +108,7 @@ class RallyTraxApplication : Application(), Configuration.Provider {
                     .build()
             )
             .build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             com.rallytrax.app.data.fuel.GasStationCacheWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             gasStationRequest,
