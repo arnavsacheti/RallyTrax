@@ -80,7 +80,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.flowWithLifecycle
 import com.rallytrax.app.data.local.entity.AchievementEntity
 import com.rallytrax.app.ui.auth.GoogleSignInCard
 import com.rallytrax.app.ui.components.GoalRing
@@ -178,10 +181,11 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.snackbarMessage.collect { message ->
-            snackbarHostState.showSnackbar(message)
-        }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel.snackbarMessage, lifecycle) {
+        viewModel.snackbarMessage
+            .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+            .collect { message -> snackbarHostState.showSnackbar(message) }
     }
 
     Scaffold(

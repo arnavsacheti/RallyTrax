@@ -76,7 +76,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.flowWithLifecycle
 import com.rallytrax.app.ui.components.EmptyStateView
 import com.rallytrax.app.ui.components.ShimmerLoadingList
 import com.rallytrax.app.ui.theme.RallyTraxMotion
@@ -132,11 +135,14 @@ fun LibraryScreen(
         uri?.let { viewModel.importGpx(context, it) }
     }
 
-    // Snackbar messages
-    LaunchedEffect(Unit) {
-        viewModel.snackbarMessage.collect { message ->
-            snackbarHostState.showSnackbar(message)
-        }
+    // Snackbar messages — collected only while at least STARTED so a message
+    // emitted while the screen is in the back stack but stopped doesn't queue
+    // up against a hidden snackbar host.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel.snackbarMessage, lifecycle) {
+        viewModel.snackbarMessage
+            .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+            .collect { message -> snackbarHostState.showSnackbar(message) }
     }
 
     // Undo delete snackbar — item disappears immediately, deletion on snackbar expiry
