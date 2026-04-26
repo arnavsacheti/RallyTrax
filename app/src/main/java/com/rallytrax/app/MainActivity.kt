@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -286,10 +287,16 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Auto-install after in-app download completes
+                // Auto-install after in-app download completes. Guarded so we
+                // fire installUpdate exactly once per Activity instance even if
+                // downloadState re-emits DOWNLOADED (avoids flooding PackageInstaller).
                 val downloadState by updateViewModel.downloadState.collectAsStateWithLifecycle()
-                if (downloadState.status == com.rallytrax.app.update.DownloadStatus.DOWNLOADED) {
-                    LaunchedEffect(Unit) {
+                var installTriggered by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(downloadState.status) {
+                    if (downloadState.status == com.rallytrax.app.update.DownloadStatus.DOWNLOADED &&
+                        !installTriggered
+                    ) {
+                        installTriggered = true
                         updateViewModel.installUpdate(this@MainActivity)
                     }
                 }
