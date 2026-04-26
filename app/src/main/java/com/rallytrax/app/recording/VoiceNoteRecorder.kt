@@ -40,15 +40,25 @@ class VoiceNoteRecorder(private val context: Context) {
     }
 
     fun stopRecording(): String? {
+        val r = recorder ?: return null
         return try {
-            recorder?.stop()
-            recorder?.release()
+            try {
+                r.stop()
+                currentFile?.absolutePath
+            } catch (e: Exception) {
+                null
+            } finally {
+                // release() must run even if stop() throws, and even if a
+                // subsequent throw happens we still need recorder = null so a
+                // re-start gets a fresh MediaRecorder instead of a half-dead one.
+                try {
+                    r.release()
+                } catch (_: Exception) {
+                    // ignore — we're tearing down anyway
+                }
+            }
+        } finally {
             recorder = null
-            currentFile?.absolutePath
-        } catch (e: Exception) {
-            recorder?.release()
-            recorder = null
-            null
         }
     }
 
