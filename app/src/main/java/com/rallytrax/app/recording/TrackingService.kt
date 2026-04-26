@@ -7,6 +7,7 @@ import android.content.pm.ServiceInfo
 import android.location.Location
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import androidx.room.withTransaction
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -57,6 +58,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var vehicleDao: com.rallytrax.app.data.local.dao.VehicleDao
     @Inject lateinit var gasStationDetector: com.rallytrax.app.data.fuel.GasStationDetector
     @Inject lateinit var driverProfileDao: com.rallytrax.app.data.local.dao.DriverProfileDao
+    @Inject lateinit var database: com.rallytrax.app.data.local.RallyTraxDatabase
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var notificationManager: TrackingNotificationManager
@@ -398,8 +400,13 @@ class TrackingService : LifecycleService() {
                     )
                 }
                 if (paceNotes.isNotEmpty()) {
-                    paceNoteDao.deleteNotesForTrack(savedId)
-                    paceNoteDao.insertNotes(paceNotes)
+                    // Atomic swap: delete + insert in one transaction so a
+                    // process crash mid-step can't leave the track without
+                    // pace notes.
+                    database.withTransaction {
+                        paceNoteDao.deleteNotesForTrack(savedId)
+                        paceNoteDao.insertNotes(paceNotes)
+                    }
 
                     // Update persistent driver profile with this stint's speed data
                     if (hasSpeedData) {
