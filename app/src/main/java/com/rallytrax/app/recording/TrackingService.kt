@@ -29,6 +29,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -338,8 +339,9 @@ class TrackingService : LifecycleService() {
         _recordingStatus.value = RecordingStatus.STOPPED
 
         lifecycleScope.launch {
-            // Await any in-flight flush from a previous flushBuffer() call
-            pendingFlushJob?.join()
+            // Await any in-flight flush from a previous flushBuffer() call,
+            // bounded so a starved/stuck dispatcher can't hang stop indefinitely.
+            withTimeoutOrNull(5_000L) { pendingFlushJob?.join() }
 
             // Flush remaining buffer
             if (pointBuffer.isNotEmpty()) {
