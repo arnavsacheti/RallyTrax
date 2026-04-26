@@ -352,14 +352,16 @@ abstract class RallyTraxDatabase : RoomDatabase() {
 
         val MIGRATION_14_15 = object : Migration(14, 15) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Check if column already exists (may have been added by a prior dev build)
-                val cursor = db.query("PRAGMA table_info(track_points)")
-                val columns = mutableListOf<String>()
-                val nameIndex = cursor.getColumnIndex("name")
-                while (cursor.moveToNext()) {
-                    columns.add(cursor.getString(nameIndex))
+                // Check if column already exists (may have been added by a prior dev build).
+                // .use { } guarantees the cursor closes even if moveToNext or getString throw.
+                val columns = db.query("PRAGMA table_info(track_points)").use { cursor ->
+                    val names = mutableListOf<String>()
+                    val nameIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        names.add(cursor.getString(nameIndex))
+                    }
+                    names
                 }
-                cursor.close()
                 if ("rollRateDegPerS" !in columns) {
                     db.execSQL("ALTER TABLE track_points ADD COLUMN rollRateDegPerS REAL DEFAULT NULL")
                 }
