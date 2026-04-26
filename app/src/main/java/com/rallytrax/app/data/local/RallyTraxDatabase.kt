@@ -60,7 +60,7 @@ import com.rallytrax.app.data.local.entity.WeatherEntity
         TripSuggestionEntity::class,
         CommonRouteEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = true,
 )
 abstract class RallyTraxDatabase : RoomDatabase() {
@@ -509,6 +509,15 @@ abstract class RallyTraxDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`)
                     )
                 """)
+            }
+        }
+
+        val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Ownership enum stored as TEXT. Existing rows are owned cars
+                // — that's the only thing the Garage tracked before this
+                // migration, so defaulting to OWNED matches user intent.
+                db.execSQL("ALTER TABLE vehicles ADD COLUMN ownership TEXT NOT NULL DEFAULT 'OWNED'")
             }
         }
 

@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rallytrax.app.data.local.entity.Ownership
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,6 +102,29 @@ fun AddVehicleSheet(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
+            // Ownership selector — Borrowed / Rental skip the NHTSA pipeline
+            // and use a slim form, since users adding a friend's car or a
+            // rental don't need EPA MPG or VIN decoding for a one-off trip.
+            Text("Ownership", style = MaterialTheme.typography.labelLarge)
+            Spacer(modifier = Modifier.height(4.dp))
+            val ownerships = listOf(Ownership.OWNED, Ownership.BORROWED, Ownership.RENTED)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                ownerships.forEachIndexed { index, ownership ->
+                    SegmentedButton(
+                        selected = uiState.ownership == ownership,
+                        onClick = { viewModel.updateOwnership(ownership) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = ownerships.size),
+                    ) {
+                        Text(
+                            ownership.name.lowercase().replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Vehicle type selector
             Text("Vehicle Type", style = MaterialTheme.typography.labelLarge)
             Spacer(modifier = Modifier.height(4.dp))
@@ -118,32 +142,37 @@ fun AddVehicleSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Mode selector
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = selectedMode == 0,
-                    onClick = { selectedMode = 0 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    icon = { Icon(Icons.Filled.Search, null, Modifier.size(18.dp)) },
-                ) { Text("Year/Make/Model") }
-                SegmentedButton(
-                    selected = selectedMode == 1,
-                    onClick = { selectedMode = 1 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    icon = { Icon(Icons.Filled.CameraAlt, null, Modifier.size(18.dp)) },
-                ) { Text("Scan or enter VIN") }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (selectedMode == 0) {
-                YearMakeModelPicker(viewModel, uiState)
+            if (uiState.ownership != Ownership.OWNED) {
+                LoanerSlimForm(viewModel, uiState)
             } else {
-                VinEntrySection(viewModel, uiState, onScanClick = { showVinScanner = true })
+                // Mode selector
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = selectedMode == 0,
+                        onClick = { selectedMode = 0 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        icon = { Icon(Icons.Filled.Search, null, Modifier.size(18.dp)) },
+                    ) { Text("Year/Make/Model") }
+                    SegmentedButton(
+                        selected = selectedMode == 1,
+                        onClick = { selectedMode = 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        icon = { Icon(Icons.Filled.CameraAlt, null, Modifier.size(18.dp)) },
+                    ) { Text("Scan or enter VIN") }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (selectedMode == 0) {
+                    YearMakeModelPicker(viewModel, uiState)
+                } else {
+                    VinEntrySection(viewModel, uiState, onScanClick = { showVinScanner = true })
+                }
             }
 
-            // Vehicle name field (visible once model is selected)
-            if (uiState.selectedModel != null) {
+            // Vehicle name field (visible once model is selected). The slim
+            // loaner form already has its own name field, so skip when not OWNED.
+            if (uiState.ownership == Ownership.OWNED && uiState.selectedModel != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = uiState.name,
@@ -155,7 +184,7 @@ fun AddVehicleSheet(
             }
 
             // Fuel type selector
-            if (uiState.selectedModel != null) {
+            if (uiState.ownership == Ownership.OWNED && uiState.selectedModel != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Fuel Type", style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(4.dp))
@@ -175,7 +204,10 @@ fun AddVehicleSheet(
             }
 
             // EPA trim selector (if multiple trims available)
-            if (uiState.trims.size > 1 && uiState.selectedTrim == null) {
+            if (uiState.ownership == Ownership.OWNED &&
+                uiState.trims.size > 1 &&
+                uiState.selectedTrim == null
+            ) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Select trim for EPA data:",
@@ -205,7 +237,7 @@ fun AddVehicleSheet(
             }
 
             // EPA info display
-            if (uiState.epaCombinedMpg != null) {
+            if (uiState.ownership == Ownership.OWNED && uiState.epaCombinedMpg != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     uiState.epaCityMpg?.let {
@@ -353,6 +385,49 @@ private fun YearMakeModelPicker(viewModel: AddVehicleViewModel, state: AddVehicl
             }
         }
     }
+}
+
+@Composable
+private fun LoanerSlimForm(viewModel: AddVehicleViewModel, state: AddVehicleUiState) {
+    // Single nickname is enough to find the entry later in Garage. Year /
+    // make / model are optional free-text — entered once at the rental
+    // counter, never updated, never aggregated.
+    OutlinedTextField(
+        value = state.name,
+        onValueChange = { viewModel.updateName(it) },
+        label = { Text("Nickname") },
+        placeholder = { Text("e.g. Mom's Subaru, Hertz Camry") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = state.slimYear,
+            onValueChange = { viewModel.updateSlimYear(it) },
+            label = { Text("Year") },
+            singleLine = true,
+            modifier = Modifier.width(96.dp),
+        )
+        OutlinedTextField(
+            value = state.slimMake,
+            onValueChange = { viewModel.updateSlimMake(it) },
+            label = { Text("Make") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = state.slimModel,
+        onValueChange = { viewModel.updateSlimModel(it) },
+        label = { Text("Model") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

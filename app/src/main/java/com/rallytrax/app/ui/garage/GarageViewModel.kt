@@ -3,6 +3,7 @@ package com.rallytrax.app.ui.garage
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.local.dao.MaintenanceDao
+import com.rallytrax.app.data.local.entity.Ownership
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.preferences.UserPreferencesData
 import com.rallytrax.app.data.preferences.UserPreferencesRepository
@@ -32,7 +33,12 @@ data class VehicleWithStats(
 )
 
 data class GarageUiState(
+    /** Vehicles the user owns — the canonical Garage list. */
     val vehicles: List<VehicleWithStats> = emptyList(),
+    /** Borrowed friend's-car / rental entries. Rendered in their own
+     *  collapsible section so they don't clutter the Garage but the user
+     *  can still find and edit them. */
+    val loaners: List<VehicleWithStats> = emptyList(),
     val isLoading: Boolean = true,
 )
 
@@ -54,7 +60,10 @@ class GarageViewModel @Inject constructor(
                 val warnings = computeWarnings(vehicle, trackCount)
                 VehicleWithStats(vehicle, trackCount, totalDistance, warnings)
             }
-            GarageUiState(vehicles = withStats, isLoading = false)
+            val (loaners, owned) = withStats.partition {
+                Ownership.fromStorage(it.vehicle.ownership) != Ownership.OWNED
+            }
+            GarageUiState(vehicles = owned, loaners = loaners, isLoading = false)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GarageUiState())
 
@@ -82,14 +91,24 @@ class GarageViewModel @Inject constructor(
     }
 
     private suspend fun computeWarnings(vehicle: VehicleEntity, trackCount: Int): List<VehicleWarning> {
+        // Spec/VIN/maintenance prompts are noise on a borrowed or rental car —
+        // the user isn't filling in EPA MPG for a Hertz Corolla. Only surface
+        // "no tracks" so a stale loaner can still be cleaned up.
+        val isOwned = Ownership.fromStorage(vehicle.ownership) == Ownership.OWNED
         return buildList {
-            if (vehicle.vin.isNullOrBlank()) add(VehicleWarning.MISSING_VIN)
+            if (isOwned && vehicle.vin.isNullOrBlank()) add(VehicleWarning.MISSING_VIN)
             if (trackCount == 0) add(VehicleWarning.NO_TRACKS)
-            if (vehicle.horsePower == null && vehicle.engineDisplacementL == null && vehicle.curbWeightKg == null) {
+            if (isOwned &&
+                vehicle.horsePower == null &&
+                vehicle.engineDisplacementL == null &&
+                vehicle.curbWeightKg == null
+            ) {
                 add(VehicleWarning.INCOMPLETE_SPECS)
             }
-            val dueSchedules = maintenanceDao.getDueSchedulesForVehicle(vehicle.id)
-            if (dueSchedules.isNotEmpty()) add(VehicleWarning.MAINTENANCE_DUE)
+            if (isOwned) {
+                val dueSchedules = maintenanceDao.getDueSchedulesForVehicle(vehicle.id)
+                if (dueSchedules.isNotEmpty()) add(VehicleWarning.MAINTENANCE_DUE)
+            }
         }
     }
 

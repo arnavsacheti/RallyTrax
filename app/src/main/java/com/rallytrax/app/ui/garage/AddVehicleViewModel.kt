@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.rallytrax.app.data.api.FuelEconomyTrim
 import com.rallytrax.app.data.api.NhtsaMake
 import com.rallytrax.app.data.api.NhtsaModel
+import com.rallytrax.app.data.local.entity.Ownership
 import com.rallytrax.app.data.local.entity.VehicleEntity
 import com.rallytrax.app.data.repository.VehicleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,6 +53,14 @@ data class AddVehicleUiState(
     val epaCityMpg: Double? = null,
     val epaHwyMpg: Double? = null,
     val epaCombinedMpg: Double? = null,
+
+    // Ownership. Borrowed/rented entries skip the NHTSA/EPA pipeline and use
+    // free-text year/make/model — a Hertz Corolla doesn't need an EPA trim
+    // lookup, the user just wants the trip on the right car.
+    val ownership: Ownership = Ownership.OWNED,
+    val slimYear: String = "",
+    val slimMake: String = "",
+    val slimModel: String = "",
 
     // Save state
     val isSaving: Boolean = false,
@@ -174,6 +183,22 @@ class AddVehicleViewModel @Inject constructor(
         _uiState.update { it.copy(vehicleType = type) }
     }
 
+    fun updateOwnership(ownership: Ownership) {
+        _uiState.update { it.copy(ownership = ownership) }
+    }
+
+    fun updateSlimYear(year: String) {
+        _uiState.update { it.copy(slimYear = year.filter { c -> c.isDigit() }.take(4)) }
+    }
+
+    fun updateSlimMake(make: String) {
+        _uiState.update { it.copy(slimMake = make) }
+    }
+
+    fun updateSlimModel(model: String) {
+        _uiState.update { it.copy(slimModel = model) }
+    }
+
     fun updateName(name: String) {
         _uiState.update { it.copy(name = name) }
     }
@@ -246,6 +271,10 @@ class AddVehicleViewModel @Inject constructor(
 
     fun saveVehicle() {
         val state = _uiState.value
+        if (state.ownership != Ownership.OWNED) {
+            saveLoanerVehicle(state)
+            return
+        }
         val year = state.selectedYear ?: return
         val make = state.selectedMake?.makeName ?: return
         val model = state.selectedModel?.modelName ?: return
@@ -273,6 +302,7 @@ class AddVehicleViewModel @Inject constructor(
                     epaCityMpg = state.epaCityMpg,
                     epaHwyMpg = state.epaHwyMpg,
                     epaCombinedMpg = state.epaCombinedMpg,
+                    ownership = state.ownership.name,
                 )
                 vehicleRepository.addVehicle(vehicle)
                 _uiState.update { it.copy(isSaving = false, saved = true) }
@@ -283,12 +313,45 @@ class AddVehicleViewModel @Inject constructor(
         }
     }
 
+    private fun saveLoanerVehicle(state: AddVehicleUiState) {
+        val name = state.name.ifBlank {
+            listOf(state.slimYear, state.slimMake, state.slimModel)
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+                .ifBlank { state.ownership.name.lowercase().replaceFirstChar { it.uppercase() } + " car" }
+        }
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            try {
+                val vehicle = VehicleEntity(
+                    name = name,
+                    year = state.slimYear.toIntOrNull() ?: currentYear,
+                    make = state.slimMake.trim().ifBlank { "—" },
+                    model = state.slimModel.trim().ifBlank { "—" },
+                    vehicleType = state.vehicleType,
+                    fuelType = state.fuelType,
+                    ownership = state.ownership.name,
+                )
+                vehicleRepository.addVehicle(vehicle)
+                _uiState.update { it.copy(isSaving = false, saved = true) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save loaner vehicle", e)
+                _uiState.update { it.copy(isSaving = false, saveError = e.message) }
+            }
+        }
+    }
+
     fun canSave(): Boolean {
         val state = _uiState.value
-        return state.selectedYear != null &&
-            state.selectedMake != null &&
-            state.selectedModel != null &&
-            !state.isSaving
+        if (state.isSaving) return false
+        return if (state.ownership == Ownership.OWNED) {
+            state.selectedYear != null &&
+                state.selectedMake != null &&
+                state.selectedModel != null
+        } else {
+            // Loaner: just need a label of some kind so the entry isn't blank.
+            state.name.isNotBlank() || state.slimMake.isNotBlank() || state.slimModel.isNotBlank()
+        }
     }
 
     fun reset() {

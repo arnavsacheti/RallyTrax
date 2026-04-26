@@ -155,7 +155,7 @@ fun GarageScreen(
             }
         },
     ) { innerPadding ->
-        if (uiState.vehicles.isEmpty() && !uiState.isLoading) {
+        if (uiState.vehicles.isEmpty() && uiState.loaners.isEmpty() && !uiState.isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -220,6 +220,34 @@ fun GarageScreen(
                         },
                         enableDismissFromStartToEnd = false,
                     ) {
+                        VehicleCard(
+                            vehicleWithStats = vehicleWithStats,
+                            unitSystem = preferences.unitSystem,
+                            onClick = { onVehicleClick(vehicle.id) },
+                            onLongClick = { viewModel.toggleActiveVehicle(vehicle.id) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+
+                if (uiState.loaners.isNotEmpty()) {
+                    item(key = "loaners-header") {
+                        Text(
+                            text = "Borrowed & rentals",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 4.dp),
+                        )
+                    }
+                    items(
+                        items = uiState.loaners,
+                        key = { it.vehicle.id },
+                    ) { vehicleWithStats ->
+                        val vehicle = vehicleWithStats.vehicle
+                        // No swipe-to-archive for loaners — they're typically
+                        // one-off entries; deletion happens from VehicleDetail.
                         VehicleCard(
                             vehicleWithStats = vehicleWithStats,
                             unitSystem = preferences.unitSystem,

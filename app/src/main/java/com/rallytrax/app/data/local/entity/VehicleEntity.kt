@@ -35,6 +35,13 @@ data class VehicleEntity(
     val wheelDiameter: Double? = null,
     val isActive: Boolean = false,
     val isArchived: Boolean = false,
+    /**
+     * Stored as the [Ownership] enum's `name`. Existing rows pre-migration
+     * default to `OWNED`. BORROWED/RENTED vehicles are excluded from the
+     * Garage default view, maintenance scheduling, and MPG aggregation —
+     * but their drives still attribute to the user's totals.
+     */
+    val ownership: String = "OWNED",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
