@@ -1,5 +1,6 @@
 package com.rallytrax.app.recording
 
+import kotlin.math.abs
 import kotlin.math.cos
 
 /**
@@ -49,6 +50,14 @@ class GpsKalmanFilter {
     /** Process noise spectral density — acceleration variance in deg²/s⁴ */
     // ~3 m/s² typical vehicle acceleration, converted to degrees
     private val processNoiseAccelMps2 = 3.0
+
+    /**
+     * Floor below which the 2x2 innovation covariance determinant is treated
+     * as singular. Variances live in deg² with sigma≈1e-4 deg for a 10m fix,
+     * so det≈1e-16 in normal operation; 1e-20 catches truly degenerate cases
+     * without falsely rejecting tight, well-conditioned fixes.
+     */
+    private val singularDetThreshold = 1e-20
 
     /**
      * Initialize the filter with the first GPS fix.
@@ -120,7 +129,15 @@ class GpsKalmanFilter {
         newP[idx(3, 2)] = P[idx(3, 2)]
         newP[idx(3, 3)] = P[idx(3, 3)]
 
-        // Add process noise Q (continuous white noise acceleration model)
+        // Add process noise Q (continuous white noise acceleration model).
+        // NOTE: noise is added independently along lat and lon, treating the
+        // two axes as uncoupled. A vehicle actually accelerates along its
+        // bearing, so the "true" Q has off-diagonal blocks coupling vLat/vLon
+        // by sin(bearing)·cos(bearing). For typical driving the diagonal
+        // approximation is fine — the velocity update step folds in the
+        // bearing-aware speed measurement, which restores most of the lost
+        // information. See issue #100 for a future bearing-coupled Q rework
+        // and for the empirical test track that should validate it.
         val qLat = processNoiseAccelMps2 / metersPerDegLat
         val mpdLon = metersPerDegLon(x[0]).coerceAtLeast(1.0)
         val qLon = processNoiseAccelMps2 / mpdLon
@@ -182,9 +199,11 @@ class GpsKalmanFilter {
         val s10 = P[idx(1, 0)]
         val s11 = P[idx(1, 1)] + rLon
 
-        // Invert 2x2 S matrix
+        // Invert 2x2 S matrix. Use an epsilon floor — exact-equality on a
+        // float det effectively never triggers, which would let near-singular
+        // matrices slip through and explode 1/det.
         val det = s00 * s11 - s01 * s10
-        if (det == 0.0) return currentEstimate()
+        if (abs(det) < singularDetThreshold) return currentEstimate()
         val invDet = 1.0 / det
         val si00 = s11 * invDet
         val si01 = -s01 * invDet
@@ -255,7 +274,7 @@ class GpsKalmanFilter {
         val s11 = P[idx(3, 3)] + rVLon
 
         val det = s00 * s11 - s01 * s10
-        if (det == 0.0) return
+        if (abs(det) < singularDetThreshold) return
         val invDet = 1.0 / det
         val si00 = s11 * invDet
         val si01 = -s01 * invDet
