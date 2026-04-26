@@ -116,6 +116,13 @@ class ReplayAudioManager(
     private fun requestAudioFocus() {
         if (hasFocus) return
 
+        // Abandon any prior request before building a new one. AUDIOFOCUS_LOSS
+        // flips hasFocus to false but doesn't release the underlying request,
+        // so without this we'd leak the previous AudioFocusRequest each time
+        // we re-acquire focus after another app stole it.
+        focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        focusRequest = null
+
         val attrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -141,6 +148,7 @@ class ReplayAudioManager(
         focusRequest?.let {
             audioManager.abandonAudioFocusRequest(it)
         }
+        focusRequest = null
         hasFocus = false
     }
 
