@@ -26,7 +26,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -104,7 +107,7 @@ private data class SelectionState(
     val isMultiSelectMode: Boolean,
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val trackDao: TrackDao,
@@ -148,15 +151,21 @@ class LibraryViewModel @Inject constructor(
     private val thumbnailFetchMutex = Mutex()
     private val thumbnailsInFlight = mutableSetOf<String>()
 
-    private val allTracks = _searchQuery.flatMapLatest { query ->
-        if (query.isBlank()) {
-            trackDao.getRoutes()
-        } else {
-            trackDao.searchRoutes(query)
+    private val allTracks = _searchQuery
+        // Avoid hammering DAO/search when the user is typing rapidly.
+        .debounce(150)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                trackDao.getRoutes()
+            } else {
+                trackDao.searchRoutes(query)
+            }
         }
-    }.onEach { tracks ->
-        prefetchThumbnails(tracks.map { it.id })
-    }
+        // Don't kick off prefetch on identical re-emissions of the same id set.
+        .distinctUntilChanged { old, new -> old.map { it.id } == new.map { it.id } }
+        .onEach { tracks ->
+            prefetchThumbnails(tracks.map { it.id })
+        }
 
     private val categoryFilters = combine(
         _selectedTags,
