@@ -53,7 +53,15 @@ class SyncManager @Inject constructor(
     private val firestoreSyncHelper: FirestoreSyncHelper,
     private val database: RallyTraxDatabase,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /**
+     * App-lifetime scope. SyncManager is a Hilt @Singleton, so the scope's
+     * job intentionally lives for the process lifetime — there's no shorter
+     * lifecycle to bind to and we want background sync to outlive any single
+     * Activity. Use IO dispatcher because the work is Firestore + Storage I/O,
+     * not main-thread UI updates. SupervisorJob keeps a single failure from
+     * cancelling other launched work (status init, debounce, etc.).
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var debounceJob: Job? = null
 
     private val _syncStatus = MutableStateFlow(SyncStatus())
@@ -65,6 +73,17 @@ class SyncManager @Inject constructor(
             val prefs = preferencesRepository.preferences.first()
             _syncStatus.value = _syncStatus.value.copy(lastSyncTime = prefs.lastSyncTime)
         }
+    }
+
+    /**
+     * Cancel the long-lived scope. Intended for tests (and a future
+     * ProcessLifecycle teardown hook) — production callers should not invoke
+     * this; the singleton is meant to live for the process.
+     */
+    @androidx.annotation.VisibleForTesting
+    fun cancel() {
+        debounceJob?.cancel()
+        scope.coroutineContext[Job]?.cancel()
     }
 
     fun setError(message: String) {
