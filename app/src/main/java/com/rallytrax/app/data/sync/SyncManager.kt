@@ -2,6 +2,7 @@ package com.rallytrax.app.data.sync
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -11,6 +12,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.rallytrax.app.data.gpx.GpxExporter
 import com.rallytrax.app.data.gpx.TrackImporter
+import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
@@ -49,6 +51,7 @@ class SyncManager @Inject constructor(
     private val maintenanceDao: MaintenanceDao,
     private val fuelLogDao: FuelLogDao,
     private val firestoreSyncHelper: FirestoreSyncHelper,
+    private val database: RallyTraxDatabase,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var debounceJob: Job? = null
@@ -282,13 +285,17 @@ class SyncManager @Inject constructor(
                 val bytes = firestoreSyncHelper.downloadGpxFile(trackId) ?: continue
                 val result = TrackImporter.import(ByteArrayInputStream(bytes))
 
-                // Insert track, points, and pace notes
-                trackDao.insertTrack(result.track)
-                result.points.chunked(1000).forEach { chunk ->
-                    trackPointDao.insertPoints(chunk)
-                }
-                if (result.paceNotes.isNotEmpty()) {
-                    paceNoteDao.insertNotes(result.paceNotes)
+                // Insert track, points, and pace notes atomically — a crash
+                // mid-loop must not leave a track without its points (or
+                // points without a parent track).
+                database.withTransaction {
+                    trackDao.insertTrack(result.track)
+                    result.points.chunked(1000).forEach { chunk ->
+                        trackPointDao.insertPoints(chunk)
+                    }
+                    if (result.paceNotes.isNotEmpty()) {
+                        paceNoteDao.insertNotes(result.paceNotes)
+                    }
                 }
 
                 restoredCount++

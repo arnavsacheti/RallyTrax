@@ -29,6 +29,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -781,5 +783,17 @@ class TrackingService : LifecycleService() {
         voiceNoteRecorder?.stopRecording()
         voiceNoteRecorder = null
         fusedLocationClient.removeLocationUpdates(locationCallback)
+        // Drain in-flight DB flush and any unflushed buffered points so a
+        // rapid stop+destroy (or system-initiated teardown) doesn't lose GPS
+        // data. Bounded so we never block teardown for more than 5 s.
+        runBlocking {
+            withTimeoutOrNull(5_000L) {
+                pendingFlushJob?.join()
+                if (pointBuffer.isNotEmpty()) {
+                    trackPointDao.insertPoints(pointBuffer.toList())
+                    pointBuffer.clear()
+                }
+            }
+        }
     }
 }
