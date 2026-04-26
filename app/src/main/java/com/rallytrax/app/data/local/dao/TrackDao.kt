@@ -8,6 +8,11 @@ import androidx.room.Update
 import com.rallytrax.app.data.local.entity.TrackEntity
 import kotlinx.coroutines.flow.Flow
 
+data class VehicleStatsProjection(
+    val trackCount: Int,
+    val totalDistanceMeters: Double,
+)
+
 @Dao
 interface TrackDao {
 
@@ -66,6 +71,17 @@ interface TrackDao {
 
     @Query("SELECT COUNT(*) FROM tracks WHERE vehicleId = :vehicleId")
     suspend fun getTrackCountForVehicle(vehicleId: String): Int
+
+    /**
+     * Combined stats projection — one query instead of two, used by Garage
+     * list rendering where every emission re-evaluates per-vehicle stats.
+     */
+    @Query(
+        "SELECT COUNT(*) AS trackCount, " +
+            "COALESCE(SUM(distanceMeters), 0.0) AS totalDistanceMeters " +
+            "FROM tracks WHERE vehicleId = :vehicleId",
+    )
+    suspend fun getStatsForVehicle(vehicleId: String): VehicleStatsProjection
 
     // --- Aggregation queries for four-phase activity lifecycle ---
 
