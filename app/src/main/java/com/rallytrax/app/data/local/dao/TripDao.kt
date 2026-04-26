@@ -57,6 +57,14 @@ interface TripDao {
     @Update
     suspend fun updateTrip(trip: TripEntity)
 
+    /**
+     * Atomically bump only `updatedAt`. Used after assigning a track to a
+     * trip so we don't have to round-trip the whole row through a Flow read,
+     * which would race with concurrent edits.
+     */
+    @Query("UPDATE trips SET updatedAt = :updatedAt WHERE id = :tripId")
+    suspend fun touchTrip(tripId: String, updatedAt: Long)
+
     @Delete
     suspend fun deleteTrip(trip: TripEntity)
 }
