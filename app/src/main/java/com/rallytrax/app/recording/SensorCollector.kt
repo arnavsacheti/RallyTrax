@@ -23,7 +23,8 @@ class SensorCollector(context: Context) : SensorEventListener {
         val barometerAltitudeM: Double?, // altitude from pressure sensor
     )
 
-    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        ?: error("SENSOR_SERVICE unavailable on this device")
 
     private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
     private val gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
