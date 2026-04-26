@@ -1,6 +1,7 @@
 package com.rallytrax.app.di
 
 import android.content.Context
+import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.FuelLogDao
 import com.rallytrax.app.data.local.dao.MaintenanceDao
 import com.rallytrax.app.data.local.dao.PaceNoteDao
@@ -33,6 +34,7 @@ object SyncModule {
         maintenanceDao: MaintenanceDao,
         fuelLogDao: FuelLogDao,
         firestoreSyncHelper: FirestoreSyncHelper,
+        database: RallyTraxDatabase,
     ): SyncManager = SyncManager(
         context,
         preferencesRepository,
@@ -43,5 +45,6 @@ object SyncModule {
         maintenanceDao,
         fuelLogDao,
         firestoreSyncHelper,
+        database,
     )
 }
