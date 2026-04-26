@@ -1,11 +1,12 @@
 package com.rallytrax.app.data.repository
 
+import androidx.room.withTransaction
+import com.rallytrax.app.data.local.RallyTraxDatabase
 import com.rallytrax.app.data.local.dao.TrackDao
 import com.rallytrax.app.data.local.dao.TripDao
 import com.rallytrax.app.data.local.entity.TrackEntity
 import com.rallytrax.app.data.local.entity.TripEntity
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,6 +14,7 @@ import javax.inject.Singleton
 class TripRepository @Inject constructor(
     private val tripDao: TripDao,
     private val trackDao: TrackDao,
+    private val database: RallyTraxDatabase,
 ) {
     fun getAllTrips(): Flow<List<TripEntity>> = tripDao.getAllTrips()
 
@@ -45,10 +47,15 @@ class TripRepository @Inject constructor(
     }
 
     suspend fun assignTrackToTrip(trackId: String, tripId: String?) {
-        trackDao.updateTripId(trackId, tripId)
-        if (tripId != null) {
-            val trip = tripDao.getTripById(tripId).first()
-            trip?.let { tripDao.updateTrip(it.copy(updatedAt = System.currentTimeMillis())) }
+        // Both writes happen in a single transaction so a concurrent edit
+        // can't slip between them, and the trip's updatedAt is bumped via a
+        // targeted UPDATE — no read-then-write round-trip that could race
+        // with another writer or the trip being deleted.
+        database.withTransaction {
+            trackDao.updateTripId(trackId, tripId)
+            if (tripId != null) {
+                tripDao.touchTrip(tripId, System.currentTimeMillis())
+            }
         }
     }
 
