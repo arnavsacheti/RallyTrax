@@ -44,6 +44,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import com.rallytrax.app.recording.RecordingStatus
 import javax.inject.Inject
 
 data class ReplayUiState(
@@ -255,6 +257,22 @@ class ReplayViewModel @Inject constructor(
                 isOffRoute = false,
                 progressFraction = 0f,
             )
+
+            // Confirm the service actually transitioned to RECORDING within
+            // a reasonable window. If it didn't (service crashed, permissions
+            // revoked, foreground promotion failed), surface an error so the
+            // user knows their stint is NOT being captured rather than silently
+            // discovering it post-replay.
+            launch {
+                val started = withTimeoutOrNull(5_000L) {
+                    TrackingService.recordingStatus.first { it == RecordingStatus.RECORDING }
+                }
+                if (started == null) {
+                    _uiState.value = _uiState.value.copy(
+                        error = "Couldn't start the recording service — replay will run but no stint will be saved.",
+                    )
+                }
+            }
         }
     }
 
