@@ -59,7 +59,8 @@ class AuthRepository @Inject constructor(
                 ?: return Result.failure<AuthUser>(Exception("Sign-in succeeded but no user returned")).also {
                     _authState.value = AuthState.Error("No user returned from Firebase")
                 }
-            Log.d(TAG, "Firebase sign-in succeeded for ${user.email}")
+            // Don't log user.email — it's PII. uid is sufficient for diagnostics.
+            Log.d(TAG, "Firebase sign-in succeeded (uid=${user.uid})")
             _authState.value = AuthState.SignedIn(user)
             Result.success(user)
         } catch (e: GetCredentialCancellationException) {
