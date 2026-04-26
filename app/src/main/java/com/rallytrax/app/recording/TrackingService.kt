@@ -65,6 +65,8 @@ class TrackingService : LifecycleService() {
     private var accumulatedTimeMs: Long = 0L
     private var timerStartMs: Long = 0L
     private var lastLocation: Location? = null
+    private var lastFilteredLat: Double = Double.NaN
+    private var lastFilteredLon: Double = Double.NaN
     private var previousElevation: Double? = null
     private var totalDistance: Double = 0.0
     private var maxSpeed: Double = 0.0
@@ -449,14 +451,15 @@ class TrackingService : LifecycleService() {
         minLon = minOf(minLon, location.longitude)
         maxLon = maxOf(maxLon, location.longitude)
 
-        // Distance from filtered positions (skip first point of new segment)
-        if (!isNewSegment && lastLocation != null) {
-            val delta = lastLocation!!.distanceTo(location)
-            // Filter out GPS jumps (> 100 m/s which is 360 km/h)
-            if (delta / 1.0 < 100.0) {
-                totalDistance += delta
-            }
+        // Distance from Kalman-filtered positions — the filter's Mahalanobis
+        // gate ignores jump fixes, so distance won't spike on a single bad fix.
+        if (!isNewSegment && !lastFilteredLat.isNaN()) {
+            val out = FloatArray(1)
+            Location.distanceBetween(lastFilteredLat, lastFilteredLon, filtered.lat, filtered.lon, out)
+            totalDistance += out[0]
         }
+        lastFilteredLat = filtered.lat
+        lastFilteredLon = filtered.lon
 
         // Speed — use Kalman-filtered speed for smoother stats
         val speed = if (rawSpeed != null && rawSpeed > 0) rawSpeed else filtered.speedMps
