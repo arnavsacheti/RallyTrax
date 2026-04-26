@@ -197,16 +197,54 @@ class SyncManager @Inject constructor(
         }
 
         val garageJson = garageData.toJson()
-        val garageMd5 = FirestoreSyncHelper.md5Hash(garageJson)
-
+        val localMd5 = FirestoreSyncHelper.md5Hash(garageJson)
         val remoteMd5 = firestoreSyncHelper.getGarageMd5()
-        if (garageMd5 == remoteMd5) {
-            Log.d(TAG, "Garage data unchanged — skipping upload")
-            return
-        }
+        val baselineMd5 = preferencesRepository.preferences.first().lastSyncedGarageMd5
 
-        firestoreSyncHelper.setGarageData(garageJson)
-        Log.d(TAG, "Garage data backed up successfully")
+        // Three-way conflict detection. The previous logic was a plain
+        // last-writer-wins on a full JSON blob — if both sides moved away
+        // from the baseline independently, the local push silently
+        // overwrote the remote changes. Compare against the baseline so we
+        // can tell which side(s) changed:
+        val localChanged = localMd5 != baselineMd5
+        val remoteChanged = remoteMd5 != null && remoteMd5 != baselineMd5
+
+        when {
+            !localChanged && !remoteChanged -> {
+                // Both sides match the baseline — nothing to do.
+                Log.d(TAG, "Garage data unchanged — skipping upload")
+            }
+            localChanged && !remoteChanged -> {
+                // Only local diverged — push.
+                firestoreSyncHelper.setGarageData(garageJson)
+                preferencesRepository.setLastSyncedGarageMd5(localMd5)
+                Log.d(TAG, "Garage data backed up successfully")
+            }
+            !localChanged && remoteChanged -> {
+                // Only remote diverged — surface so user can pull (download
+                // path lives outside this method; for now we record the
+                // remote hash as the new baseline so we don't loop on this).
+                _syncStatus.value = _syncStatus.value.copy(
+                    error = "Remote garage changed — pull or resolve in settings.",
+                )
+                Log.w(TAG, "Garage diverged remotely (baseline=$baselineMd5 remote=$remoteMd5); not auto-pushing")
+            }
+            else -> {
+                // Both diverged from the baseline AND the result still
+                // differs — this is a real conflict. Refuse to clobber.
+                if (localMd5 == remoteMd5) {
+                    // Identical drift on both sides; record the common hash
+                    // as the new baseline so we converge on the next sync.
+                    preferencesRepository.setLastSyncedGarageMd5(localMd5)
+                    Log.d(TAG, "Garage drifted identically on both sides; baseline updated")
+                } else {
+                    _syncStatus.value = _syncStatus.value.copy(
+                        error = "Garage data conflict — local and remote both changed.",
+                    )
+                    Log.w(TAG, "Garage conflict (baseline=$baselineMd5 local=$localMd5 remote=$remoteMd5); user must resolve")
+                }
+            }
+        }
     }
 
     /**

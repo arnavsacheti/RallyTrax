@@ -68,6 +68,13 @@ data class UserPreferencesData(
     val backupTracksEnabled: Boolean = false,
     val drivePageToken: String? = null,
     val signedInEmail: String? = null,
+    /**
+     * MD5 of the garage JSON the last time we successfully synced. Used by
+     * SyncManager.backupGarageData to detect three-way divergence:
+     * if both local and remote have moved away from this baseline, we have
+     * a real conflict and surface it instead of silently clobbering.
+     */
+    val lastSyncedGarageMd5: String? = null,
     // Rugged mode
     val ruggedModeEnabled: Boolean = false,
     val ruggedModeExpiresAt: Long? = null, // epoch millis, null = "until turned off"
@@ -102,6 +109,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val BACKUP_TRACKS_ENABLED = booleanPreferencesKey("backup_tracks_enabled")
         val DRIVE_PAGE_TOKEN = stringPreferencesKey("drive_page_token")
         val SIGNED_IN_EMAIL = stringPreferencesKey("signed_in_email")
+        val LAST_SYNCED_GARAGE_MD5 = stringPreferencesKey("last_synced_garage_md5")
         // Rugged mode
         val RUGGED_MODE_ENABLED = booleanPreferencesKey("rugged_mode_enabled")
         val RUGGED_MODE_EXPIRES_AT = longPreferencesKey("rugged_mode_expires_at")
@@ -149,6 +157,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             backupTracksEnabled = prefs[Keys.BACKUP_TRACKS_ENABLED] ?: false,
             drivePageToken = prefs[Keys.DRIVE_PAGE_TOKEN],
             signedInEmail = prefs[Keys.SIGNED_IN_EMAIL],
+            lastSyncedGarageMd5 = prefs[Keys.LAST_SYNCED_GARAGE_MD5],
             ruggedModeEnabled = prefs[Keys.RUGGED_MODE_ENABLED] ?: false,
             ruggedModeExpiresAt = prefs[Keys.RUGGED_MODE_EXPIRES_AT],
             weatherApiKey = prefs[Keys.WEATHER_API_KEY],
@@ -231,6 +240,16 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setLastSyncTime(time: Long) {
         dataStore.edit { it[Keys.LAST_SYNC_TIME] = time }
+    }
+
+    suspend fun setLastSyncedGarageMd5(md5: String?) {
+        dataStore.edit {
+            if (md5 != null) {
+                it[Keys.LAST_SYNCED_GARAGE_MD5] = md5
+            } else {
+                it.remove(Keys.LAST_SYNCED_GARAGE_MD5)
+            }
+        }
     }
 
     suspend fun setBackupTracksEnabled(enabled: Boolean) {
