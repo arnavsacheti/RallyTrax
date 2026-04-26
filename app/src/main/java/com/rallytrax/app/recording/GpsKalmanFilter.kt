@@ -216,26 +216,9 @@ class GpsKalmanFilter {
             x[i] += k[i * 2 + 0] * yLat + k[i * 2 + 1] * yLon
         }
 
-        // Covariance update: P = (I - K*H) * P
-        val newP = DoubleArray(16)
-        for (i in 0..3) {
-            for (j in 0..3) {
-                var sum = 0.0
-                // (I - K*H)[i][m] * P[m][j]
-                for (m in 0..3) {
-                    val ikh = if (i == m) 1.0 else 0.0
-                    // K*H: k[i,0]*H[0,m] + k[i,1]*H[1,m]
-                    val kh = when (m) {
-                        0 -> k[i * 2 + 0]
-                        1 -> k[i * 2 + 1]
-                        else -> 0.0
-                    }
-                    sum += (ikh - kh) * P[idx(m, j)]
-                }
-                newP[idx(i, j)] = sum
-            }
-        }
-        System.arraycopy(newP, 0, P, 0, 16)
+        // Joseph-form covariance update. Position measurement observes states
+        // 0 (lat) and 1 (lon); R = diag(rLat, rLon).
+        josephUpdate(k, c0 = 0, c1 = 1, r0 = rLat, r1 = rLon)
 
         // If speed+bearing available, also fold in velocity observation
         if (speedMps != null && bearingDeg != null && speedMps > 0.5) {
@@ -291,20 +274,51 @@ class GpsKalmanFilter {
             x[i] += k[i * 2 + 0] * yVLat + k[i * 2 + 1] * yVLon
         }
 
+        // Joseph-form covariance update. Velocity measurement observes states
+        // 2 (vLat) and 3 (vLon); R = diag(rVLat, rVLon).
+        josephUpdate(k, c0 = 2, c1 = 3, r0 = rVLat, r1 = rVLon)
+    }
+
+    /**
+     * Joseph-form covariance update for a 2-row measurement matrix H that
+     * selects two state indices [c0, c1] (i.e. H[0,c0]=H[1,c1]=1, rest 0)
+     * with diagonal measurement noise R = diag(r0, r1).
+     *
+     *   P ← (I − K·H)·P·(I − K·H)ᵀ + K·R·Kᵀ
+     *
+     * Symmetric and positive-semidefinite-preserving across many updates,
+     * unlike the simpler (I − K·H)·P form which can drift on long sessions
+     * and produce a non-PSD P that quietly poisons subsequent gains.
+     *
+     * Sparsity of H lets us skip the explicit matrix multiply: for these
+     * selectors,
+     *   (I − K·H)[i,m] = δ_{im} − K[i,0]·δ_{m,c0} − K[i,1]·δ_{m,c1}
+     * which collapses each Σₘ into three terms instead of four.
+     */
+    private fun josephUpdate(k: DoubleArray, c0: Int, c1: Int, r0: Double, r1: Double) {
+        // Step 1: M = (I − K·H) · P
+        val m = DoubleArray(16)
+        for (i in 0..3) {
+            val ki0 = k[i * 2 + 0]
+            val ki1 = k[i * 2 + 1]
+            for (j in 0..3) {
+                m[idx(i, j)] = P[idx(i, j)] - ki0 * P[idx(c0, j)] - ki1 * P[idx(c1, j)]
+            }
+        }
+        // Step 2: P_new = M · (I − K·H)ᵀ + K·R·Kᵀ
         val newP = DoubleArray(16)
         for (i in 0..3) {
+            val ki0 = k[i * 2 + 0]
+            val ki1 = k[i * 2 + 1]
             for (j in 0..3) {
-                var sum = 0.0
-                for (m in 0..3) {
-                    val ikh = if (i == m) 1.0 else 0.0
-                    val kh = when (m) {
-                        2 -> k[i * 2 + 0]
-                        3 -> k[i * 2 + 1]
-                        else -> 0.0
-                    }
-                    sum += (ikh - kh) * P[idx(m, j)]
-                }
-                newP[idx(i, j)] = sum
+                val kj0 = k[j * 2 + 0]
+                val kj1 = k[j * 2 + 1]
+                newP[idx(i, j)] =
+                    m[idx(i, j)] -
+                        kj0 * m[idx(i, c0)] -
+                        kj1 * m[idx(i, c1)] +
+                        ki0 * r0 * kj0 +
+                        ki1 * r1 * kj1
             }
         }
         System.arraycopy(newP, 0, P, 0, 16)

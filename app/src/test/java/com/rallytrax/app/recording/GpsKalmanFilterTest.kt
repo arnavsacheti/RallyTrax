@@ -53,6 +53,41 @@ class GpsKalmanFilterTest {
     }
 
     @Test
+    fun `covariance stays symmetric across many updates (Joseph form)`() {
+        val filter = GpsKalmanFilter()
+        val pField = GpsKalmanFilter::class.java.getDeclaredField("P").apply { isAccessible = true }
+
+        var t = 0L
+        filter.update(lat = 47.0, lon = 8.0, accuracyM = 5f, speedMps = 10.0, bearingDeg = 90.0, timestampMs = t)
+
+        var worstAsymmetry = 0.0
+        repeat(2_000) { i ->
+            t += 200
+            // Driving east at ~10 m/s with mild Gaussian-ish jitter.
+            val lon = 8.0 + (i + 1) * 200.0 / 1000.0 * 1.317e-4
+            val jitter = ((i * 31 % 7) - 3) * 1e-6
+            filter.update(
+                lat = 47.0 + jitter,
+                lon = lon + jitter,
+                accuracyM = 5f,
+                speedMps = 10.0,
+                bearingDeg = 90.0,
+                timestampMs = t,
+            )
+            val p = pField.get(filter) as DoubleArray
+            for (a in 0..3) for (b in (a + 1)..3) {
+                val asym = Math.abs(p[a * 4 + b] - p[b * 4 + a])
+                val mag = Math.abs(p[a * 4 + b]) + Math.abs(p[b * 4 + a]) + 1e-30
+                worstAsymmetry = maxOf(worstAsymmetry, asym / mag)
+            }
+        }
+        // Joseph form should keep relative asymmetry at floating-point noise.
+        // The naïve (I-KH)P form drifts by orders of magnitude over thousands
+        // of updates.
+        assertTrue("P drifted from symmetric (relative asym=$worstAsymmetry)", worstAsymmetry < 1e-9)
+    }
+
+    @Test
     fun `longitude velocity covariance grows linearly with dt (regression for q2Lon dt squared bug)`() {
         // Before the fix, P[3,3] grew quadratically with dt during predict,
         // diverging from P[2,2]. After the fix they should grow at the same
