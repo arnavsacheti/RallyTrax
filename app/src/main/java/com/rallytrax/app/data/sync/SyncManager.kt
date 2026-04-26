@@ -291,7 +291,16 @@ class SyncManager @Inject constructor(
     suspend fun restoreTracks(): Int = withContext(Dispatchers.IO) {
         val trackIds = firestoreSyncHelper.listBackedUpTrackIds()
         var restoredCount = 0
+        var failedCount = 0
 
+        // Orphan-prevention contract for restore failures:
+        //   * download or parse failure throws BEFORE any DAO write — caught
+        //     by the surrounding catch and the loop moves to the next track
+        //     with no DB state mutated. Network/parse intentionally live
+        //     outside the transaction since they don't touch SQLite.
+        //   * a write inside withTransaction that fails rolls back the
+        //     entire track + points + pace-note insert as one unit.
+        // Either way: a partially-imported track is not possible.
         for (trackId in trackIds) {
             try {
                 // Skip if track already exists locally
@@ -300,13 +309,15 @@ class SyncManager @Inject constructor(
                     continue
                 }
 
-                // Download and parse
-                val bytes = firestoreSyncHelper.downloadGpxFile(trackId) ?: continue
+                // Download and parse (outside the DB transaction by design)
+                val bytes = firestoreSyncHelper.downloadGpxFile(trackId) ?: run {
+                    failedCount++
+                    Log.w(TAG, "Download returned null for track $trackId")
+                    continue
+                }
                 val result = TrackImporter.import(ByteArrayInputStream(bytes))
 
-                // Insert track, points, and pace notes atomically — a crash
-                // mid-loop must not leave a track without its points (or
-                // points without a parent track).
+                // Atomic per-track insert (track + points + pace notes).
                 database.withTransaction {
                     trackDao.insertTrack(result.track)
                     result.points.chunked(1000).forEach { chunk ->
@@ -320,11 +331,16 @@ class SyncManager @Inject constructor(
                 restoredCount++
                 Log.d(TAG, "Restored track: $trackId")
             } catch (e: Exception) {
+                failedCount++
                 Log.w(TAG, "Failed to restore track $trackId", e)
             }
         }
 
-        Log.d(TAG, "Restore complete: $restoredCount tracks restored from ${trackIds.size} files")
+        Log.d(
+            TAG,
+            "Restore complete: $restoredCount restored, $failedCount failed " +
+                "from ${trackIds.size} files",
+        )
         restoredCount
     }
 
