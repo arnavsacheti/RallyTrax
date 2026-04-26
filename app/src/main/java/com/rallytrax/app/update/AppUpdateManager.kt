@@ -104,11 +104,30 @@ class AppUpdateManager @Inject constructor(
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(receiver, filter)
+        // RECEIVER_EXPORTED is required (not RECEIVER_NOT_EXPORTED): the
+        // DownloadManager.ACTION_DOWNLOAD_COMPLETE broadcast is sent by the
+        // system but is NOT a protected broadcast, so on API 33+ a receiver
+        // registered with NOT_EXPORTED would never fire. The receiver is
+        // anonymous, registered dynamically, and unregistered as soon as the
+        // download terminates (success or failure) — there's no manifest
+        // entry, so the export only affects this transient registration.
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                context.registerReceiver(receiver, filter)
+            }
+        } catch (e: Exception) {
+            // Registration can fail under quota / SecurityException edge
+            // cases. Drop the field reference and surface the error so we
+            // don't leave a dangling BroadcastReceiver that the next
+            // startDownload would clobber.
+            receiver = null
+            _state.value = DownloadState(
+                status = DownloadStatus.ERROR,
+                errorMessage = "Couldn't register download receiver: ${e.message}",
+            )
         }
     }
 
