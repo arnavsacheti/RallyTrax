@@ -27,6 +27,17 @@ class GpsKalmanFilter {
     private var lastTimestampMs: Long = 0L
     private var initialized = false
 
+    /**
+     * Chi-squared 99.9% threshold for 2 dof. Position innovations with
+     * Mahalanobis² above this are treated as outliers (tunnels, ferries, hot
+     * starts, multipath jumps) and skipped — predict still advanced the state
+     * and inflated covariance, so the next inlier fix snaps us back quickly.
+     */
+    private val innovationGateChiSq2dof = 13.82
+
+    var rejectedOutlierCount: Int = 0
+        private set
+
     /** Metres per degree latitude (approximately constant) */
     private val metersPerDegLat = 111_320.0
 
@@ -124,7 +135,7 @@ class GpsKalmanFilter {
         newP[idx(1, 1)] += q2Lon * dt * dt * dt / 3.0
         newP[idx(1, 3)] += q2Lon * dt * dt / 2.0
         newP[idx(3, 1)] += q2Lon * dt * dt / 2.0
-        newP[idx(3, 3)] += q2Lon * dt * dt
+        newP[idx(3, 3)] += q2Lon * dt
 
         System.arraycopy(newP, 0, P, 0, 16)
 
@@ -179,6 +190,17 @@ class GpsKalmanFilter {
         val si01 = -s01 * invDet
         val si10 = -s10 * invDet
         val si11 = s00 * invDet
+
+        // Innovation gating: reject outlier fixes whose Mahalanobis² exceeds
+        // the 99.9% χ² bound. S already includes R, so this scales naturally
+        // with reported GPS accuracy — a 100 m-accuracy fix has to be that
+        // much further off to be rejected.
+        val mahalanobisSq =
+            yLat * yLat * si00 + 2.0 * yLat * yLon * si01 + yLon * yLon * si11
+        if (mahalanobisSq > innovationGateChiSq2dof) {
+            rejectedOutlierCount++
+            return currentEstimate()
+        }
 
         // Kalman gain: K = P * H^T * S^-1 (4x2 matrix)
         val k = DoubleArray(8)
@@ -310,6 +332,7 @@ class GpsKalmanFilter {
         x = doubleArrayOf(0.0, 0.0, 0.0, 0.0)
         P = DoubleArray(16)
         lastTimestampMs = 0L
+        rejectedOutlierCount = 0
     }
 
     /** Row-major index into 4x4 matrix stored as flat array. */
