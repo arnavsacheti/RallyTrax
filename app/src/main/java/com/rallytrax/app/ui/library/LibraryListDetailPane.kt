@@ -21,6 +21,7 @@ import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +32,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.rallytrax.app.navigation.TrackDetailRoute
 import com.rallytrax.app.ui.trackdetail.TrackDetailScreen
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
@@ -72,6 +75,15 @@ fun LibraryListDetailPane(
 
     val selectedTrackId = navigator.currentDestination?.contentKey
     LaunchedEffect(selectedTrackId) {
+        // Wait for the detail-pane NavHost to set its graph before issuing
+        // any navigate command. On compact widths the detail pane lives in
+        // an AnimatedPane that defers composition while the list is shown,
+        // so detailNavController.graph isn't valid until the back-stack
+        // entry first appears. Reading .graph before that throws
+        // IllegalStateException ("graph is not set").
+        snapshotFlow { detailNavController.currentBackStackEntry }
+            .filterNotNull()
+            .first()
         val target: Any = if (selectedTrackId != null) {
             TrackDetailRoute(selectedTrackId)
         } else {
