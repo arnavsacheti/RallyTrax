@@ -167,6 +167,13 @@ class RecordingScreen(
                 )
             }
             RecordingStatus.RECORDING -> {
+                // Keep the in-drive primary strip to two critical actions
+                // (Pause + Stop). Adding Fuel Stop here pushed the total
+                // simultaneous action count above what's safely glanceable
+                // while driving and risked sub-76dp touch targets on smaller
+                // heads-up displays. Fuel Stop is still markable from the
+                // phone and from Settings; it doesn't need to be in the
+                // primary in-drive strip.
                 actionStripBuilder.addAction(
                     Action.Builder()
                         .setTitle("Pause")
@@ -178,12 +185,6 @@ class RecordingScreen(
                         .setTitle("Stop")
                         .setBackgroundColor(CarColor.RED)
                         .setOnClickListener { stopRecording() }
-                        .build()
-                )
-                actionStripBuilder.addAction(
-                    Action.Builder()
-                        .setTitle("Fuel Stop")
-                        .setOnClickListener { markSegment("fuel") }
                         .build()
                 )
             }
@@ -280,11 +281,4 @@ class RecordingScreen(
         }
     }
 
-    private fun markSegment(type: String) {
-        val intent = Intent(carContext, TrackingService::class.java).apply {
-            action = TrackingService.ACTION_MARK_SEGMENT
-            putExtra(TrackingService.EXTRA_SEGMENT_TYPE, type)
-        }
-        carContext.startService(intent)
-    }
 }
