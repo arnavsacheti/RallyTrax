@@ -149,13 +149,18 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
+        # Phone flavor only — that's what we publish via GitHub Releases.
+        # The automotive flavor needs a separate Play Store / OEM channel
+        # and isn't part of the side-loadable APK release flow.
+        run: ./gradlew assemblePhoneRelease
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: app/build/outputs/apk/release/*.apk
+          # Path includes the flavor segment (`phone`) introduced when the
+          # `phone` / `automotive` product flavors were added.
+          path: app/build/outputs/apk/phone/release/*.apk
 
   # ── Publish: tag, release notes, GitHub Release ─────────────────────────
   publish:
