@@ -32,4 +32,7 @@ interface TrackPointDao {
 
     @Query("DELETE FROM track_points WHERE trackId = :trackId")
     suspend fun deletePointsForTrack(trackId: String)
+
+    @Query("DELETE FROM track_points WHERE trackId = :trackId AND (`index` < :startIndex OR `index` > :endIndex)")
+    suspend fun deletePointsOutsideRange(trackId: String, startIndex: Int, endIndex: Int)
 }

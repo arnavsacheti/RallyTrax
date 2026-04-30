@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
@@ -149,6 +150,7 @@ fun TrackDetailScreen(
     onBack: () -> Unit,
     onReplay: (String) -> Unit = {},
     onEdit: (String) -> Unit = {},
+    onCrop: (String) -> Unit = {},
     onViewAllSegments: () -> Unit = {},
     onSegmentClick: (String) -> Unit = {},
     viewModel: TrackDetailViewModel = hiltViewModel(),
@@ -199,6 +201,14 @@ fun TrackDetailScreen(
                                     uiState.track?.let { onEdit(it.id) }
                                 },
                                 leadingIcon = { Icon(Icons.Filled.Edit, null) },
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Crop Stint") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    uiState.track?.let { onCrop(it.id) }
+                                },
+                                leadingIcon = { Icon(Icons.Filled.ContentCut, null) },
                             )
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text("Share Activity") },

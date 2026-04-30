@@ -24,6 +24,7 @@ import com.rallytrax.app.ui.trackdetail.EditTrackScreen
 import com.rallytrax.app.ui.replay.ReplayScreen
 import com.rallytrax.app.ui.replay.ReplayHudScreen
 import com.rallytrax.app.ui.settings.SettingsScreen
+import com.rallytrax.app.ui.trackdetail.CropStintScreen
 import com.rallytrax.app.ui.trackdetail.TrackDetailScreen
 
 @Composable
@@ -241,6 +242,9 @@ fun RallyTraxNavHost(
                 onEdit = { trackId ->
                     navController.navigate(EditTrackRoute(trackId))
                 },
+                onCrop = { trackId ->
+                    navController.navigate(CropStintRoute(trackId))
+                },
                 onViewAllSegments = {
                     navController.navigate(SegmentsListRoute)
                 },
@@ -275,6 +279,12 @@ fun RallyTraxNavHost(
                         popUpTo<HomeRoute> { inclusive = false }
                     }
                 },
+            )
+        }
+        composable<CropStintRoute> {
+            CropStintScreen(
+                onBack = { navController.popBackStack() },
+                onCropComplete = { navController.popBackStack() },
             )
         }
     }
